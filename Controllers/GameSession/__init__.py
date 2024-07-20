@@ -70,14 +70,13 @@ class BaseGameSession:
             self.gamers[gamer_id].team_id = gamer_id + 1
         self.gamers.reverse()
 
-    def send_command(self, command_id, command_data):
+    async def send_command(self, command_id, command_data):
         from Entities.SocketIOManagerClass import send_command
-        asyncio.new_event_loop().run_until_complete(
-            send_command(command=make_command_json(id=command_id, data=command_data)))
+        await send_command(command=make_command_json(id=command_id, data=command_data))
 
     async def command_received(self, data, socket_id):
         gamer_id = self.find_gamer_from_socket(socket_id).gamer_id
-        self.game_controller.recieve_data(data['id'], data['data'], gamer_id)
+        await self.game_controller.recieve_data(data['id'], data['data'], gamer_id)
         # from Entities.SocketIOManagerClass import send_command
         # if data['id'] == commands.Game_Data:
         #     gamer_id = self.find_gamer_from_socket(socket_id).gamer_id

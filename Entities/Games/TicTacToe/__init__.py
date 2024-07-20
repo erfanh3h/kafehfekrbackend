@@ -1,4 +1,5 @@
 from Entities.Games.base_game_class import BaseGameClass
+from Controllers.GameSession.commands import Finish_Game
 
 
 class TicTacToeGameClass(BaseGameClass):
@@ -6,58 +7,35 @@ class TicTacToeGameClass(BaseGameClass):
         super().__init__(send_data_function)
         self.board = [" " for i in range(9)]
         self.win_conditions = [[0, 1, 2], [3, 4, 5], [6, 7, 8], [0, 3, 6], [1, 4, 7], [2, 5, 8], [0, 4, 8], [2, 4, 6]]
+        self.counter = 0
 
-    def recieve_data(self, command_id, data, gamer_id):
+    async def recieve_data(self, command_id, data, gamer_id):
         print(command_id, data, gamer_id)
-
-    def start_game(self):
-        super().start_game()
-        count = 0
-        winner = None
-        # This function check if the board is full
-        while count < 9 and winner is None:
-            self.current_turn = count % 2
-            self.play_round()
-            self.printPretty()
-            if count == 8:
-                print("The board is full. Game over.")
-                if winner:
-                    print("There is a tie. ")
-
-            # Check if here is a winner
+        if self.current_turn == 0 and gamer_id != 0 or self.current_turn == 1 and gamer_id != 1:
+            return
+        peace_number = data
+        is_peace_corrected = self.check_authority(peace_number)
+        if is_peace_corrected:
+            self.counter += 1
+            if gamer_id == 0:
+                self.board[peace_number] = self.symbol_1
+                self.current_turn = 1
+            else:
+                self.board[peace_number] = self.symbol_2
+                self.current_turn = 0
             winner = self.check_winner()
-            count += 1
-        if not winner:
-            print("Game over.")
-        self.report(winner)
+            if winner is not None:
+                await self.send_data_function(Finish_Game, {"Winner": winner})
+                self.printPretty()
 
-    def play_round(self):
-        super().play_round()
-        # This function starts the game.
-
-        # Decides the turn
-        if self.current_turn % 2 == 0:
-            player = self.symbol_1
-        elif self.current_turn % 2 == 1:
-            player = self.symbol_2
-        print("Player " + player + ", it is your turn. ")
-        peace_number = int(input("Pick a peace number : "))
-
+    def check_authority(self, peace_number: int):
         # Check if players' selection is out of range
-        while peace_number < 0 or peace_number > 8:
-            print("Out of boarder. Pick another one. ")
-            peace_number = int(input("Pick a peace number : "))
-
+        if peace_number < 0 or peace_number > 8:
+            return False
             # Check if the square is already filled
-        while (self.board[peace_number] == self.symbol_1) or (self.board[peace_number] == self.symbol_2):
-            print("The square you picked is already filled. Pick another one.")
-            peace_number = int(input("Pick a peace number : "))
-
-            # Locates player's symbol on the board
-        if player == self.symbol_1:
-            self.board[peace_number] = self.symbol_1
-        else:
-            self.board[peace_number] = self.symbol_2
+        if (self.board[peace_number] == self.symbol_1) or (self.board[peace_number] == self.symbol_2):
+            return False
+        return True
 
     def printPretty(self):
         # This function prints the board nice!
@@ -78,11 +56,3 @@ class TicTacToeGameClass(BaseGameClass):
                 print("Player " + self.symbol_2 + ", you won!")
                 break
         return winner
-
-    def report(self, winner):
-        print("\n")
-        input("Press enter to see the game summary. ")
-        if winner is None:
-            print("There is a tie. ")
-        else:
-            print("Winner : Player " + winner + ".")

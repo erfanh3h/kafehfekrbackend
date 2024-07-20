@@ -14,7 +14,7 @@ class BaseGameClass:
     def play_round(self):
         pass
 
-    def recieve_data(self, command_id, data, gamer_id):
+    async def recieve_data(self, command_id, data, gamer_id):
         pass
 
     def check_end(self):
