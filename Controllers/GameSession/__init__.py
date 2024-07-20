@@ -7,6 +7,7 @@ from Controllers.GameSession.static_functions import make_command_json, create_r
 from Controllers.GameSession import commands
 from Entities.TimerClass import TimerClass
 from Models.Gamer import GamerModel
+from Entities.Games.base_game_class import BaseGameClass
 
 
 class BaseGameSession:
@@ -16,6 +17,7 @@ class BaseGameSession:
                                          range(2)]
         self.teams_score: list[int] = []
         self.timer = TimerClass()
+        self.game_controller: BaseGameClass
 
     def start_game_timer(self):
         def entrypoint():
@@ -26,7 +28,7 @@ class BaseGameSession:
 
     def check_start_game(self):
         while True:
-            if len(self.gamers) == 4:
+            if len(self.gamers) == 2:
                 self.prepare_gamers()
                 self.send_game_data()
                 break
@@ -63,6 +65,6 @@ class BaseGameSession:
 
     async def command_received(self, data, socket_id):
         from Entities.SocketIOManagerClass import send_command
-        if data['id'] == commands.Stop_Talk:
+        if data['id'] == commands.Game_Data:
             gamer_id = self.find_gamer_from_socket(socket_id).gamer_id
             self.timer.stop()
