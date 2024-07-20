@@ -7,6 +7,7 @@ class BaseGameClass:
         self.symbol_4 = "3"
         self.current_turn = 0
         self.send_data_function = send_data_function
+        self.is_game_finished = False
 
     def start_game(self):
         pass
@@ -18,4 +19,7 @@ class BaseGameClass:
         pass
 
     def check_end(self):
+        pass
+
+    def change_turn(self):
         pass

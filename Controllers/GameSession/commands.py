@@ -1,4 +1,5 @@
 Game_Data = "GameData"
 Reaction = "Reaction"
+Current_Turn = "CurrentTurn"
 Select_Peace = "SelectPeace"
 Finish_Game = "FinishGame"

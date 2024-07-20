@@ -2,7 +2,7 @@ import asyncio
 import threading
 import time
 
-from Controllers.GameSession.wait_times import TALK_TIME, CHALLENGE_REQUEST_TIME, CHALLENGE_ACCEPT_TIME
+from Controllers.GameSession.wait_times import Turn_Time
 from Controllers.GameSession.static_functions import make_command_json, create_random_name
 from Controllers.GameSession import commands
 from Entities.Games.TicTacToe import TicTacToeGameClass
@@ -37,7 +37,8 @@ class BaseGameSession:
             if len(self.gamers) == 2:
                 self.prepare_gamers()
                 self.send_game_data()
-                self.game_controller.start_game()
+                self.game_controller.change_turn()
+                self.send_current_turn()
                 break
             time.sleep(3)
 
@@ -71,12 +72,28 @@ class BaseGameSession:
         self.gamers.reverse()
 
     async def send_command(self, command_id, command_data):
+        if command_id == commands.Finish_Game:
+            self.timer.stop()
         from Entities.SocketIOManagerClass import send_command
         await send_command(command=make_command_json(id=command_id, data=command_data))
 
     async def command_received(self, data, socket_id):
         gamer_id = self.find_gamer_from_socket(socket_id).gamer_id
-        await self.game_controller.recieve_data(data['id'], data['data'], gamer_id)
+        if data['id'] == commands.Select_Peace:
+            is_selection_correct = self.game_controller.check_authority(data['data'], gamer_id)
+            if is_selection_correct:
+                await self.game_controller.recieve_data(data['id'], data['data'], gamer_id)
+                self.timer.stop()
+
+    def send_current_turn(self):
+        if self.game_controller.is_game_finished:
+            return
+        self.game_controller.change_turn()
+        from Entities.SocketIOManagerClass import send_command
+        asyncio.new_event_loop().run_until_complete(
+            send_command(command=make_command_json(id=commands.Current_Turn, data=self.game_controller.current_turn)))
+        self.timer.start(Turn_Time, self.send_current_turn)
+
         # from Entities.SocketIOManagerClass import send_command
         # if data['id'] == commands.Game_Data:
         #     gamer_id = self.find_gamer_from_socket(socket_id).gamer_id

@@ -11,24 +11,23 @@ class TicTacToeGameClass(BaseGameClass):
 
     async def recieve_data(self, command_id, data, gamer_id):
         print(command_id, data, gamer_id)
-        if self.current_turn == 0 and gamer_id != 0 or self.current_turn == 1 and gamer_id != 1:
-            return
         peace_number = data
-        is_peace_corrected = self.check_authority(peace_number)
-        if is_peace_corrected:
-            self.counter += 1
-            if gamer_id == 0:
-                self.board[peace_number] = self.symbol_1
-                self.current_turn = 1
-            else:
-                self.board[peace_number] = self.symbol_2
-                self.current_turn = 0
-            winner = self.check_winner()
-            if winner is not None:
-                await self.send_data_function(Finish_Game, {"Winner": winner})
-                self.printPretty()
+        self.counter += 1
+        if gamer_id == 0:
+            self.board[peace_number] = self.symbol_1
+        else:
+            self.board[peace_number] = self.symbol_2
+        winner = self.check_winner()
+        if winner is not None:
+            await self.send_data_function(Finish_Game, {"Winner": winner})
+            self.printPretty()
+            self.is_game_finished = True
 
-    def check_authority(self, peace_number: int):
+    def check_authority(self, data, gamer_id: int):
+        if self.current_turn == 0 and gamer_id != 0 or self.current_turn == 1 and gamer_id != 1:
+            print("not turn of : ", gamer_id)
+            return False
+        peace_number = data
         # Check if players' selection is out of range
         if peace_number < 0 or peace_number > 8:
             return False
@@ -56,3 +55,9 @@ class TicTacToeGameClass(BaseGameClass):
                 print("Player " + self.symbol_2 + ", you won!")
                 break
         return winner
+
+    def change_turn(self):
+        if self.current_turn == 0:
+            self.current_turn = 1
+        else:
+            self.current_turn = 0

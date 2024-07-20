@@ -1,9 +1,3 @@
-TALK_TIME = 20
-
-Challenge_TIME = 17
-
-CHALLENGE_REQUEST_TIME = 15
-
-CHALLENGE_ACCEPT_TIME = 15
+Turn_Time = 10
 
 
