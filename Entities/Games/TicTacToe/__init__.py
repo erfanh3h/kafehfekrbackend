@@ -2,10 +2,13 @@ from Entities.Games.base_game_class import BaseGameClass
 
 
 class TicTacToeGameClass(BaseGameClass):
-    def __init__(self):
-        super().__init__()
+    def __init__(self, send_data_function):
+        super().__init__(send_data_function)
         self.board = [" " for i in range(9)]
         self.win_conditions = [[0, 1, 2], [3, 4, 5], [6, 7, 8], [0, 3, 6], [1, 4, 7], [2, 5, 8], [0, 4, 8], [2, 4, 6]]
+
+    def recieve_data(self, command_id, data, gamer_id):
+        print(command_id, data, gamer_id)
 
     def start_game(self):
         super().start_game()
