@@ -4,7 +4,7 @@ from Models.User import UserModel
 
 
 class GamerModel(UserModel):
-    def __init__(self, user_id: int, username: str, socket_id = ''):
+    def __init__(self, user_id: int, username: str, socket_id='', team_id: int = 0):
         super().__init__(user_id, username)
         self.socket_id = socket_id
         self.gamer_id: int = 0
@@ -13,11 +13,7 @@ class GamerModel(UserModel):
         self.is_leaver: bool = False
         self.report_charge: int = 5
         self.reconnect_charge: int = 3
-        self.let_talk: bool = True
-        self.is_talking = False
-        self.is_Challenging = False
-        self.challenge_done = False
-        self.end_talk: bool = False
+        self.team_id: int = team_id
 
         # self.role: int = 0
         # self.letAct: bool = True

@@ -2,20 +2,19 @@ import asyncio
 import threading
 import time
 
-from Controllers.GameController.wait_times import TALK_TIME, CHALLENGE_REQUEST_TIME, CHALLENGE_ACCEPT_TIME, \
-    Challenge_TIME
-from Controllers.GameController.static_functions import make_command_json, create_random_name
-from Controllers.GameController import commands
+from Controllers.GameSession.wait_times import TALK_TIME, CHALLENGE_REQUEST_TIME, CHALLENGE_ACCEPT_TIME
+from Controllers.GameSession.static_functions import make_command_json, create_random_name
+from Controllers.GameSession import commands
 from Entities.TimerClass import TimerClass
 from Models.Gamer import GamerModel
 
-class GameController:
+
+class BaseGameSession:
     def __init__(self):
         # self.temp_gamers: list[GamerModel] = [GamerModel(user_id=i, username=str(i)) for i in range(2)]
-        self.gamers: list[GamerModel] = [GamerModel(user_id=i, username=create_random_name()) for i in range(2)]
-        self.talk_priority_list: list[int] = []
-        self.team0_score: int = 10
-        self.team1_score: int = 10
+        self.gamers: list[GamerModel] = [GamerModel(user_id=i, team_id=i + 1, username=create_random_name()) for i in
+                                         range(2)]
+        self.teams_score: list[int] = []
         self.timer = TimerClass()
 
     def start_game_timer(self):
@@ -28,10 +27,8 @@ class GameController:
     def check_start_game(self):
         while True:
             if len(self.gamers) == 4:
-                self.prepare_rolls()
+                self.prepare_gamers()
                 self.send_game_data()
-                time.sleep(1)
-                self.start_day()
                 break
             time.sleep(3)
 
@@ -58,18 +55,14 @@ class GameController:
         asyncio.new_event_loop().run_until_complete(
             send_command(command=make_command_json(id=commands.Game_Data, data=game_data)))
 
-    def prepare_rolls(self):
+    def prepare_gamers(self):
         for gamer_id in range(0, len(self.gamers)):
             self.gamers[gamer_id].gamer_id = gamer_id
+            self.gamers[gamer_id].team_id = gamer_id + 1
         self.gamers.reverse()
-
 
     async def command_received(self, data, socket_id):
         from Entities.SocketIOManagerClass import send_command
         if data['id'] == commands.Stop_Talk:
             gamer_id = self.find_gamer_from_socket(socket_id).gamer_id
             self.timer.stop()
-
-    def start_day(self):
-        pass
-

@@ -1,18 +1,20 @@
 import socketio
 
-from Controllers.GameController import GameController
+from Controllers.GameSession.normal_game_session import NormalGameSession
 from Models.Gamer import GamerModel
-from Controllers.GameController import static_functions
-gameController = GameController()
-gameController.start_game_timer()
+from Controllers.GameSession import static_functions
+
+gameSession = NormalGameSession()
+gameSession.start_game_timer()
 Socket_Server = socketio.AsyncServer(async_mode='asgi')
 
 user_sids = []
 
+
 @Socket_Server.event
-async def connect(sid, environ , auth):
+async def connect(sid, environ, auth):
     print('connect ', sid)
-    if auth is not None :
+    if auth is not None:
         name = auth['name']
     else:
         name = static_functions.create_random_name()
@@ -21,8 +23,9 @@ async def connect(sid, environ , auth):
     await my_message(sid, {'Test': f'{sid}'})
     user_sids.append(sid)
 
-    gameController.add_gamer(GamerModel(user_id=sid, username=name, socket_id=sid))
+    gameSession.add_gamer(GamerModel(user_id=sid, username=name, socket_id=sid))
     # print(Socket_Server.rooms(sid))
+
 
 @Socket_Server.event
 async def my_message(sid, data):
@@ -31,14 +34,11 @@ async def my_message(sid, data):
 
 
 @Socket_Server.event
-async def userMessage(sid, data):
-    await gameController.message_received(data,sid)
-    print('User Sended message ', data)
-
-@Socket_Server.event
 async def userCommand(sid, data):
-    await gameController.command_received(data,sid)
+    await gameSession.command_received(data, sid)
     print('User Sended command ', data)
+
+
 @Socket_Server.event
 async def disconnect(sid):
     print('disconnect ', sid)
