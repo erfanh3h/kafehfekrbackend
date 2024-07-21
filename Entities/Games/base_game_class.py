@@ -1,14 +1,12 @@
-
 class BaseGameClass:
     def __init__(self, send_data_function):
-        self.symbol_1 = "0"
-        self.symbol_2 = "1"
-        self.symbol_3 = "2"
-        self.symbol_4 = "3"
         self.current_turn = 0
         self.send_data_function = send_data_function
         self.is_game_finished = False
         self.is_round_finished = False
+
+    def get_game_data(self):
+        pass
 
     def start_game(self):
         pass

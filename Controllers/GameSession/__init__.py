@@ -14,7 +14,6 @@ class BaseGameSession:
     def __init__(self):
         # self.temp_gamers: list[GamerModel] = [GamerModel(user_id=i, username=str(i)) for i in range(2)]
         self.gamers: list[GamerModel] = []
-        self.teams_score: list[int] = []
         self.timer = TimerClass()
         self.game_controller: BaseGameClass
 
