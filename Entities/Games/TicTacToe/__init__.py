@@ -1,5 +1,5 @@
 from Entities.Games.base_game_class import BaseGameClass
-from Controllers.GameSession.commands import Finish_Game
+from Controllers.GameSession.commands import Finish_Game , Peace_Selected
 
 
 class TicTacToeGameClass(BaseGameClass):
@@ -17,6 +17,7 @@ class TicTacToeGameClass(BaseGameClass):
             self.board[peace_number] = self.symbol_1
         else:
             self.board[peace_number] = self.symbol_2
+        await self.send_data_function(Peace_Selected, {'user': gamer_id, 'target_peace': peace_number})
         winner = self.check_winner()
         if winner is not None:
             await self.send_data_function(Finish_Game, {"Winner": winner})

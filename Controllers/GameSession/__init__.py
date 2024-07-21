@@ -79,10 +79,11 @@ class BaseGameSession:
 
     async def command_received(self, data, socket_id):
         gamer_id = self.find_gamer_from_socket(socket_id).gamer_id
+        peace_id = data['data']
         if data['id'] == commands.Select_Peace:
-            is_selection_correct = self.game_controller.check_authority(data['data'], gamer_id)
+            is_selection_correct = self.game_controller.check_authority(peace_id, gamer_id)
             if is_selection_correct:
-                await self.game_controller.recieve_data(data['id'], data['data'], gamer_id)
+                await self.game_controller.recieve_data(data['id'], peace_id, gamer_id)
                 self.timer.stop()
 
     def send_current_turn(self):
