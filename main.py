@@ -10,6 +10,9 @@ from Entities.SocketIOClass import Socket_Server
 app = socketio.ASGIApp(Socket_Server)
 logging.basicConfig(level=logging.DEBUG)
 if __name__ == '__main__':
+    # for fix asyncio errors
+    import nest_asyncio
+    nest_asyncio.apply()
     # web.run_app(app, host='0.0.0.0', port=5000)
     uvicorn.run(app, host='0.0.0.0', port=5000)
     # eventlet.wsgi.server(eventlet.listen(('', 5000)), app)

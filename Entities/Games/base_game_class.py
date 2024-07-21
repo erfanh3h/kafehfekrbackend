@@ -8,6 +8,7 @@ class BaseGameClass:
         self.current_turn = 0
         self.send_data_function = send_data_function
         self.is_game_finished = False
+        self.is_round_finished = False
 
     def start_game(self):
         pass
@@ -22,4 +23,7 @@ class BaseGameClass:
         pass
 
     def change_turn(self):
+        pass
+
+    def create_board_map(self):
         pass

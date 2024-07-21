@@ -1,12 +1,12 @@
 import socketio
 
-from Controllers.GameSession.normal_game_session import NormalGameSession
+from Controllers.GameSession.tictactoe_game_session import TicTacToeGameSession
 from Entities.Games.game_types import GameTypesEnum
 from Models.Gamer import GamerModel
-from Controllers.GameSession import static_functions
+from Commons import static_functions
 
-gameSession = NormalGameSession()
-gameSession.start_game_timer(game_type=GameTypesEnum.TIC_TAC_TOE)
+gameSession = TicTacToeGameSession()
+gameSession.start_game_timer()
 Socket_Server = socketio.AsyncServer(async_mode='asgi')
 
 user_sids = []

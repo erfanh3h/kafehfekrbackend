@@ -1,5 +1,5 @@
 from Entities.Games.base_game_class import BaseGameClass
-from Controllers.GameSession.commands import Finish_Game , Peace_Selected
+from Commons import commands
 
 
 class TicTacToeGameClass(BaseGameClass):
@@ -8,6 +8,14 @@ class TicTacToeGameClass(BaseGameClass):
         self.board = [" " for i in range(9)]
         self.win_conditions = [[0, 1, 2], [3, 4, 5], [6, 7, 8], [0, 3, 6], [1, 4, 7], [2, 5, 8], [0, 4, 8], [2, 4, 6]]
         self.counter = 0
+        self.round_count = 6
+        self.current_round = 1
+
+    def change_round(self):
+        self.board = [" " for i in range(9)]
+        self.counter = 0
+        self.is_round_finished = False
+        self.current_round += 1
 
     async def recieve_data(self, command_id, data, gamer_id):
         print(command_id, data, gamer_id)
@@ -17,12 +25,16 @@ class TicTacToeGameClass(BaseGameClass):
             self.board[peace_number] = self.symbol_1
         else:
             self.board[peace_number] = self.symbol_2
-        await self.send_data_function(Peace_Selected, {'user': gamer_id, 'target_peace': peace_number})
+        await self.send_data_function(commands.Peace_Selected, {'user': gamer_id, 'target_peace': peace_number})
         winner = self.check_winner()
         if winner is not None:
-            await self.send_data_function(Finish_Game, {"Winner": winner})
-            self.printPretty()
-            self.is_game_finished = True
+            if self.current_round == self.round_count:
+                await self.send_data_function(commands.Finish_Game, {"Winner": winner})
+                self.printPretty()
+                self.is_game_finished = True
+            else:
+                self.is_round_finished = True
+                await self.send_data_function(commands.Finish_Round, {"Winner": winner})
 
     def check_authority(self, data, gamer_id: int):
         if self.current_turn == 0 and gamer_id != 0 or self.current_turn == 1 and gamer_id != 1:
@@ -34,6 +46,9 @@ class TicTacToeGameClass(BaseGameClass):
             return False
             # Check if the square is already filled
         if (self.board[peace_number] == self.symbol_1) or (self.board[peace_number] == self.symbol_2):
+            return False
+
+        if self.is_game_finished or self.is_round_finished:
             return False
         return True
 
