@@ -17,7 +17,7 @@ class TicTacToeGameClass(BaseGameClass):
 
     def get_game_data(self):
         data = {"board": self.board, "scores": [self.gamer1_score, self.gamer2_score],
-                "current_round": self.current_round , "current_turn": self.current_turn}
+                "current_round": self.current_round, "current_turn": self.current_turn}
         return data
 
     def change_round(self):
@@ -40,10 +40,10 @@ class TicTacToeGameClass(BaseGameClass):
             self.board[peace_number] = self.symbol_2
         await self.send_data_function(commands.Peace_Selected, {'user': gamer_id, 'target_peace': peace_number})
         winner = self.check_winner()
-        if winner is not None:
+        if winner is not None or self.counter == 9:
             if self.current_round == self.round_count:
-                await self.send_data_function(commands.Finish_Game, {"Winner": winner})
-                self.printPretty()
+                game_winner = self.get_game_winner()
+                await self.send_data_function(commands.Finish_Game, {"Winner": game_winner})
                 self.is_game_finished = True
             else:
                 self.is_round_finished = True
@@ -65,13 +65,6 @@ class TicTacToeGameClass(BaseGameClass):
             return False
         return True
 
-    def printPretty(self):
-        # This function prints the board nice!
-        print("---+---+---")
-        for r in range(3):
-            print(self.board[r * 3], " |", self.board[r * 3 + 1], "|", self.board[r * 3 + 2])
-            print("---+---+---")
-
     def check_winner(self):
         winner = None
         for condition in self.win_conditions:
@@ -84,6 +77,14 @@ class TicTacToeGameClass(BaseGameClass):
                 self.gamer2_score += 1
                 break
         return winner
+
+    def get_game_winner(self):
+        if self.gamer1_score > self.gamer2_score:
+            return self.symbol_1
+        elif self.gamer2_score > self.gamer1_score:
+            return self.symbol_2
+        else:
+            return None
 
     def change_turn(self):
         if self.current_turn == 1:
