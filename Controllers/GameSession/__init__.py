@@ -18,6 +18,7 @@ class BaseGameSession:
         self.game_controller: BaseGameClass = BaseGameClass(None)
         self.game_id = game_id
         self.is_game_running = False
+        self.gamer_idies = []
 
     def start_game_timer(self):
         def entrypoint():
@@ -57,6 +58,7 @@ class BaseGameSession:
 
     def add_gamer(self, gamer: GamerModel):
         self.gamers.append(gamer)
+        self.gamer_idies.append(gamer.user_id)
 
     def join_gamer(self, user_id: int, socket_id):
         for gamer_index in range(0, len(self.gamers)):

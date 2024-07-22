@@ -33,9 +33,12 @@ async def connect(socket_id, environ, auth):
     #     await my_message(socket_id, {'Test': f'{socket_id}'})
 
     if is_game_id_valid(user_game_id):
-        await Socket_Server.enter_room(socket_id, user_game_id)
-        gameSession.join_gamer(user_id, socket_id)
-        socketid_gameid_pairs[socket_id] = user_game_id
+        if games[user_game_id].gamer_idies.__contains__(user_id):
+            await Socket_Server.enter_room(socket_id, user_game_id)
+            games[user_game_id].join_gamer(user_id, socket_id)
+            socketid_gameid_pairs[socket_id] = user_game_id
+        else:
+            await Socket_Server.disconnect(socket_id)
     else:
         await Socket_Server.disconnect(socket_id)
 
