@@ -8,7 +8,9 @@ class GamerModel(UserModel):
         super().__init__(user_id, username)
         self.socket_id = socket_id
         self.gamer_id: int = 0
+        self.user_id: int = user_id
         self.is_alive: bool = True
+        self.is_joined_game: bool = False
         self.is_disconnected: bool = False
         self.is_leaver: bool = False
         self.report_charge: int = 5
@@ -24,11 +26,7 @@ class GamerModel(UserModel):
         # self.score : int = 0
 
     def reset_day(self):
-        self.let_talk = True
-        self.is_talking = False
-        self.is_Challenging = False
-        self.challenge_done = False
-        self.end_talk = False
+        pass
 
     async def talk(self):
         pass
@@ -57,22 +55,15 @@ class GamerModel(UserModel):
         # except TimeoutError:
         #     pass
 
-    def first_vote(self):
-        pass
+    def join_game(self, socket_id):
+        self.is_joined_game = True
+        self.socket_id = socket_id
 
-    def last_vote(self):
-        pass
+    def reconnect(self, socket_id):
+        self.is_disconnected = False
+        self.socket_id = socket_id
+        self.reconnect_charge -= 1
 
-    def reaction(self):
-        pass
-
-    def night_action(self):
-        pass
-
-    async def send_wait_message(self, reason):
-        pass
-        # await self.communication.send_command_message({'id': 'Waiting', 'data': reason})
-
-    async def send_custom_message(self, message):
-        pass
-        # await self.communication.send_command_message(message)
+    def disconnect(self):
+        self.is_disconnected = True
+        self.socket_id = ""

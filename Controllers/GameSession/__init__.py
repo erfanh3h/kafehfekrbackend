@@ -11,11 +11,13 @@ from Entities.Games.base_game_class import BaseGameClass
 
 
 class BaseGameSession:
-    def __init__(self):
+    def __init__(self, game_id: str):
         # self.temp_gamers: list[GamerModel] = [GamerModel(user_id=i, username=str(i)) for i in range(2)]
         self.gamers: list[GamerModel] = []
         self.timer = TimerClass()
-        self.game_controller: BaseGameClass
+        self.game_controller: BaseGameClass = BaseGameClass(None)
+        self.game_id = game_id
+        self.is_game_running = False
 
     def start_game_timer(self):
         def entrypoint():
@@ -24,15 +26,22 @@ class BaseGameSession:
         t = threading.Thread(target=entrypoint, daemon=True)
         t.start()
 
+    def check_all_players_joined(self):
+        for gamer in self.gamers:
+            if not gamer.is_joined_game:
+                return False
+        return True
+
     def check_start_game(self):
         while True:
-            if len(self.gamers) == 2:
+            if self.check_all_players_joined():
+                self.is_game_running = True
                 self.prepare_gamers()
                 self.send_game_data()
                 self.game_controller.change_turn()
                 self.send_current_turn()
                 break
-            time.sleep(3)
+            time.sleep(2)
 
     def find_gamer_from_socket(self, socket_id) -> GamerModel:
         for gamer in self.gamers:
@@ -49,6 +58,16 @@ class BaseGameSession:
     def add_gamer(self, gamer: GamerModel):
         self.gamers.append(gamer)
 
+    def join_gamer(self, user_id: int, socket_id):
+        for gamer_index in range(0, len(self.gamers)):
+            if self.gamers[gamer_index].user_id == user_id:
+                if self.gamers[gamer_index].is_joined_game:
+                    print("gamedata" , self.game_controller.get_game_data())
+                    self.gamers[gamer_index].reconnect(socket_id)
+                else:
+                    self.gamers[gamer_index].join_game(socket_id)
+                break
+
     def send_game_data(self):
         game_data = {'gamers': []}
         for gamer in self.gamers:
@@ -61,7 +80,7 @@ class BaseGameSession:
         for gamer_id in range(0, len(self.gamers)):
             self.gamers[gamer_id].gamer_id = gamer_id
             self.gamers[gamer_id].team_id = gamer_id + 1
-        self.gamers.reverse()
+        # self.gamers.reverse()
 
     async def send_command(self, command_id, command_data):
         from Entities.SocketIOManagerClass import send_command
@@ -73,6 +92,11 @@ class BaseGameSession:
     def send_current_turn(self):
         pass
 
+    def disconnect_user(self, socket_id):
+        for gamer_index in range(0, len(self.gamers)):
+            if self.gamers[gamer_index].socket_id == socket_id:
+                self.gamers[gamer_index].disconnect()
+                break
         # from Entities.SocketIOManagerClass import send_command
         # if data['id'] == commands.Game_Data:
         #     gamer_id = self.find_gamer_from_socket(socket_id).gamer_id

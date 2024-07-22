@@ -9,8 +9,8 @@ from Controllers.GameSession import BaseGameSession
 
 
 class TicTacToeGameSession(BaseGameSession):
-    def __init__(self):
-        super().__init__()
+    def __init__(self , game_id : str):
+        super().__init__(game_id)
 
     async def send_command(self, command_id, command_data):
         if command_id == commands.Finish_Game:
@@ -24,6 +24,9 @@ class TicTacToeGameSession(BaseGameSession):
         super().start_game_timer()
 
     async def command_received(self, data, socket_id):
+        if not self.is_game_running:
+            print("game not started yet")
+            return
         gamer_id = self.find_gamer_from_socket(socket_id).gamer_id
         peace_id = data['data']
         if data['id'] == commands.Select_Peace:

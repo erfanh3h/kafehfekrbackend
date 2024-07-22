@@ -24,10 +24,11 @@ async def command(data):
 @sio.event
 async def disconnect():
     print('disconnected from server')
+    exit(0)
 
 
 async def start():
-    await sio.connect('http://localhost:5000', wait_timeout=1, auth={'name': 'test'})
+    await sio.connect('http://localhost:5000', wait_timeout=1, auth={'user_id': 0, 'game_id': 'gameId'})
     await asyncio.sleep(1)
     while True:
         message = input("select peace : ")
