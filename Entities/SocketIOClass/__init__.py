@@ -51,8 +51,10 @@ async def my_message(socket_id, data):
 
 @Socket_Server.event
 async def userCommand(socket_id, data):
-    await gameSession.command_received(data, socket_id)
-    print('User Sended command ', data)
+    game_id = return_gameid_from_socketid(socket_id)
+    if game_id is not None:
+        await games[game_id].command_received(data, socket_id)
+        print('User Sended command ', data)
 
 
 @Socket_Server.event
