@@ -62,8 +62,8 @@ class BaseGameSession:
         for gamer_index in range(0, len(self.gamers)):
             if self.gamers[gamer_index].user_id == user_id:
                 if self.gamers[gamer_index].is_joined_game:
-                    print("gamedata" , self.game_controller.get_game_data())
                     self.gamers[gamer_index].reconnect(socket_id)
+                    self.send_reconnect_data(socket_id)
                 else:
                     self.gamers[gamer_index].join_game(socket_id)
                 break
@@ -76,9 +76,19 @@ class BaseGameSession:
         asyncio.new_event_loop().run_until_complete(
             send_command(command=make_command_json(id=commands.Game_Data, data=game_data)))
 
+    def send_reconnect_data(self, socket_id):
+        reconnect_data = {'gamers': []}
+        for gamer in self.gamers:
+            reconnect_data['gamers'].append({'id': gamer.gamer_id, 'name': gamer.username})
+        reconnect_data['game_data'] = self.game_controller.get_game_data()
+        from Entities.SocketIOManagerClass import send_private_command
+        asyncio.new_event_loop().run_until_complete(
+            send_private_command(command=make_command_json(id=commands.Reconnect_Data, data=reconnect_data),
+                                 socket_id=socket_id))
+
     def prepare_gamers(self):
         for gamer_id in range(0, len(self.gamers)):
-            self.gamers[gamer_id].gamer_id = gamer_id
+            self.gamers[gamer_id].gamer_id = gamer_id + 1
             self.gamers[gamer_id].team_id = gamer_id + 1
         # self.gamers.reverse()
 

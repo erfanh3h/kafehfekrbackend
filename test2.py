@@ -2,7 +2,7 @@ class TicTacToeGameClass:
     def __init__(self):
         self.board = [" " for i in range(9)]
         self.win_conditions = [[0, 1, 2], [3, 4, 5], [6, 7, 8], [0, 3, 6], [1, 4, 7], [2, 5, 8], [0, 4, 8], [2, 4, 6]]
-        self.current_turn = 0
+        self.current_turn = 1
         self.symbol_1 = "1"
         self.symbol_2 = "2"
 

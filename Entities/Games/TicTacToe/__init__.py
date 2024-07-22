@@ -5,9 +5,9 @@ from Commons import commands
 class TicTacToeGameClass(BaseGameClass):
     def __init__(self, send_data_function):
         super().__init__(send_data_function)
-        self.symbol_1 = "0"
-        self.symbol_2 = "1"
-        self.board = [" " for i in range(9)]
+        self.symbol_1 = 1
+        self.symbol_2 = 2
+        self.board = [0 for i in range(9)]
         self.win_conditions = [[0, 1, 2], [3, 4, 5], [6, 7, 8], [0, 3, 6], [1, 4, 7], [2, 5, 8], [0, 4, 8], [2, 4, 6]]
         self.counter = 0
         self.round_count = 2
@@ -17,24 +17,24 @@ class TicTacToeGameClass(BaseGameClass):
 
     def get_game_data(self):
         data = {"board": self.board, "scores": [self.gamer1_score, self.gamer2_score],
-                "current_round": self.current_round}
+                "current_round": self.current_round , "current_turn": self.current_turn}
         return data
 
     def change_round(self):
-        self.board = [" " for i in range(9)]
+        self.board = [0 for i in range(9)]
         self.counter = 0
         self.is_round_finished = False
         self.current_round += 1
         if self.current_round % 2 == 0:
-            self.current_turn = 0
-        else:
             self.current_turn = 1
+        else:
+            self.current_turn = 2
 
     async def recieve_data(self, command_id, data, gamer_id):
         print(command_id, data, gamer_id)
         peace_number = data
         self.counter += 1
-        if gamer_id == 0:
+        if gamer_id == 1:
             self.board[peace_number] = self.symbol_1
         else:
             self.board[peace_number] = self.symbol_2
@@ -50,7 +50,7 @@ class TicTacToeGameClass(BaseGameClass):
                 await self.send_data_function(commands.Finish_Round, {"Winner": winner})
 
     def check_authority(self, data, gamer_id: int):
-        if self.current_turn == 0 and gamer_id != 0 or self.current_turn == 1 and gamer_id != 1:
+        if (self.current_turn == 1 and gamer_id != 1) or (self.current_turn == 2 and gamer_id != 2):
             print("not turn of : ", gamer_id)
             return False
         peace_number = data
@@ -78,17 +78,15 @@ class TicTacToeGameClass(BaseGameClass):
             if self.board[condition[0]] == self.board[condition[1]] == self.board[condition[2]] == self.symbol_1:
                 winner = self.symbol_1
                 self.gamer1_score += 1
-                print("Player " + self.symbol_1 + ", you won!")
                 break
             if self.board[condition[0]] == self.board[condition[1]] == self.board[condition[2]] == self.symbol_2:
                 winner = self.symbol_2
                 self.gamer2_score += 1
-                print("Player " + self.symbol_2 + ", you won!")
                 break
         return winner
 
     def change_turn(self):
-        if self.current_turn == 0:
-            self.current_turn = 1
+        if self.current_turn == 1:
+            self.current_turn = 2
         else:
-            self.current_turn = 0
+            self.current_turn = 1

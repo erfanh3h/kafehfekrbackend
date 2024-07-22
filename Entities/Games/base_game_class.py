@@ -1,6 +1,6 @@
 class BaseGameClass:
     def __init__(self, send_data_function):
-        self.current_turn = 0
+        self.current_turn = 1
         self.send_data_function = send_data_function
         self.is_game_finished = False
         self.is_round_finished = False

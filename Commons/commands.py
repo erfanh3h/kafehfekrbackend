@@ -1,4 +1,5 @@
 Game_Data = "GameData"
+Reconnect_Data = "ReconnectData"
 Reaction = "Reaction"
 Current_Turn = "CurrentTurn"
 Select_Peace = "SelectPeace"
