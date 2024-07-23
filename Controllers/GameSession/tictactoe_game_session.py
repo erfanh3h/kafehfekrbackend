@@ -28,14 +28,17 @@ class TicTacToeGameSession(BaseGameSession):
             print("game not started yet")
             return
         gamer_id = self.find_gamer_from_socket(socket_id).gamer_id
-        peace_id = data['data']
         if data['id'] == commands.Select_Peace:
+            peace_id = data['data']
             is_selection_correct = self.game_controller.check_authority(peace_id, gamer_id)
             if is_selection_correct:
                 await self.game_controller.recieve_data(data['id'], peace_id, gamer_id)
                 self.timer.stop()
                 if self.game_controller.is_round_finished:
                     self.change_round()
+        elif data['id'] == commands.Surrender:
+            await self.game_controller.surrender(gamer_id)
+            self.timer.stop()
 
     def send_current_turn(self):
         if self.game_controller.is_game_finished or self.game_controller.is_round_finished:

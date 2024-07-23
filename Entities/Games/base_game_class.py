@@ -25,3 +25,6 @@ class BaseGameClass:
 
     def create_board_map(self):
         pass
+
+    async def surrender(self , gamer_id):
+        pass
