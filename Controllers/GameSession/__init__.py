@@ -76,7 +76,7 @@ class BaseGameSession:
             game_data['gamers'].append({'id': gamer.gamer_id, 'name': gamer.username})
         from Entities.SocketIOManagerClass import send_command
         asyncio.new_event_loop().run_until_complete(
-            send_command(command=make_command_json(id=commands.Game_Data, data=game_data)))
+            send_command(command=make_command_json(id=commands.Game_Data, data=game_data), game_id=self.game_id))
 
     def send_reconnect_data(self, socket_id):
         reconnect_data = {'gamers': []}
@@ -90,7 +90,7 @@ class BaseGameSession:
         from Entities.SocketIOManagerClass import send_private_command
         asyncio.new_event_loop().run_until_complete(
             send_private_command(command=make_command_json(id=commands.Reconnect_Data, data=reconnect_data),
-                                 socket_id=socket_id))
+                                 socket_id=socket_id, game_id=self.game_id))
 
     def prepare_gamers(self):
         for gamer_id in range(0, len(self.gamers)):
@@ -100,10 +100,15 @@ class BaseGameSession:
 
     async def send_command(self, command_id, command_data):
         from Entities.SocketIOManagerClass import send_command
-        await send_command(command=make_command_json(id=command_id, data=command_data))
+        await send_command(command=make_command_json(id=command_id, data=command_data), game_id=self.game_id)
 
     async def command_received(self, data, socket_id):
         pass
+
+    async def reaction_received(self, data, socket_id):
+        gamer_id = self.find_gamer_from_socket(socket_id).gamer_id
+        from Entities.SocketIOManagerClass import send_reaction
+        await send_reaction(reaction_id=data, player_id=gamer_id, game_id=self.game_id)
 
     def send_current_turn(self):
         pass

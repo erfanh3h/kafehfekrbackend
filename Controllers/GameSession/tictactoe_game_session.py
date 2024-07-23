@@ -9,7 +9,7 @@ from Controllers.GameSession import BaseGameSession
 
 
 class TicTacToeGameSession(BaseGameSession):
-    def __init__(self , game_id : str):
+    def __init__(self, game_id: str):
         super().__init__(game_id)
 
     async def send_command(self, command_id, command_data):
@@ -43,7 +43,8 @@ class TicTacToeGameSession(BaseGameSession):
         self.game_controller.change_turn()
         from Entities.SocketIOManagerClass import send_command
         asyncio.new_event_loop().run_until_complete(
-            send_command(command=make_command_json(id=commands.Current_Turn, data=self.game_controller.current_turn)))
+            send_command(command=make_command_json(id=commands.Current_Turn, data=self.game_controller.current_turn),
+                         game_id=self.game_id))
         self.timer.start(Turn_Time, self.send_current_turn)
 
     def change_round(self):
@@ -51,5 +52,6 @@ class TicTacToeGameSession(BaseGameSession):
         self.game_controller.change_round()
         from Entities.SocketIOManagerClass import send_command
         asyncio.new_event_loop().run_until_complete(
-            send_command(command=make_command_json(id=commands.New_Round, data=self.game_controller.current_round)))
+            send_command(command=make_command_json(id=commands.New_Round, data=self.game_controller.current_round),
+                         game_id=self.game_id))
         self.send_current_turn()

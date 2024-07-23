@@ -44,9 +44,11 @@ async def connect(socket_id, environ, auth):
 
 
 @Socket_Server.event
-async def my_message(socket_id, data):
-    await Socket_Server.send(data)
-    print('Send message ', data)
+async def userReaction(socket_id, data):
+    game_id = return_gameid_from_socketid(socket_id)
+    if game_id is not None:
+        await games[game_id].reaction_received(data, socket_id)
+        print('User Sended command ', data)
 
 
 @Socket_Server.event
