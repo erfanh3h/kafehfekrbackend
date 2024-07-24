@@ -53,21 +53,25 @@ class RPCGameClass(BaseGameClass):
 
     def check_turn_round_winner(self):
         winner = self.check_winner()
-        if winner is not None:
-            if self.current_turn_round == self.turn_round_count:
-                if self.current_round != self.round_count:
-                    self.is_round_finished = True
-                else:
-                    self.is_game_finished = True
+        if self.current_turn_round == self.turn_round_count:
+            if self.current_round != self.round_count:
+                self.is_round_finished = True
+                if self.gamer1_round_score > self.gamer2_round_score:
+                    self.gamer1_total_score +=1
+                elif self.gamer2_round_score > self.gamer1_round_score:
+                    self.gamer2_total_score +=1
             else:
-                self.is_turn_round_finished = True
+                self.is_game_finished = True
+        else:
+            self.is_turn_round_finished = True
         return winner
 
     def check_authority(self, data, gamer_id: int):
+        print("akbar")
         return True
 
     def check_winner(self):
-        winner = None
+        winner = 0
         for condition in self.win_conditions:
             if self.gamer1_round_selection == condition[0] and self.gamer2_round_selection == condition[1]:
                 winner = self.symbol_1
@@ -85,7 +89,7 @@ class RPCGameClass(BaseGameClass):
         elif self.gamer2_round_score > self.gamer1_round_score:
             return self.symbol_2
         else:
-            return None
+            return 0
 
     def get_game_winner(self):
         if self.gamer1_total_score > self.gamer2_total_score:

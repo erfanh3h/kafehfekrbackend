@@ -68,19 +68,18 @@ class RPCGameSession(BaseGameSession):
             asyncio.new_event_loop().run_until_complete(
                 send_command(command=make_command_json(id=commands.Finish_Round, data={"Winner": round_winner}),
                              game_id=self.game_id))
-            self.timer.start(RPC_Sleep_Round_Time, self.send_current_turn)
+            self.timer.start(RPC_Sleep_Round_Time, self.start_new_turn_round)
             self.game_controller.change_round()
         elif self.game_controller.is_turn_round_finished:
             print("end turn round ", self.game_controller.current_turn_round)
             turn_round_winner = self.game_controller.check_winner()
-            self.game_controller.change_turn_round()
             asyncio.new_event_loop().run_until_complete(
-                send_command(command=make_command_json(id=commands.Finish_Round, data={
+                send_command(command=make_command_json(id=commands.Finish_Turn_Round, data={
                     "Winner": turn_round_winner,
-                    "P1_selection": self.game_controller.gamer1_round_selection,
-                    "P2_selection": self.game_controller.gamer2_round_selection}
+                    "P1_selection": str(self.game_controller.gamer1_round_selection),
+                    "P2_selection": str(self.game_controller.gamer2_round_selection)}
                                                        ), game_id=self.game_id))
-            self.timer.start(RPC_Sleep_Turn_Round_Time, self.send_current_turn)
+            self.timer.start(RPC_Sleep_Turn_Round_Time, self.start_new_turn_round)
             self.game_controller.change_turn_round()
         else:
             self.start_new_turn_round()
