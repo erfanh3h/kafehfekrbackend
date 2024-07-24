@@ -4,6 +4,7 @@ class BaseGameClass:
         self.send_data_function = send_data_function
         self.is_game_finished = False
         self.is_round_finished = False
+        self.is_turn_round_finished = False
 
     def get_game_data(self):
         pass
@@ -17,7 +18,7 @@ class BaseGameClass:
     async def recieve_data(self, command_id, data, gamer_id):
         pass
 
-    def check_end(self):
+    def change_round(self):
         pass
 
     def change_turn(self):
@@ -26,5 +27,14 @@ class BaseGameClass:
     def create_board_map(self):
         pass
 
-    async def surrender(self , gamer_id):
+    def check_authority(self, data, gamer_id: int):
+        pass
+
+    def check_winner(self):
+        pass
+
+    def get_game_winner(self):
+        pass
+
+    async def surrender(self, gamer_id):
         pass
