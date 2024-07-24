@@ -2,17 +2,17 @@ from enum import Enum
 
 
 class RPCModel(Enum):
-    Rock = "Rock"
-    Paper = "Paper"
-    Cutter = "Cutter"
+    Rock = "rock"
+    Paper = "paper"
+    Cutter = "cutter"
 
 
 def string_to_rpc_enum(string):
-    if string == "Rock":
+    if string == "rock":
         return RPCModel.Rock
-    elif string == "Paper":
+    elif string == "paper":
         return RPCModel.Paper
-    elif string == "Cutter":
+    elif string == "cutter":
         return RPCModel.Cutter
     else:
         return RPCModel.Rock

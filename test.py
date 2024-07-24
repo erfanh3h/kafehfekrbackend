@@ -31,12 +31,23 @@ async def start():
     await sio.connect('http://localhost:5000', wait_timeout=1, auth={'user_id': 0, 'game_id': 'gameId'})
     await asyncio.sleep(1)
     while True:
-        message = input("select peace : ")
-        await sio.emit('userCommand', {'id': 'SelectPeace', 'data': int(message)})
+        message = input("select peace type : ")
+        selection = "rock"
+        if message == "0":
+            selection = "rock"
+        elif message == "1":
+            selection = "paper"
+        elif message == "2":
+            selection = "cutter"
+        await sio.emit('userCommand', {'id': 'SelectPeace', 'data': selection})
         await asyncio.sleep(.15)
 
     # await sio.wait()
 
+#tictactoe
+# message = input("select peace : ")
+# await sio.emit('userCommand', {'id': 'SelectPeace', 'data': int(message)})
+# await asyncio.sleep(.15)
 
 if __name__ == '__main__':
     loop = asyncio.get_event_loop()

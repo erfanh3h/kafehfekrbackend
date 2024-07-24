@@ -1,7 +1,7 @@
 import asyncio
 import time
 
-from Commons.wait_times import Turn_Time, TicTacToe_Sleep_Round_Time
+from Commons.wait_times import TicTacToe_Turn_Time, TicTacToe_Sleep_Round_Time
 from Commons.static_functions import make_command_json
 from Commons import commands
 from Entities.Games.TicTacToe import TicTacToeGameClass
@@ -48,7 +48,7 @@ class TicTacToeGameSession(BaseGameSession):
         asyncio.new_event_loop().run_until_complete(
             send_command(command=make_command_json(id=commands.Current_Turn, data=self.game_controller.current_turn),
                          game_id=self.game_id))
-        self.timer.start(Turn_Time, self.send_current_turn)
+        self.timer.start(TicTacToe_Turn_Time, self.send_current_turn)
 
     def change_round(self):
         time.sleep(TicTacToe_Sleep_Round_Time)

@@ -23,8 +23,9 @@ class RPCGameClass(BaseGameClass):
         self.gamer2_round_selection = RPCModel.Rock
 
     def get_game_data(self):
-        data = {"board": self.board, "scores": [self.gamer1_score, self.gamer2_score],
-                "current_round": self.current_round, "current_turn": self.current_turn}
+        data = {"round_scores": [self.gamer1_round_score, self.gamer2_round_score],
+                "total_scores": [self.gamer1_total_score, self.gamer2_total_score],
+                "current_round": self.current_round, "currentturn__round": self.current_turn_round, }
         return data
 
     def change_round(self):
@@ -50,20 +51,17 @@ class RPCGameClass(BaseGameClass):
         else:
             self.gamer2_round_selection = string_to_rpc_enum(string=data)
 
-    async def check_turn_round_winner(self):
+    def check_turn_round_winner(self):
         winner = self.check_winner()
         if winner is not None:
             if self.current_turn_round == self.turn_round_count:
                 if self.current_round != self.round_count:
-                    await self.send_data_function(commands.Finish_Round, {"Winner": winner})
                     self.is_round_finished = True
                 else:
-                    game_winner = self.get_game_winner()
-                    await self.send_data_function(commands.Finish_Round, {"Winner": game_winner})
                     self.is_game_finished = True
             else:
                 self.is_turn_round_finished = True
-                await self.send_data_function(commands.Finish_Turn_Round, {"Winner": winner})
+        return winner
 
     def check_authority(self, data, gamer_id: int):
         return True
@@ -80,6 +78,14 @@ class RPCGameClass(BaseGameClass):
                 self.gamer1_round_score += 1
                 break
         return winner
+
+    def get_round_winner(self):
+        if self.gamer1_round_score > self.gamer2_round_score:
+            return self.symbol_1
+        elif self.gamer2_round_score > self.gamer1_round_score:
+            return self.symbol_2
+        else:
+            return None
 
     def get_game_winner(self):
         if self.gamer1_total_score > self.gamer2_total_score:
