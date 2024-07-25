@@ -2,7 +2,7 @@ import asyncio
 import threading
 import time
 
-from Commons.wait_times import RPC_Turn_Round_Time, RPC_Sleep_Round_Time, RPC_Sleep_Turn_Round_Time
+from Entities.Games.wait_times import RPC_Turn_Round_Time, RPC_Sleep_Round_Time, RPC_Sleep_Turn_Round_Time
 from Commons.static_functions import make_command_json
 from Commons import commands
 from Entities.Games.RPC import RPCGameClass

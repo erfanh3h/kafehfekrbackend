@@ -1,6 +1,7 @@
 from Entities.Games.RPC.rpc_model import RPCModel, string_to_rpc_enum
 from Entities.Games.base_game_class import BaseGameClass
 from Commons import commands
+from Entities.Games.game_rounds import RPC_Round_Count, RPC_Turn_Round_Count
 
 
 class RPCGameClass(BaseGameClass):
@@ -11,8 +12,8 @@ class RPCGameClass(BaseGameClass):
         self.board = [0 for i in range(9)]
         self.win_conditions = [[RPCModel.Rock, RPCModel.Cutter], [RPCModel.Cutter, RPCModel.Paper],
                                [RPCModel.Paper, RPCModel.Rock]]
-        self.round_count = 2
-        self.turn_round_count = 5
+        self.round_count = RPC_Round_Count
+        self.turn_round_count = RPC_Turn_Round_Count
         self.current_round = 1
         self.current_turn_round = 1
         self.gamer1_round_score = 0

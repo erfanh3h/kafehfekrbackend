@@ -1,6 +1,6 @@
 from Entities.Games.base_game_class import BaseGameClass
 from Commons import commands
-
+from Entities.Games.game_rounds import TicTacToe_Round_Count
 
 class TicTacToeGameClass(BaseGameClass):
     def __init__(self, send_data_function):
@@ -10,7 +10,7 @@ class TicTacToeGameClass(BaseGameClass):
         self.board = [0 for i in range(9)]
         self.win_conditions = [[0, 1, 2], [3, 4, 5], [6, 7, 8], [0, 3, 6], [1, 4, 7], [2, 5, 8], [0, 4, 8], [2, 4, 6]]
         self.counter = 0
-        self.round_count = 2
+        self.round_count = TicTacToe_Round_Count
         self.current_round = 1
         self.gamer1_score = 0
         self.gamer2_score = 0

@@ -1,7 +1,7 @@
 import asyncio
 import time
 
-from Commons.wait_times import TicTacToe_Turn_Time, TicTacToe_Sleep_Round_Time
+from Entities.Games.wait_times import TicTacToe_Turn_Time, TicTacToe_Sleep_Round_Time
 from Commons.static_functions import make_command_json
 from Commons import commands
 from Entities.Games.TicTacToe import TicTacToeGameClass
