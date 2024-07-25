@@ -54,12 +54,12 @@ class RPCGameClass(BaseGameClass):
     def check_turn_round_winner(self):
         winner = self.check_winner()
         if self.current_turn_round == self.turn_round_count:
+            if self.gamer1_round_score > self.gamer2_round_score:
+                self.gamer1_total_score += 1
+            elif self.gamer2_round_score > self.gamer1_round_score:
+                self.gamer2_total_score += 1
             if self.current_round != self.round_count:
                 self.is_round_finished = True
-                if self.gamer1_round_score > self.gamer2_round_score:
-                    self.gamer1_total_score +=1
-                elif self.gamer2_round_score > self.gamer1_round_score:
-                    self.gamer2_total_score +=1
             else:
                 self.is_game_finished = True
         else:
@@ -79,7 +79,7 @@ class RPCGameClass(BaseGameClass):
                 break
             if self.gamer2_round_selection == condition[0] and self.gamer1_round_selection == condition[1]:
                 winner = self.symbol_2
-                self.gamer1_round_score += 1
+                self.gamer2_round_score += 1
                 break
         return winner
 
@@ -97,7 +97,7 @@ class RPCGameClass(BaseGameClass):
         elif self.gamer2_total_score > self.gamer1_total_score:
             return self.symbol_2
         else:
-            return None
+            return 0
 
     def change_turn(self):
         pass

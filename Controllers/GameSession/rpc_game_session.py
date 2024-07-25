@@ -57,28 +57,25 @@ class RPCGameSession(BaseGameSession):
         from Entities.SocketIOManagerClass import send_command
         self.game_controller.check_turn_round_winner()
         if self.game_controller.is_game_finished:
+            self.check_and_send_turn_round_winner()
+            time.sleep(3)
+            self.check_and_send_round_winner()
+            time.sleep(3)
             print("end game ")
             game_winner = self.game_controller.get_game_winner()
             asyncio.new_event_loop().run_until_complete(
                 send_command(command=make_command_json(id=commands.Finish_Game, data={"Winner": game_winner}),
                              game_id=self.game_id))
         elif self.game_controller.is_round_finished:
+            self.check_and_send_turn_round_winner()
+            time.sleep(3)
             print("end round ", self.game_controller.current_round)
-            round_winner = self.game_controller.get_round_winner()
-            asyncio.new_event_loop().run_until_complete(
-                send_command(command=make_command_json(id=commands.Finish_Round, data={"Winner": round_winner}),
-                             game_id=self.game_id))
+            self.check_and_send_round_winner()
             self.timer.start(RPC_Sleep_Round_Time, self.start_new_turn_round)
             self.game_controller.change_round()
         elif self.game_controller.is_turn_round_finished:
             print("end turn round ", self.game_controller.current_turn_round)
-            turn_round_winner = self.game_controller.check_winner()
-            asyncio.new_event_loop().run_until_complete(
-                send_command(command=make_command_json(id=commands.Finish_Turn_Round, data={
-                    "Winner": turn_round_winner,
-                    "P1_selection": str(self.game_controller.gamer1_round_selection),
-                    "P2_selection": str(self.game_controller.gamer2_round_selection)}
-                                                       ), game_id=self.game_id))
+            self.check_and_send_turn_round_winner()
             self.timer.start(RPC_Sleep_Turn_Round_Time, self.start_new_turn_round)
             self.game_controller.change_turn_round()
         else:
@@ -90,3 +87,20 @@ class RPCGameSession(BaseGameSession):
         self.timer.start(RPC_Turn_Round_Time, self.send_current_turn)
         asyncio.new_event_loop().run_until_complete(
             send_command(command=make_command_json(id=commands.New_Turn_Round, data=None), game_id=self.game_id))
+
+    def check_and_send_turn_round_winner(self):
+        from Entities.SocketIOManagerClass import send_command
+        turn_round_winner = self.game_controller.check_winner()
+        asyncio.new_event_loop().run_until_complete(
+            send_command(command=make_command_json(id=commands.Finish_Turn_Round, data={
+                "Winner": turn_round_winner,
+                "P1_selection": self.game_controller.gamer1_round_selection.value,
+                "P2_selection": self.game_controller.gamer2_round_selection.value}
+                                                   ), game_id=self.game_id))
+
+    def check_and_send_round_winner(self):
+        from Entities.SocketIOManagerClass import send_command
+        round_winner = self.game_controller.get_round_winner()
+        asyncio.new_event_loop().run_until_complete(
+            send_command(command=make_command_json(id=commands.Finish_Round, data={"Winner": round_winner}),
+                         game_id=self.game_id))
