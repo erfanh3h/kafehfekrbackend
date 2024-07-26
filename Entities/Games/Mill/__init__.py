@@ -15,6 +15,7 @@ class MillGameClass(BaseGameClass):
         self.player2_played_peaces = 0
         self.player1_removed_peaces = 0
         self.player2_removed_peaces = 0
+        self.current_remover = 0 # if user successfully removed a peace , he can remove peace now
         self.win_conditions = [[0, 1, 2], [0, 9, 21], [21, 22, 23], [23, 14, 16], [1, 4, 7], [9, 10, 11], [22, 19, 16],
                                [14, 13, 12], [3, 4, 5], [3, 10, 18], [18, 19, 20], [20, 13, 5], [6, 7, 8], [6, 1, 15],
                                [15, 16, 17],
@@ -37,7 +38,7 @@ class MillGameClass(BaseGameClass):
 
     async def recieve_data(self, command_id, data, gamer_id):
         print(command_id, data, gamer_id)
-        if command_id == commands.Peace_Selected:
+        if command_id == commands.Select_Peace:
             peace_number = data
             if gamer_id == 1:
                 self.board[peace_number] = self.symbol_1
@@ -47,22 +48,23 @@ class MillGameClass(BaseGameClass):
                 self.player2_played_peaces += 1
             result = self.check_all_match_three_conditions(peace_number, gamer_id)
             if result:
-                self.call_user_for_send_nominate_remove()
-        elif command_id == commands.Peace_Swaped:
+                self.current_remover = gamer_id
+        elif command_id == commands.Swap_Peace:
             source_peace_number = data["source"]
             target_peace_number = data["target"]
             self.board[source_peace_number] = 0
             self.board[target_peace_number] = gamer_id
             result = self.check_all_match_three_conditions(target_peace_number, gamer_id)
             if result:
-                self.call_user_for_send_nominate_remove()
-        elif command_id == commands.Removed_Peace:
+                self.current_remover = gamer_id
+        elif command_id == commands.Remove_Peace:
             peace_number = data
             self.board[peace_number] = 0
             if gamer_id == 1:
                 self.player2_removed_peaces += 1
             else:
                 self.player2_removed_peaces += 1
+            self.current_remover = 0
             winner = self.check_winner()
             if winner is not None:
                 await self.send_data_function(commands.Finish_Game, {"Winner": winner})
@@ -90,10 +92,11 @@ class MillGameClass(BaseGameClass):
         pass
 
     def change_turn(self):
+        self.current_remover = 0
         if self.current_turn == 1:
-            self.current_turn = 2
+            self.current_turn = self.symbol_2
         else:
-            self.current_turn = 1
+            self.current_turn = self.symbol_1
 
     async def surrender(self, gamer_id):
         self.is_game_finished = True
@@ -133,10 +136,6 @@ class MillGameClass(BaseGameClass):
             else:
                 return True
 
-    def call_user_for_send_nominate_remove(self):
-        import asyncio
-        asyncio.new_event_loop().run_until_complete(self.send_data_function(commands.Select_Remove_Peace, None))
-
     def check_select_authority(self, data, gamer_id):
         if not self.check_authority(data, gamer_id):
             return False
@@ -150,6 +149,8 @@ class MillGameClass(BaseGameClass):
     def check_swap_authority(self, data, gamer_id):
         if not self.check_authority(data, gamer_id):
             return False
+        if not self.check_player_all_pieces_placed(gamer_id):
+            return False
         source_peace_number = data["source"]
         target_peace_number = data["target"]
         if self.board[source_peace_number] != gamer_id:
@@ -160,6 +161,8 @@ class MillGameClass(BaseGameClass):
 
     def check_remove_authority(self, data, gamer_id):
         if not self.check_authority(data, gamer_id):
+            return False
+        if self.current_remover != gamer_id:
             return False
         peace_number = data
         if self.board[peace_number] == 0 or self.board[peace_number] == gamer_id:
