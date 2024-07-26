@@ -40,7 +40,6 @@ async def start():
         elif message == "2":
             selection = "cutter"
         await sio.emit('userCommand', {'id': 'SelectPeace', 'data': selection})
-        await asyncio.sleep(.15)
 
     # await sio.wait()
 
@@ -49,6 +48,16 @@ async def start():
 # await sio.emit('userCommand', {'id': 'SelectPeace', 'data': int(message)})
 # await asyncio.sleep(.15)
 
+#RPC
+# message = input("select peace type : ")
+# selection = "rock"
+# if message == "0":
+#     selection = "rock"
+# elif message == "1":
+#     selection = "paper"
+# elif message == "2":
+#     selection = "cutter"
+# await sio.emit('userCommand', {'id': 'SelectPeace', 'data': selection})
 if __name__ == '__main__':
     loop = asyncio.get_event_loop()
     loop.run_until_complete(start())
