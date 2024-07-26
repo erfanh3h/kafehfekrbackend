@@ -26,7 +26,7 @@ class RPCGameClass(BaseGameClass):
     def get_game_data(self):
         data = {"round_scores": [self.gamer1_round_score, self.gamer2_round_score],
                 "total_scores": [self.gamer1_total_score, self.gamer2_total_score],
-                "current_round": self.current_round, "currentturn__round": self.current_turn_round, }
+                "current_round": self.current_round, "current_turn__round": self.current_turn_round, }
         return data
 
     def change_round(self):
