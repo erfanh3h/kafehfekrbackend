@@ -68,7 +68,8 @@ class RPCGameClass(BaseGameClass):
         return winner
 
     def check_authority(self, data, gamer_id: int):
-        print("akbar")
+        if self.is_round_finished or self.is_game_finished or self.is_turn_round_finished:
+            return False
         return True
 
     def check_winner(self):

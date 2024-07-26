@@ -1,0 +1,167 @@
+from Entities.Games.base_game_class import BaseGameClass
+from Commons import commands
+
+
+class MillGameClass(BaseGameClass):
+    def __init__(self, send_data_function):
+        super().__init__(send_data_function)
+        self.symbol_1 = 1
+        self.symbol_2 = 2
+        self.board = [0 for i in range(9)]
+        self.current_round = 1
+        self.player1_peaces = 10
+        self.player2_peaces = 10
+        self.player1_played_peaces = 0
+        self.player2_played_peaces = 0
+        self.player1_removed_peaces = 0
+        self.player2_removed_peaces = 0
+        self.win_conditions = [[0, 1, 2], [0, 9, 21], [21, 22, 23], [23, 14, 16], [1, 4, 7], [9, 10, 11], [22, 19, 16],
+                               [14, 13, 12], [3, 4, 5], [3, 10, 18], [18, 19, 20], [20, 13, 5], [6, 7, 8], [6, 1, 15],
+                               [15, 16, 17],
+                               [17, 12, 8], ]
+        self.pieces_neighbors = {0: [1, 9], 1: [0, 2, 4], 2: [1, 14], 3: [4, 10], 4: [1, 3, 5, 7], 5: [4, 13],
+                                 6: [7, 11],
+                                 7: [4, 6, 8], 8: [7, 12], 9: [0, 10, 21], 10: [3, 9, 11, 18], 11: [6, 10, 15],
+                                 12: [8, 13, 17],
+                                 13: [5, 12, 14, 20], 14: [2, 13, 23], 15: [11, 16], 16: [15, 17, 19], 17: [12, 16],
+                                 18: [10, 19],
+                                 19: [16, 18, 20, 22], 20: [13, 19], 21: [9, 22], 22: [19, 21, 23], 23: [14, 22]}
+
+    def get_game_data(self):
+        data = {"board": self.board, "scores": "[self.gamer1_score, self.gamer2_score]",
+                "current_turn": self.current_turn}
+        return data
+
+    def change_round(self):
+        pass
+
+    async def recieve_data(self, command_id, data, gamer_id):
+        print(command_id, data, gamer_id)
+        if command_id == commands.Peace_Selected:
+            peace_number = data
+            if gamer_id == 1:
+                self.board[peace_number] = self.symbol_1
+                self.player1_played_peaces += 1
+            else:
+                self.board[peace_number] = self.symbol_2
+                self.player2_played_peaces += 1
+            result = self.check_all_match_three_conditions(peace_number, gamer_id)
+            if result:
+                self.call_user_for_send_nominate_remove()
+        elif command_id == commands.Peace_Swaped:
+            source_peace_number = data["source"]
+            target_peace_number = data["target"]
+            self.board[source_peace_number] = 0
+            self.board[target_peace_number] = gamer_id
+            result = self.check_all_match_three_conditions(target_peace_number, gamer_id)
+            if result:
+                self.call_user_for_send_nominate_remove()
+        elif command_id == commands.Removed_Peace:
+            peace_number = data
+            self.board[peace_number] = 0
+            if gamer_id == 1:
+                self.player2_removed_peaces += 1
+            else:
+                self.player2_removed_peaces += 1
+            winner = self.check_winner()
+            if winner is not None:
+                await self.send_data_function(commands.Finish_Game, {"Winner": winner})
+                self.is_game_finished = True
+
+    def check_authority(self, data, gamer_id: int):
+        if (self.current_turn == 1 and gamer_id != 1) or (self.current_turn == 2 and gamer_id != 2):
+            print("not turn of : ", gamer_id)
+            return False
+        if self.is_game_finished:
+            return False
+        return True
+
+    def check_winner(self):
+        winner = None
+        if self.player1_peaces - self.player1_removed_peaces < 3:
+            print(f"Player{self.symbol_2} win game.")
+            winner = self.symbol_2
+        elif self.player2_peaces - self.player2_removed_peaces < 3:
+            print(f"Player{self.symbol_1} win game.")
+            winner = self.symbol_1
+        return winner
+
+    def get_game_winner(self):
+        pass
+
+    def change_turn(self):
+        if self.current_turn == 1:
+            self.current_turn = 2
+        else:
+            self.current_turn = 1
+
+    async def surrender(self, gamer_id):
+        self.is_game_finished = True
+        if gamer_id == 1:
+            game_winner = 2
+        else:
+            game_winner = 1
+        await self.send_data_function(commands.Surrender, {"gamer_id": gamer_id})
+
+    def check_all_match_three_conditions(self, user_input, gamer_id):
+        temp_list = []
+        for raw_data in self.win_conditions:
+            if raw_data.__contains__(user_input):
+                temp_list.append(raw_data)
+
+        for raw_data in temp_list:
+            raw_result = self.check_match_three(raw_data, gamer_id)
+            if raw_result:
+                return True
+        return False
+
+    def check_match_three(self, raw_data, user_label) -> bool:
+        for data in raw_data:
+            if self.board[data] != user_label:
+                return False
+        return True
+
+    def check_player_all_pieces_placed(self, gamer_id) -> bool:
+        if gamer_id == 1:
+            if self.player1_played_peaces < self.player1_peaces:
+                return False
+            else:
+                return True
+        else:
+            if self.player2_played_peaces < self.player2_peaces:
+                return False
+            else:
+                return True
+
+    def call_user_for_send_nominate_remove(self):
+        import asyncio
+        asyncio.new_event_loop().run_until_complete(self.send_data_function(commands.Select_Remove_Peace, None))
+
+    def check_select_authority(self, data, gamer_id):
+        if not self.check_authority(data, gamer_id):
+            return False
+        peace_number = data
+        if self.board[peace_number] != 0:
+            return False
+        if self.check_player_all_pieces_placed(gamer_id):
+            return False
+        return True
+
+    def check_swap_authority(self, data, gamer_id):
+        if not self.check_authority(data, gamer_id):
+            return False
+        source_peace_number = data["source"]
+        target_peace_number = data["target"]
+        if self.board[source_peace_number] != gamer_id:
+            return False
+        if self.board[target_peace_number] != 0:
+            return False
+        return True
+
+    def check_remove_authority(self, data, gamer_id):
+        if not self.check_authority(data, gamer_id):
+            return False
+        peace_number = data
+        if self.board[peace_number] == 0 or self.board[peace_number] == gamer_id:
+            return False
+        return True
