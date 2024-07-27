@@ -39,9 +39,10 @@ class MillGameSession(BaseGameSession):
                 await self.game_controller.recieve_data(data['id'], data, gamer_id)
                 self.timer.stop()
         elif data['id'] == commands.Select_Remove_Peace:
-            is_selection_correct = self.game_controller.check_remove_authority(data['data'], gamer_id)
+            peace_id = data['data']
+            is_selection_correct = self.game_controller.check_remove_authority(peace_id, gamer_id)
             if is_selection_correct:
-                await self.game_controller.recieve_data(data['id'], data, gamer_id)
+                await self.game_controller.recieve_data(data['id'], peace_id, gamer_id)
                 self.timer.stop()
         elif data['id'] == commands.Surrender:
             await self.game_controller.surrender(gamer_id)
@@ -61,8 +62,11 @@ class MillGameSession(BaseGameSession):
         else:
             asyncio.new_event_loop().run_until_complete(
                 send_command(
-                    command=make_command_json(id=commands.Select_Remove_Peace, data=self.game_controller.current_remover),
+                    command=make_command_json(id=commands.Select_Remove_Peace,
+                                              data=self.game_controller.current_remover),
                     game_id=self.game_id))
-            self.timer.start(Mill_Remove_Time, self.send_current_turn)
-            self.game_controller.current_remover = 0
+            self.timer.start(Mill_Remove_Time, self.call_after_wait_for_remove_peace)
 
+    def call_after_wait_for_remove_peace(self):
+        self.game_controller.current_remover = 0
+        self.send_current_turn()
