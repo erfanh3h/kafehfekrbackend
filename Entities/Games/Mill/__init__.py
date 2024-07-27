@@ -7,7 +7,7 @@ class MillGameClass(BaseGameClass):
         super().__init__(send_data_function)
         self.symbol_1 = 1
         self.symbol_2 = 2
-        self.board = [0 for i in range(9)]
+        self.board = [0 for i in range(24)]
         self.current_round = 1
         self.player1_peaces = 10
         self.player2_peaces = 10
@@ -15,8 +15,8 @@ class MillGameClass(BaseGameClass):
         self.player2_played_peaces = 0
         self.player1_removed_peaces = 0
         self.player2_removed_peaces = 0
-        self.current_remover = 0 # if user successfully removed a peace , he can remove peace now
-        self.win_conditions = [[0, 1, 2], [0, 9, 21], [21, 22, 23], [23, 14, 16], [1, 4, 7], [9, 10, 11], [22, 19, 16],
+        self.current_remover = 0  # if user successfully removed a peace , he can remove peace now
+        self.win_conditions = [[0, 1, 2], [0, 9, 21], [21, 22, 23], [23, 14, 2], [1, 4, 7], [9, 10, 11], [22, 19, 16],
                                [14, 13, 12], [3, 4, 5], [3, 10, 18], [18, 19, 20], [20, 13, 5], [6, 7, 8], [6, 1, 15],
                                [15, 16, 17],
                                [17, 12, 8], ]
@@ -46,6 +46,7 @@ class MillGameClass(BaseGameClass):
             else:
                 self.board[peace_number] = self.symbol_2
                 self.player2_played_peaces += 1
+            await self.send_data_function(commands.Peace_Selected, {'user': gamer_id, 'target_peace': peace_number})
             result = self.check_all_match_three_conditions(peace_number, gamer_id)
             if result:
                 self.current_remover = gamer_id
@@ -54,10 +55,12 @@ class MillGameClass(BaseGameClass):
             target_peace_number = data["target"]
             self.board[source_peace_number] = 0
             self.board[target_peace_number] = gamer_id
+            await self.send_data_function(commands.Peace_Swaped, {'user': gamer_id, 'source_peace': source_peace_number,
+                                                                  'target_peace': target_peace_number})
             result = self.check_all_match_three_conditions(target_peace_number, gamer_id)
             if result:
                 self.current_remover = gamer_id
-        elif command_id == commands.Remove_Peace:
+        elif command_id == commands.Peace_Removed:
             peace_number = data
             self.board[peace_number] = 0
             if gamer_id == 1:
@@ -65,6 +68,7 @@ class MillGameClass(BaseGameClass):
             else:
                 self.player2_removed_peaces += 1
             self.current_remover = 0
+            await self.send_data_function(commands.Peace_Removed, {'user': gamer_id, 'target_peace': peace_number})
             winner = self.check_winner()
             if winner is not None:
                 await self.send_data_function(commands.Finish_Game, {"Winner": winner})
@@ -156,6 +160,8 @@ class MillGameClass(BaseGameClass):
         if self.board[source_peace_number] != gamer_id:
             return False
         if self.board[target_peace_number] != 0:
+            return False
+        if target_peace_number not in self.pieces_neighbors[source_peace_number]:
             return False
         return True
 
