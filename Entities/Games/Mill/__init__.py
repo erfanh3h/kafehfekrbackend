@@ -9,8 +9,8 @@ class MillGameClass(BaseGameClass):
         self.symbol_2 = 2
         self.board = [0 for i in range(24)]
         self.current_round = 1
-        self.player1_peaces = 3
-        self.player2_peaces = 3
+        self.player1_peaces = 10
+        self.player2_peaces = 10
         self.player1_played_peaces = 0
         self.player2_played_peaces = 0
         self.player1_removed_peaces = 0
@@ -29,8 +29,9 @@ class MillGameClass(BaseGameClass):
                                  19: [16, 18, 20, 22], 20: [13, 19], 21: [9, 22], 22: [19, 21, 23], 23: [14, 22]}
 
     def get_game_data(self):
-        data = {"board": self.board, "scores": "[self.gamer1_score, self.gamer2_score]",
-                "current_turn": self.current_turn}
+        data = {"board": self.board, "played_peaces": [self.player1_played_peaces, self.player1_played_peaces],
+                "removed_peaces": [self.player1_removed_peaces, self.player1_removed_peaces],
+                "current_turn": self.current_turn, "current_remover": self.current_remover}
         return data
 
     def change_round(self):
