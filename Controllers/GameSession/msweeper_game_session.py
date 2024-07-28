@@ -61,8 +61,7 @@ class MSweeperGameSession(BaseGameSession):
         self.game_controller.change_turn()
         from Entities.SocketIOManagerClass import send_command
         asyncio.new_event_loop().run_until_complete(
-            send_command(command=make_command_json(id=commands.Start_Game, data=self.game_controller.current_turn),
-                         game_id=self.game_id))
+            send_command(command=make_command_json(id=commands.Start_Game, data=None), game_id=self.game_id))
         self.timer.start(MSweeper_game_Time, self.check_winner)
 
     def check_winner(self):
