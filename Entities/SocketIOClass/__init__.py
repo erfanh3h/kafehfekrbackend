@@ -1,6 +1,7 @@
 import socketio
 
 from Controllers.GameSession.mill_game_session import MillGameSession
+from Controllers.GameSession.tictactoe_game_session import TicTacToeGameSession
 from Models.Gamer import GamerModel
 from Commons import static_functions
 
@@ -8,6 +9,7 @@ Socket_Server = socketio.AsyncServer(async_mode='asgi')
 
 current_game_id = "gameId"
 gameSession = MillGameSession(game_id=current_game_id)
+# gameSession = TicTacToeGameSession(game_id=current_game_id)
 gameSession.add_gamer(GamerModel(user_id=0, username='test'))
 gameSession.add_gamer(GamerModel(user_id=1, username='mobile'))
 gameSession.start_game_timer()
