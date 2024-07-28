@@ -5,3 +5,5 @@ RPC_Sleep_Turn_Round_Time = 3
 RPC_Sleep_Round_Time = 5
 Mill_Select_Time = 15
 Mill_Remove_Time = 15
+MSweeper_game_Time = 600
+

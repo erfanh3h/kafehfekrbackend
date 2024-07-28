@@ -102,6 +102,13 @@ class BaseGameSession:
         from Entities.SocketIOManagerClass import send_command
         await send_command(command=make_command_json(id=command_id, data=command_data), game_id=self.game_id)
 
+    async def send_private_command(self , command_id , command_data , gamer_id):
+        socket_id = self.find_gamer_from_id(gamer_id).socket_id
+        from Entities.SocketIOManagerClass import send_private_command
+        asyncio.new_event_loop().run_until_complete(
+            send_private_command(command=make_command_json(id=command_id, data=command_data),
+                                 socket_id=socket_id, game_id=self.game_id))
+
     async def command_received(self, data, socket_id):
         pass
 
