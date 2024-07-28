@@ -1,6 +1,7 @@
 class boardSpot(object):
     value = 0
     selected = False
+    select_mine = False
     mine = False
 
     def __init__(self):

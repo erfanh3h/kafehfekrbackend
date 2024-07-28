@@ -34,7 +34,6 @@ class MSweeperGameSession(BaseGameSession):
                 self.is_game_running = True
                 self.prepare_gamers()
                 self.send_game_data()
-                self.game_controller.change_turn()
                 self.send_start_game()
                 break
             time.sleep(2)
