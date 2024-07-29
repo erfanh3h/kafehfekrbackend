@@ -23,10 +23,10 @@ class MSweeperGameClass(BaseGameClass):
         self.symbol_1 = 1
         self.symbol_2 = 2
         self.board_size = 8
-        self.num_mines = 12
+        self.num_mines = 10
         self.board = [[boardSpot() for i in range(self.board_size)] for j in range(self.board_size)]
-        self.player1_board = self.board.copy()
-        self.player2_board = self.board.copy()
+        self.player1_board = [[boardSpot() for i in range(self.board_size)] for j in range(self.board_size)]
+        self.player2_board = [[boardSpot() for i in range(self.board_size)] for j in range(self.board_size)]
         self.player1_selectable_spots = self.board_size * self.board_size - self.num_mines
         self.player2_selectable_spots = self.board_size * self.board_size - self.num_mines
         self.player1_selectable_mines = self.num_mines
@@ -44,6 +44,7 @@ class MSweeperGameClass(BaseGameClass):
         self.player2_score = 0
         self.is_player1_tapped_mine = False
         self.is_player2_tapped_mine = False
+        print(self.show_board())
 
     def show_board(self):
         returnString = " "
@@ -76,9 +77,9 @@ class MSweeperGameClass(BaseGameClass):
         for y in range(0, self.board_size):
             returnString += str(y)
             for x in range(0, self.board_size):
-                if self.board[x][y].mine and self.player1_board[x][y].selected:
+                if self.player1_board[x][y].mine and self.player1_board[x][y].selected:
                     returnString += " |" + str(self.player1_board[x][y].value)
-                elif self.board[x][y].selected:
+                elif self.player1_board[x][y].selected:
                     returnString += " | " + str(self.player1_board[x][y].value)
                 else:
                     returnString += " |  "
@@ -103,9 +104,11 @@ class MSweeperGameClass(BaseGameClass):
     async def select_peace(self, x, y, gamer_id):
         if gamer_id == 1:
             self.player1_board[x][y].selected = True
+            self.player1_board[x][y].value = self.board[x][y].value
             self.player1_selectable_spots -= 1
         else:
             self.player2_board[x][y].selected = True
+            self.player2_board[x][y].value = self.board[x][y].value
             self.player2_selectable_spots -= 1
         if self.board[x][y].value == -1:
             return False
@@ -136,16 +139,18 @@ class MSweeperGameClass(BaseGameClass):
     async def select_mine(self, x, y, gamer_id):
         if gamer_id == 1:
             self.player1_board[x][y].select_mine = True
-            self.player2_selectable_mines -= 1
+            self.player1_selectable_mines -= 1
         else:
             self.player2_board[x][y].select_mine = True
             self.player2_selectable_mines -= 1
         if self.is_peace_mine(x, y):
             if gamer_id == 1:
                 self.player1_score += 1
+                self.player1_board[x][y].value = self.board[x][y].value
                 score = self.player1_score
             else:
                 self.player2_score += 1
+                self.player2_board[x][y].value = self.board[x][y].value
                 score = self.player2_score
             peace_number = get_peace_of_coordinate(x, y)
             await self.send_private_data_function(commands.Select_Mine_Correct, {"peace_number": peace_number},
@@ -184,12 +189,11 @@ class MSweeperGameClass(BaseGameClass):
                     self.player2_selectable_mines = 0
                     self.player2_selectable_spots = 0
                     self.is_player2_tapped_mine = True
-            else:
-                is_game_finished = self.check_end_game()
-                if is_game_finished:
-                    self.finish_game()
-                    game_winner = self.get_game_winner()
-                    await self.send_data_function(commands.Finish_Game, {"Winner": game_winner})
+            is_game_finished = self.check_end_game()
+            if is_game_finished:
+                self.finish_game()
+                game_winner = self.get_game_winner()
+                await self.send_data_function(commands.Finish_Game, {"Winner": game_winner})
             print(self.show_board())
             print(self.show_player1_board())
         elif command_id == commands.Select_Mine:
@@ -211,13 +215,17 @@ class MSweeperGameClass(BaseGameClass):
         #         await self.send_data_function(commands.Finish_Round, {"Winner": winner})
 
     def check_end_game(self):
-        if (self.player1_selectable_spots == 0 and self.player2_selectable_spots == 0 and
-                self.player1_selectable_mines == 0 and self.player2_selectable_mines == 0):
+        if self.player1_selectable_mines == 0 and self.player2_selectable_mines == 0:
             return True
         if self.player1_selectable_mines == 0 and self.player1_score == self.num_mines:
             return True
         if self.player2_selectable_mines == 0 and self.player2_score == self.num_mines:
             return True
+        if self.player1_selectable_mines == 0 and self.player2_score > self.player1_score:
+            return True
+        if self.player2_selectable_mines == 0 and self.player1_score > self.player2_score:
+            return True
+        return False
 
     def get_game_winner(self):
         if self.player1_score > self.player2_score:
