@@ -31,6 +31,10 @@ class MSweeperGameClass(BaseGameClass):
         self.player2_selectable_spots = self.board_size * self.board_size - self.num_mines
         self.player1_selectable_mines = self.num_mines
         self.player2_selectable_mines = self.num_mines
+        self.player1_score = 0
+        self.player2_score = 0
+        self.is_player1_tapped_mine = False
+        self.is_player2_tapped_mine = False
         i = 0
         while i < self.num_mines:
             x = random.randint(0, self.board_size - 1)
@@ -40,52 +44,28 @@ class MSweeperGameClass(BaseGameClass):
                 i += 1
             else:
                 i -= 1
-        self.player1_score = 0
-        self.player2_score = 0
-        self.is_player1_tapped_mine = False
-        self.is_player2_tapped_mine = False
         print(self.show_board())
 
-    def show_board(self):
-        returnString = " "
-        divider = "\n---"
-
-        for i in range(0, self.board_size):
-            returnString += " | " + str(i)
-            divider += "----"
-        divider += "\n"
-
-        returnString += divider
-        for y in range(0, self.board_size):
-            returnString += str(y)
-            for x in range(0, self.board_size):
-                returnString += " |" + str(self.board[x][y].value)
-            returnString += " |"
-            returnString += divider
-        return returnString
-
-    def show_player1_board(self):
-        returnString = " "
-        divider = "\n---"
-
-        for i in range(0, self.board_size):
-            returnString += " | " + str(i)
-            divider += "----"
-        divider += "\n"
-
-        returnString += divider
-        for y in range(0, self.board_size):
-            returnString += str(y)
-            for x in range(0, self.board_size):
-                if self.player1_board[x][y].mine and self.player1_board[x][y].selected:
-                    returnString += " |" + str(self.player1_board[x][y].value)
-                elif self.player1_board[x][y].selected:
-                    returnString += " | " + str(self.player1_board[x][y].value)
-                else:
-                    returnString += " |  "
-            returnString += " |"
-            returnString += divider
-        return returnString
+    def get_game_data_msweeper(self, gamer_id):
+        board_peaces_data = []
+        if gamer_id == 1:
+            remaining_selectable_mines = self.player1_selectable_mines
+            remaining_selectable_peaces = self.player1_selectable_spots
+            is_tapped_mine = self.is_player1_tapped_mine
+            for j in range(self.board_size):
+                for i in range(self.board_size):
+                    board_peaces_data.append(self.player1_board[i][j].to_json())
+        else:
+            remaining_selectable_mines = self.player2_selectable_mines
+            remaining_selectable_peaces = self.player2_selectable_spots
+            is_tapped_mine = self.is_player2_tapped_mine
+            for j in range(self.board_size):
+                for i in range(self.board_size):
+                    board_peaces_data.append(self.player2_board[i][j].to_json())
+        data = {"board": board_peaces_data, "scores": [self.player1_score, self.player2_score],
+                "remaining_selectable_mines": remaining_selectable_mines,
+                "remaining_selectable_peaces": remaining_selectable_peaces, "is_tapped_mine": is_tapped_mine}
+        return data
 
     def add_mine(self, x, y):
         self.board[x][y].value = -1
@@ -138,40 +118,37 @@ class MSweeperGameClass(BaseGameClass):
 
     async def select_mine(self, x, y, gamer_id):
         if gamer_id == 1:
-            self.player1_board[x][y].select_mine = True
             self.player1_selectable_mines -= 1
         else:
-            self.player2_board[x][y].select_mine = True
             self.player2_selectable_mines -= 1
         if self.is_peace_mine(x, y):
             if gamer_id == 1:
+                self.player1_board[x][y].correctly_selected_mine = True
                 self.player1_score += 1
                 self.player1_board[x][y].value = self.board[x][y].value
+                self.player1_board[x][y].mine = True
                 score = self.player1_score
             else:
+                self.player2_board[x][y].correctly_selected_mine = True
                 self.player2_score += 1
                 self.player2_board[x][y].value = self.board[x][y].value
+                self.player2_board[x][y].mine = True
                 score = self.player2_score
             peace_number = get_peace_of_coordinate(x, y)
             await self.send_private_data_function(commands.Select_Mine_Correct, {"peace_number": peace_number},
                                                   gamer_id)
             await self.send_data_function(commands.Player_Score, {"gamer_id": gamer_id, "value": score})
         else:
+            if gamer_id == 1:
+                self.player1_board[x][y].wrongly_selected_mine = True
+            else:
+                self.player2_board[x][y].wrongly_selected_mine = True
             peace_number = get_peace_of_coordinate(x, y)
             await self.send_private_data_function(commands.Select_Mine_Wrong, {"peace_number": peace_number},
                                                   gamer_id)
 
     def is_peace_mine(self, x, y):
         return self.board[x][y].value == -1
-
-    def get_game_data(self):
-        return {}
-        # data = {"board": self.board, "scores": [self.player1_score, self.player2_score],
-        #         "current_turn": self.current_turn}
-        # return data
-
-    def change_round(self):
-        pass
 
     async def recieve_data(self, command_id, data, gamer_id):
         print(command_id, data, gamer_id)
@@ -185,10 +162,14 @@ class MSweeperGameClass(BaseGameClass):
                     self.player1_selectable_mines = 0
                     self.player1_selectable_spots = 0
                     self.is_player1_tapped_mine = True
+                    self.player1_board[x][y].hitted_mine = True
+                    self.player1_board[x][y].mine = True
                 else:
                     self.player2_selectable_mines = 0
                     self.player2_selectable_spots = 0
                     self.is_player2_tapped_mine = True
+                    self.player2_board[x][y].hitted_mine = True
+                    self.player2_board[x][y].mine = True
             is_game_finished = self.check_end_game()
             if is_game_finished:
                 self.finish_game()
@@ -274,3 +255,44 @@ class MSweeperGameClass(BaseGameClass):
         else:
             game_winner = 1
         await self.send_data_function(commands.Surrender, {"gamer_id": gamer_id})
+
+    def show_board(self):
+        returnString = " "
+        divider = "\n---"
+
+        for i in range(0, self.board_size):
+            returnString += " | " + str(i)
+            divider += "----"
+        divider += "\n"
+
+        returnString += divider
+        for y in range(0, self.board_size):
+            returnString += str(y)
+            for x in range(0, self.board_size):
+                returnString += " |" + str(self.board[x][y].value)
+            returnString += " |"
+            returnString += divider
+        return returnString
+
+    def show_player1_board(self):
+        returnString = " "
+        divider = "\n---"
+
+        for i in range(0, self.board_size):
+            returnString += " | " + str(i)
+            divider += "----"
+        divider += "\n"
+
+        returnString += divider
+        for y in range(0, self.board_size):
+            returnString += str(y)
+            for x in range(0, self.board_size):
+                if self.player1_board[x][y].mine and self.player1_board[x][y].selected:
+                    returnString += " |" + str(self.player1_board[x][y].value)
+                elif self.player1_board[x][y].selected:
+                    returnString += " | " + str(self.player1_board[x][y].value)
+                else:
+                    returnString += " |  "
+            returnString += " |"
+            returnString += divider
+        return returnString

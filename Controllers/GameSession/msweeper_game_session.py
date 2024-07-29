@@ -38,6 +38,21 @@ class MSweeperGameSession(BaseGameSession):
                 break
             time.sleep(2)
 
+    def send_reconnect_data(self, socket_id):
+        reconnect_data = {'gamers': []}
+        for gamer in self.gamers:
+            reconnect_data['gamers'].append({'id': gamer.gamer_id, 'name': gamer.username})
+        gamer_id = self.find_gamer_from_socket(socket_id).gamer_id
+        reconnect_data['game_data'] = self.game_controller.get_game_data_msweeper(gamer_id)
+        if self.timer.is_user_turn:
+            reconnect_data['timer_data'] = {'is_user_turn': True, 'time': self.timer.counter + 1}
+        else:
+            reconnect_data['timer_data'] = {'is_user_turn': False, 'time': 0}
+        from Entities.SocketIOManagerClass import send_private_command
+        asyncio.new_event_loop().run_until_complete(
+            send_private_command(command=make_command_json(id=commands.Reconnect_Data, data=reconnect_data),
+                                 socket_id=socket_id, game_id=self.game_id))
+
     async def command_received(self, data, socket_id):
         if not self.is_game_running:
             print("game not started yet")
