@@ -29,8 +29,8 @@ class MillGameClass(BaseGameClass):
                                  19: [16, 18, 20, 22], 20: [13, 19], 21: [9, 22], 22: [19, 21, 23], 23: [14, 22]}
 
     def get_game_data(self):
-        data = {"board": self.board, "played_peaces": [self.player1_played_peaces, self.player1_played_peaces],
-                "removed_peaces": [self.player1_removed_peaces, self.player1_removed_peaces],
+        data = {"board": self.board, "played_peaces": [self.player1_played_peaces, self.player2_played_peaces],
+                "removed_peaces": [self.player1_removed_peaces, self.player2_removed_peaces],
                 "current_turn": self.current_turn, "current_remover": self.current_remover}
         return data
 
