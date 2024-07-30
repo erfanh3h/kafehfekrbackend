@@ -16,8 +16,6 @@ class MNumbersGameClass(BaseGameClass):
         self.current_turn = 1
         self.init_board()
 
-    # if user successfully removed a peace , he can remove peace now
-
     def init_board(self):
         for i in range(18):
             index = i * 2
@@ -45,6 +43,7 @@ class MNumbersGameClass(BaseGameClass):
                                            'index2': self.board[second_peace_index].value, 'is_correct': is_correct})
             is_game_finished = self.check_end_game()
             if is_game_finished:
+                self.is_game_finished = True
                 winner = self.get_game_winner()
                 await self.send_data_function(commands.Finish_Game, {'Winner': winner})
 
