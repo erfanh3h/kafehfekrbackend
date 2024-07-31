@@ -3,7 +3,7 @@ import time
 
 from Entities.Games.MNumbers import MNumbersGameClass
 from Entities.Games.Mill import MillGameClass
-from Entities.Games.wait_times import MNumbers_Turn_Time
+from Entities.Games.wait_times import MNumbers_Turn_Time, MNumbers_Show_Result_Time
 from Commons.static_functions import make_command_json
 from Commons import commands
 from Entities.Games.TicTacToe import TicTacToeGameClass
@@ -39,12 +39,15 @@ class MNumbersGameSession(BaseGameSession):
             self.timer.stop()
 
     def send_current_turn(self):
+        def wait_get_data():
+            self.game_controller.change_turn()
+            from Entities.SocketIOManagerClass import send_command
+            asyncio.new_event_loop().run_until_complete(
+                send_command(
+                    command=make_command_json(id=commands.Current_Turn, data=self.game_controller.current_turn),
+                    game_id=self.game_id))
+            self.timer.start(MNumbers_Turn_Time, self.send_current_turn)
+
         if self.game_controller.is_game_finished:
             return
-        self.game_controller.change_turn()
-        from Entities.SocketIOManagerClass import send_command
-        asyncio.new_event_loop().run_until_complete(
-            send_command(command=make_command_json(id=commands.Current_Turn, data=self.game_controller.current_turn),
-                         game_id=self.game_id))
-        time.sleep(2)
-        self.timer.start(MNumbers_Turn_Time, self.send_current_turn)
+        self.timer.start(MNumbers_Show_Result_Time, wait_get_data)

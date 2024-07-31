@@ -26,7 +26,15 @@ class MNumbersGameClass(BaseGameClass):
         random.shuffle(self.board)
 
     def get_game_data(self):
-        data = {"board": self.board, "scores": [self.player1_score, self.player2_score],
+        board_data = []
+        for index in range(0, len(self.board)):
+            # check peace equiped or not
+            if self.board[index].equipped_user != 0:
+                board_data.append(self.board[index].to_json())
+            else:
+                board_data.append(self.board[index].to_empty_json())
+
+        data = {"board": board_data, "scores": [self.player1_score, self.player2_score],
                 "current_turn": self.current_turn}
         return data
 
@@ -39,8 +47,10 @@ class MNumbersGameClass(BaseGameClass):
             if is_correct:
                 self.submit_peaces_for_user(first_peace_index, second_peace_index, gamer_id)
             await self.send_data_function(commands.Peace_Selected,
-                                          {'user': gamer_id, 'index1': self.board[first_peace_index].value,
-                                           'index2': self.board[second_peace_index].value, 'is_correct': is_correct})
+                                          {'user': gamer_id, 'index1': first_peace_index,
+                                           'value1': self.board[first_peace_index].value,
+                                           'index2': second_peace_index, 'value2': self.board[second_peace_index].value,
+                                           'is_correct': is_correct})
             is_game_finished = self.check_end_game()
             if is_game_finished:
                 self.is_game_finished = True

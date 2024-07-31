@@ -30,7 +30,7 @@ class TimerClass:
 
     def start_timer(self):
         print(self.counter)
-        if self.counter > self.max_time or self.is_canceled:
+        if self.counter >= self.max_time or self.is_canceled:
             self.timer.cancel()
             self.is_user_turn = False
             if self.return_function is not None:

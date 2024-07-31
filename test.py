@@ -32,7 +32,7 @@ async def start():
     await asyncio.sleep(1)
     while True:
         msg = input("select peace : ")
-        await sio.emit('userCommand', {'id': 'SelectPeace', 'data': int(msg)})
+        await sio.emit('userCommand', {'id': 'SelectPeace', 'data': {'index1': int(msg), 'index2': 35}})
         await asyncio.sleep(.15)
 
     # await sio.wait()
@@ -53,6 +53,11 @@ async def start():
 # elif message == "2":
 #     selection = "cutter"
 # await sio.emit('userCommand', {'id': 'SelectPeace', 'data': selection})
+
+# MNumbers
+# msg = input("select peace : ")
+# await sio.emit('userCommand', {'id': 'SelectPeace', 'data': {'index1': int(msg), 'index2': 35}})
+# await asyncio.sleep(.15)
 if __name__ == '__main__':
     loop = asyncio.get_event_loop()
     loop.run_until_complete(start())

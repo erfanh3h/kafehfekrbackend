@@ -7,4 +7,5 @@ Mill_Select_Time = 15
 Mill_Remove_Time = 15
 MSweeper_game_Time = 600
 MNumbers_Turn_Time = 5
+MNumbers_Show_Result_Time = 2
 
