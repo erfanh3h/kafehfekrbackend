@@ -20,7 +20,7 @@ class CheckersGameClass:
         self.check_move_list = []
 
     def is_target_peace_empty(self, r_index, c_index):
-        print(c_index, r_index)
+        # print(c_index, r_index)
         return self.board[c_index][r_index].pawn_gamer_id == 0
 
     def is_target_peace_enemy(self, r_index, c_index, gamer_id):
@@ -84,14 +84,14 @@ class CheckersGameClass:
             if self.is_target_peace_enemy(new_r_index, new_c_index, gamer_id):
                 new_r1_index = new_r_index - 1
                 new_c1_index = new_c_index + 1
-                new_r2_index = new_r_index + 1
-                new_c2_index = new_c_index + 1
+                # new_r2_index = new_r_index + 1
+                # new_c2_index = new_c_index + 1
                 if new_r1_index >= 0 and new_c1_index <= 7 and self.is_target_peace_empty(new_r1_index, new_c1_index):
                     self.check_move_list.append(
                         ((new_r1_index, new_c1_index), (new_r_index, new_c_index), (r_index, c_index), True))
-                if new_r2_index >= 0 and new_c2_index <= 7 and self.is_target_peace_empty(new_r2_index, new_c2_index):
-                    self.check_move_list.append(
-                        ((new_r2_index, new_c2_index), (new_r_index, new_c_index), (r_index, c_index), True))
+                # if new_r2_index >= 0 and new_c2_index <= 7 and self.is_target_peace_empty(new_r2_index, new_c2_index):
+                #     self.check_move_list.append(
+                #         ((new_r2_index, new_c2_index), (new_r_index, new_c_index), (r_index, c_index), True))
                 return None, None, None, False
             else:
                 return None, None, None, False
@@ -107,14 +107,14 @@ class CheckersGameClass:
             if self.is_target_peace_enemy(new_r_index, new_c_index, gamer_id):
                 new_r1_index = new_r_index + 1
                 new_c1_index = new_c_index + 1
-                new_r2_index = new_r_index - 1
-                new_c2_index = new_c_index + 1
+                # new_r2_index = new_r_index - 1
+                # new_c2_index = new_c_index + 1
                 if new_r1_index >= 0 and new_c1_index <= 7 and self.is_target_peace_empty(new_r1_index, new_c1_index):
                     self.check_move_list.append(
                         ((new_r1_index, new_c1_index), (new_r_index, new_c_index), (r_index, c_index), True))
-                if new_r2_index >= 0 and new_c2_index <= 7 and self.is_target_peace_empty(new_r2_index, new_c2_index):
-                    self.check_move_list.append(
-                        ((new_r2_index, new_c2_index), (new_r_index, new_c_index), (r_index, c_index), True))
+                # if new_r2_index >= 0 and new_c2_index <= 7 and self.is_target_peace_empty(new_r2_index, new_c2_index):
+                #     self.check_move_list.append(
+                #         ((new_r2_index, new_c2_index), (new_r_index, new_c_index), (r_index, c_index), True))
                 return None, None, None, False
             else:
                 return None, None, None, False
@@ -128,16 +128,16 @@ class CheckersGameClass:
             return (new_r_index, new_c_index), None, None, False
         else:
             if self.is_target_peace_enemy(new_r_index, new_c_index, gamer_id):
-                new_r1_index = new_r_index - 1
+                new_r1_index = new_r_index + 1
                 new_c1_index = new_c_index - 1
-                new_r2_index = new_r_index + 1
-                new_c2_index = new_c_index - 1
+                # new_r2_index = new_r_index + 1
+                # new_c2_index = new_c_index - 1
                 if new_r1_index >= 0 and new_c1_index >= 0 and self.is_target_peace_empty(new_r1_index, new_c1_index):
                     self.check_move_list.append(
                         ((new_r1_index, new_c1_index), (new_r_index, new_c_index), (r_index, c_index), True))
-                if new_r2_index >= 0 and new_c2_index >= 0 and self.is_target_peace_empty(new_r2_index, new_c2_index):
-                    self.check_move_list.append(
-                        ((new_r2_index, new_c2_index), (new_r_index, new_c_index), (r_index, c_index), True))
+                # if new_r2_index >= 0 and new_c2_index >= 0 and self.is_target_peace_empty(new_r2_index, new_c2_index):
+                #     self.check_move_list.append(
+                #         ((new_r2_index, new_c2_index), (new_r_index, new_c_index), (r_index, c_index), True))
                 return None, None, None, False
             else:
                 return None, None, None, False
@@ -151,19 +151,20 @@ class CheckersGameClass:
             return (new_r_index, new_c_index), None, None, False
         else:
             if self.is_target_peace_enemy(new_r_index, new_c_index, gamer_id):
-                new_r1_index = new_r_index + 1
+                new_r1_index = new_r_index - 1
                 new_c1_index = new_c_index - 1
-                new_r2_index = new_r_index - 1
-                new_c2_index = new_c_index - 1
+                # new_r2_index = new_r_index - 1
+                # new_c2_index = new_c_index - 1
                 if new_r1_index >= 0 and new_c1_index >= 0 and self.is_target_peace_empty(new_r1_index, new_c1_index):
                     self.check_move_list.append(
                         ((new_r1_index, new_c1_index), (new_r_index, new_c_index), (r_index, c_index), True))
-                if new_r2_index >= 0 and new_c2_index >= 0 and self.is_target_peace_empty(new_r2_index, new_c2_index):
-                    self.check_move_list.append(
-                        ((new_r2_index, new_c2_index), (new_r_index, new_c_index), (r_index, c_index), True))
+                # if new_r2_index >= 0 and new_c2_index >= 0 and self.is_target_peace_empty(new_r2_index, new_c2_index):
+                #     self.check_move_list.append(
+                #         ((new_r2_index, new_c2_index), (new_r_index, new_c_index), (r_index, c_index), True))
                 return None, None, None, False
             else:
                 return None, None, None, False
+
     def get_possible_moves_of_peace(self, r_index, c_index, gamer_id):
         moves = []
         temp_move_list = []
@@ -201,10 +202,38 @@ class CheckersGameClass:
                 moves.append(move)
         return moves
 
+    def remove_pawn(self, c_index, r_index , gamer_id):
+        self.board[r_index][c_index].set_pawn_gamer_id(0)
+        if gamer_id == 1:
+            self.player2_pawns -= 1
+        else:
+            self.player1_pawns -= 1
+
+    def move_pawn(self, s_c_index, s_r_index, t_c_index, t_r_index, gamer_id):
+        moves = self.get_possible_moves_of_peace(s_r_index, s_c_index, gamer_id)
+        self.board[s_c_index][s_r_index].set_pawn_gamer_id(0)
+        self.board[t_c_index][t_r_index].set_pawn_gamer_id(gamer_id)
+        for move_data in moves:
+            if move_data[0] == (t_r_index, t_c_index):
+                if move_data[1] is not None:
+                    remove_point = move_data[1]
+                    source_peace_index = move_data[2]
+                    while remove_point is not None:
+                        self.remove_pawn(remove_point[0], remove_point[1] , gamer_id)
+                        remove_point = None
+                        if source_peace_index is not None and source_peace_index != (s_r_index, s_c_index):
+                            for raw_move_data in moves:
+                                if raw_move_data[0] == (source_peace_index[0], source_peace_index[1]):
+                                    source_peace_index = raw_move_data[2]
+                                    remove_point = raw_move_data[1]
+                                    break
+
     def play(self):
         self.add_pawns_to_board()
         print(checkers_game)
-        print(self.get_possible_moves_of_peace(4, 2, 1))
+        self.move_pawn(2, 4, 6, 0, 1)
+        print(checkers_game)
+        # print(self.get_possible_moves_of_peace(4, 2, 1))
 
 
 checkers_game = CheckersGameClass()
