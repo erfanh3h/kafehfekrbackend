@@ -16,10 +16,9 @@ def get_peace_of_coordinate(x, y):
     return peace_number
 
 
-class MSweeperGameClass(BaseGameClass):
-    def __init__(self, send_data_function, send_private_data_function):
+class CheckersGameClass(BaseGameClass):
+    def __init__(self, send_data_function):
         super().__init__(send_data_function)
-        self.send_private_data_function = send_private_data_function
         self.symbol_1 = 1
         self.symbol_2 = 2
         self.board = [[BoardSpotClass(i, j) for i in range(8)] for j in range(8)]
@@ -53,33 +52,32 @@ class MSweeperGameClass(BaseGameClass):
         data = {"board": board_peaces_data, "pawns_count": [self.player1_pawns, self.player2_pawns]}
         return data
 
+    def change_turn(self):
+        if self.current_turn == 1:
+            self.current_turn = self.symbol_2
+        else:
+            self.current_turn = self.symbol_1
+
     async def recieve_data(self, command_id, data, gamer_id):
         print(command_id, data, gamer_id)
-        # peace_number = data
-        # x, y = get_coordinate_of_peace(peace_number)
-        # if command_id == commands.Select_Peace:
-        #     await self.select_peace(x, y, gamer_id)
-        #     if self.is_peace_mine(x, y):
-        #         await self.send_private_data_function(commands.Mine_Selected, {"peace_number": peace_number}, gamer_id)
-        #         if gamer_id == 1:
-        #             self.player1_selectable_mines = 0
-        #             self.player1_selectable_spots = 0
-        #             self.is_player1_tapped_mine = True
-        #             self.player1_board[x][y].hitted_mine = True
-        #             self.player1_board[x][y].mine = True
-        #         else:
-        #             self.player2_selectable_mines = 0
-        #             self.player2_selectable_spots = 0
-        #             self.is_player2_tapped_mine = True
-        #             self.player2_board[x][y].hitted_mine = True
-        #             self.player2_board[x][y].mine = True
-        #     is_game_finished = self.check_end_game()
-        #     if is_game_finished:
-        #         self.finish_game()
-        #         game_winner = self.get_game_winner()
-        #         await self.send_data_function(commands.Finish_Game, {"Winner": game_winner})
-        #     print(self.show_board())
-        #     print(self.show_player1_board())
+        if command_id == commands.Select_Peace:
+            source_column_index = data['s_c_index']
+            source_row_index = data['s_r_index']
+            target_column_index = data['t_c_index']
+            target_row_index = data['t_r_index']
+            is_move_correct = self.move_pawn(source_column_index, source_row_index, target_column_index,
+                                             target_row_index)
+            if is_move_correct:
+                await self.send_data_function(commands.Peace_Selected, {
+                    "select_data": {'s_c_index': source_column_index, 's_r_index': source_row_index,
+                                    't_c_index': target_column_index, 't_r_index': target_row_index,
+                                    'gamer_id': gamer_id}, })
+                winner = self.get_game_winner()
+                if winner is not None:
+                    self.is_game_finished = True
+                    await self.send_data_function(commands.Finish_Game, {"Winner": winner})
+                return True
+        return False
 
     def get_game_winner(self):
         winner = None
@@ -93,26 +91,18 @@ class MSweeperGameClass(BaseGameClass):
         self.is_game_finished = True
 
     def check_authority(self, data, gamer_id: int):
-        peace_number = data
-        x, y = get_coordinate_of_peace(peace_number)
-        # if gamer_id == 1 and self.player1_board[x][y].selected:
-        #     return False
-        # if gamer_id == 2 and self.player2_board[x][y].selected:
-        #     return False
+        if (self.current_turn == 1 and gamer_id != 1) or (self.current_turn == 2 and gamer_id != 2):
+            print("not turn of : ", gamer_id)
+            return False
         if self.is_game_finished:
             return False
         return True
 
     async def surrender(self, gamer_id):
         self.is_game_finished = True
-        if gamer_id == 1:
-            game_winner = 2
-        else:
-            game_winner = 1
         await self.send_data_function(commands.Surrender, {"gamer_id": gamer_id})
 
     def is_target_peace_empty(self, r_index, c_index):
-        # print(c_index, r_index)
         return self.board[c_index][r_index].pawn_gamer_id == 0
 
     def is_target_peace_enemy(self, r_index, c_index, gamer_id):
@@ -294,13 +284,13 @@ class MSweeperGameClass(BaseGameClass):
     def move_pawn(self, s_c_index, s_r_index, t_c_index, t_r_index, gamer_id):
         moves = self.get_possible_moves_of_peace(s_r_index, s_c_index, gamer_id)
         print(moves)
-        self.board[s_c_index][s_r_index].remove_pawn_gamer()
-        if self.check_is_last_peace(t_c_index, gamer_id):
-            self.board[t_c_index][t_r_index].set_pawn_gamer_id(gamer_id, True)
-        else:
-            self.board[t_c_index][t_r_index].set_pawn_gamer_id(gamer_id, False)
         for move_data in moves:
             if move_data[0] == (t_r_index, t_c_index):
+                self.board[s_c_index][s_r_index].remove_pawn_gamer()
+                if self.check_is_last_peace(t_c_index, gamer_id):
+                    self.board[t_c_index][t_r_index].set_pawn_gamer_id(gamer_id, True)
+                else:
+                    self.board[t_c_index][t_r_index].set_pawn_gamer_id(gamer_id, False)
                 if move_data[1] is not None:
                     remove_point = move_data[1]
                     source_peace_index = move_data[2]
@@ -313,3 +303,5 @@ class MSweeperGameClass(BaseGameClass):
                                     source_peace_index = raw_move_data[2]
                                     remove_point = raw_move_data[1]
                                     break
+                return True
+        return False

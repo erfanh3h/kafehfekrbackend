@@ -1,5 +1,6 @@
 import socketio
 
+from Controllers.GameSession.checkers_game_session import CheckersGameSession
 from Controllers.GameSession.mill_game_session import MillGameSession
 from Controllers.GameSession.mnumbers_game_session import MNumbersGameSession
 from Controllers.GameSession.msweeper_game_session import MSweeperGameSession
@@ -12,7 +13,8 @@ Socket_Server = socketio.AsyncServer(async_mode='asgi')
 
 current_game_id = "gameId"
 # gameSession = MillGameSession(game_id=current_game_id)
-gameSession = MNumbersGameSession(game_id=current_game_id)
+# gameSession = MNumbersGameSession(game_id=current_game_id)
+gameSession = CheckersGameSession(game_id=current_game_id)
 # gameSession = TicTacToeGameSession(game_id=current_game_id)
 # gameSession = RPCGameSession(game_id=current_game_id)
 # gameSession = MSweeperGameSession(game_id=current_game_id)
