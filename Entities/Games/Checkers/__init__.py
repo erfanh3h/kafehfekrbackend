@@ -46,10 +46,11 @@ class CheckersGameClass(BaseGameClass):
 
     def get_game_data(self):
         board_peaces_data = []
-        for j in range(8):
-            for i in range(8):
+        for i in range(8):
+            for j in range(8):
                 board_peaces_data.append(self.board[i][j].to_json())
-        data = {"board": board_peaces_data, "pawns_count": [self.player1_pawns, self.player2_pawns]}
+        data = {"board": board_peaces_data, "pawns_count": [self.player1_pawns, self.player2_pawns],
+                "current_turn": self.current_turn}
         return data
 
     def change_turn(self):
@@ -66,7 +67,7 @@ class CheckersGameClass(BaseGameClass):
             target_column_index = data['t_c_index']
             target_row_index = data['t_r_index']
             is_move_correct = self.move_pawn(source_column_index, source_row_index, target_column_index,
-                                             target_row_index)
+                                             target_row_index, gamer_id)
             if is_move_correct:
                 await self.send_data_function(commands.Peace_Selected, {
                     "select_data": {'s_c_index': source_column_index, 's_r_index': source_row_index,
@@ -129,7 +130,7 @@ class CheckersGameClass(BaseGameClass):
         self.board[6][2].set_pawn_gamer_id(2)
         self.board[6][4].set_pawn_gamer_id(2)
         self.board[6][6].set_pawn_gamer_id(2)
-        self.board[7][1].set_pawn_gamer_id(1)
+        self.board[7][1].set_pawn_gamer_id(2)
         self.board[7][3].set_pawn_gamer_id(2)
         self.board[7][5].set_pawn_gamer_id(2)
         self.board[7][7].set_pawn_gamer_id(2)
@@ -139,8 +140,6 @@ class CheckersGameClass(BaseGameClass):
         self.board[t_r_index][t_c_index].set_pawn_gamer_id(gamer_id)
 
     def get_direction1_right_pawn_move(self, r_index, c_index, gamer_id, is_multi_move=False):
-        if r_index < 1:
-            return None, None, None, False
         new_r_index = r_index - 1
         new_c_index = c_index + 1
         if new_r_index < 0 or new_r_index > 7 or new_c_index < 0 or new_c_index > 7:
@@ -159,8 +158,6 @@ class CheckersGameClass(BaseGameClass):
                 return None, None, None, False
 
     def get_direction1_left_pawn_move(self, r_index, c_index, gamer_id, is_multi_move=False):
-        if r_index > 6:
-            return None, None, None, False
         new_r_index = r_index + 1
         new_c_index = c_index + 1
         if new_r_index < 0 or new_r_index > 7 or new_c_index < 0 or new_c_index > 7:
@@ -179,10 +176,10 @@ class CheckersGameClass(BaseGameClass):
                 return None, None, None, False
 
     def get_direction2_right_pawn_move(self, r_index, c_index, gamer_id, is_multi_move=False):
-        if r_index < 1:
-            return None, None, None, False
         new_r_index = r_index + 1
         new_c_index = c_index - 1
+        if new_r_index < 0 or new_r_index > 7 or new_c_index < 0 or new_c_index > 7:
+            return None, None, None, False
         if self.is_target_peace_empty(new_r_index, new_c_index) and not is_multi_move:
             return (new_r_index, new_c_index), None, None, False
         else:
@@ -197,10 +194,10 @@ class CheckersGameClass(BaseGameClass):
                 return None, None, None, False
 
     def get_direction2_left_pawn_move(self, r_index, c_index, gamer_id, is_multi_move=False):
-        if r_index > 6:
-            return None, None, None, False
         new_r_index = r_index - 1
         new_c_index = c_index - 1
+        if new_r_index < 0 or new_r_index > 7 or new_c_index < 0 or new_c_index > 7:
+            return None, None, None, False
         if self.is_target_peace_empty(new_r_index, new_c_index) and not is_multi_move:
             return (new_r_index, new_c_index), None, None, False
         else:

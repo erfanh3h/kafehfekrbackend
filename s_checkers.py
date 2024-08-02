@@ -79,8 +79,6 @@ class CheckersGameClass:
         self.board[t_r_index][t_c_index].set_pawn_gamer_id(gamer_id)
 
     def get_direction1_right_pawn_move(self, r_index, c_index, gamer_id, is_multi_move=False):
-        if r_index < 1:
-            return None, None, None, False
         new_r_index = r_index - 1
         new_c_index = c_index + 1
         if new_r_index < 0 or new_r_index > 7 or new_c_index < 0 or new_c_index > 7:
@@ -104,8 +102,6 @@ class CheckersGameClass:
                 return None, None, None, False
 
     def get_direction1_left_pawn_move(self, r_index, c_index, gamer_id, is_multi_move=False):
-        if r_index > 6:
-            return None, None, None, False
         new_r_index = r_index + 1
         new_c_index = c_index + 1
         if new_r_index < 0 or new_r_index > 7 or new_c_index < 0 or new_c_index > 7:
@@ -129,10 +125,10 @@ class CheckersGameClass:
                 return None, None, None, False
 
     def get_direction2_right_pawn_move(self, r_index, c_index, gamer_id, is_multi_move=False):
-        if r_index < 1:
-            return None, None, None, False
         new_r_index = r_index + 1
         new_c_index = c_index - 1
+        if new_r_index < 0 or new_r_index > 7 or new_c_index < 0 or new_c_index > 7:
+            return None, None, None, False
         if self.is_target_peace_empty(new_r_index, new_c_index) and not is_multi_move:
             return (new_r_index, new_c_index), None, None, False
         else:
@@ -152,10 +148,10 @@ class CheckersGameClass:
                 return None, None, None, False
 
     def get_direction2_left_pawn_move(self, r_index, c_index, gamer_id, is_multi_move=False):
-        if r_index > 6:
-            return None, None, None, False
         new_r_index = r_index - 1
         new_c_index = c_index - 1
+        if new_r_index < 0 or new_r_index > 7 or new_c_index < 0 or new_c_index > 7:
+            return None, None, None, False
         if self.is_target_peace_empty(new_r_index, new_c_index) and not is_multi_move:
             return (new_r_index, new_c_index), None, None, False
         else:
@@ -280,7 +276,7 @@ class CheckersGameClass:
     def play(self):
         self.add_pawns_to_board()
         print(checkers_game)
-        self.move_pawn(7, 1, 7, 5, 1)
+        self.move_pawn(6, 0, 7, 5, 2)
         print(checkers_game)
         # print(self.check_win())
         # print(self.get_possible_moves_of_peace(4, 2, 1))
