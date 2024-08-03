@@ -72,6 +72,8 @@ class BaseGameSession:
             if self.gamers[gamer_index].is_joined_game:
                 self.gamers[gamer_index].reconnect(socket_id)
                 self.send_reconnect_data(socket_id)
+                asyncio.new_event_loop().run_until_complete(
+                    self.send_command(commands.User_Reconnected, {"user_id": user_id}))
             else:
                 self.gamers[gamer_index].join_game(socket_id)
 
@@ -132,9 +134,9 @@ class BaseGameSession:
         return gamer_id
 
     async def reaction_received(self, data, socket_id):
-        data = self.find_gamer_from_socket(socket_id)
-        if data is not None:
-            gamer_id = data.gamer_id
+        gamer_data = self.find_gamer_from_socket(socket_id)
+        if gamer_data is not None:
+            gamer_id = gamer_data.gamer_id
             from Entities.SocketIOManagerClass import send_reaction
             await send_reaction(reaction_id=data, player_id=gamer_id, game_id=self.game_id)
 
@@ -144,6 +146,10 @@ class BaseGameSession:
     def disconnect_user(self, socket_id):
         for gamer_index in range(0, len(self.gamers)):
             if self.gamers[gamer_index].socket_id == socket_id:
+                user_data = self.find_gamer_from_socket(socket_id)
+                if user_data is not None:
+                    asyncio.new_event_loop().run_until_complete(
+                        self.send_command(commands.User_Disconnected, {"user_id": user_data.user_id}))
                 self.gamers[gamer_index].disconnect()
                 break
 

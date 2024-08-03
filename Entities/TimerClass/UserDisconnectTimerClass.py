@@ -4,7 +4,7 @@ import time
 
 
 class UserDisconnectTimerClass:
-    def __init__(self, user_id: str, max_time: int = 20, ):
+    def __init__(self, user_id: str, max_time: int = 20000,):
         self.timerCounting = True
         self.max_time = max_time
         self.finish_timer_function = None
@@ -32,6 +32,6 @@ class UserDisconnectTimerClass:
             self.timer.cancel()
         else:
             self.max_time -= 1
-            print(self.user_id, self.max_time)
+            # print(self.user_id, self.max_time)
             self.timer = threading.Timer(1, self.start_timer)
             self.timer.start()
