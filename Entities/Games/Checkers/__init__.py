@@ -99,10 +99,6 @@ class CheckersGameClass(BaseGameClass):
             return False
         return True
 
-    async def surrender(self, gamer_id):
-        self.is_game_finished = True
-        await self.send_data_function(commands.Surrender, {"gamer_id": gamer_id})
-
     def is_target_peace_empty(self, r_index, c_index):
         return self.board[c_index][r_index].pawn_gamer_id == 0
 

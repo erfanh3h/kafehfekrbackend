@@ -91,11 +91,3 @@ class TicTacToeGameClass(BaseGameClass):
             self.current_turn = 2
         else:
             self.current_turn = 1
-
-    async def surrender(self, gamer_id):
-        self.is_game_finished = True
-        if gamer_id == 1:
-            game_winner = 2
-        else:
-            game_winner = 1
-        await self.send_data_function(commands.Surrender, {"gamer_id": gamer_id})

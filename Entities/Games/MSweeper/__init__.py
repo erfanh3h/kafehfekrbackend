@@ -248,14 +248,6 @@ class MSweeperGameClass(BaseGameClass):
             return False
         return True
 
-    async def surrender(self, gamer_id):
-        self.is_game_finished = True
-        if gamer_id == 1:
-            game_winner = 2
-        else:
-            game_winner = 1
-        await self.send_data_function(commands.Surrender, {"gamer_id": gamer_id})
-
     def show_board(self):
         returnString = " "
         divider = "\n---"

@@ -1,3 +1,6 @@
+from Commons import commands
+
+
 class BaseGameClass:
     def __init__(self, send_data_function):
         self.current_turn = 1
@@ -37,4 +40,9 @@ class BaseGameClass:
         pass
 
     async def surrender(self, gamer_id):
-        pass
+        self.is_game_finished = True
+        await self.send_data_function(commands.Surrender, {"gamer_id": gamer_id})
+
+    async def finish_reconnect_time(self, gamer_id):
+        self.is_game_finished = True
+        await self.send_data_function(commands.Surrender, {"gamer_id": gamer_id})

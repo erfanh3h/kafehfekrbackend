@@ -63,6 +63,7 @@ class BaseGameSession:
     def join_gamer(self, user_id: int, socket_id):
         for gamer_index in range(0, len(self.gamers)):
             if self.gamers[gamer_index].user_id == user_id:
+                self.gamers[gamer_index].set_finish_reconnect_time_function(self.finish_reconnect_time)
                 if self.gamers[gamer_index].is_joined_game:
                     self.gamers[gamer_index].reconnect(socket_id)
                     self.send_reconnect_data(socket_id)
@@ -102,7 +103,7 @@ class BaseGameSession:
         from Entities.SocketIOManagerClass import send_command
         await send_command(command=make_command_json(id=command_id, data=command_data), game_id=self.game_id)
 
-    async def send_private_command(self , command_id , command_data , gamer_id):
+    async def send_private_command(self, command_id, command_data, gamer_id):
         socket_id = self.find_gamer_from_id(gamer_id).socket_id
         from Entities.SocketIOManagerClass import send_private_command
         asyncio.new_event_loop().run_until_complete(
@@ -125,6 +126,10 @@ class BaseGameSession:
             if self.gamers[gamer_index].socket_id == socket_id:
                 self.gamers[gamer_index].disconnect()
                 break
+
+    def finish_reconnect_time(self, gamer_id):
+        pass
+
         # from Entities.SocketIOManagerClass import send_command
         # if data['id'] == commands.Game_Data:
         #     gamer_id = self.find_gamer_from_socket(socket_id).gamer_id
