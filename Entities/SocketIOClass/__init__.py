@@ -19,8 +19,8 @@ gameSession = CheckersGameSession(game_id=current_game_id)
 # gameSession = RPCGameSession(game_id=current_game_id)
 # gameSession = MSweeperGameSession(game_id=current_game_id)
 
-gameSession.add_gamer(GamerModel(user_id=0, username='test'))
-gameSession.add_gamer(GamerModel(user_id=1, username='mobile'))
+gameSession.add_gamer(GamerModel(user_id="0", username='test'))
+gameSession.add_gamer(GamerModel(user_id="1", username='mobile'))
 gameSession.start_game_timer()
 
 games = {current_game_id: gameSession}

@@ -73,7 +73,7 @@ class BaseGameSession:
     def send_game_data(self):
         game_data = {'gamers': []}
         for gamer in self.gamers:
-            game_data['gamers'].append({'id': gamer.gamer_id, 'name': gamer.username})
+            game_data['gamers'].append(gamer.to_json())
         from Entities.SocketIOManagerClass import send_command
         asyncio.new_event_loop().run_until_complete(
             send_command(command=make_command_json(id=commands.Game_Data, data=game_data), game_id=self.game_id))

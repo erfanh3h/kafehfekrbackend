@@ -4,11 +4,11 @@ from Models.User import UserModel
 
 
 class GamerModel(UserModel):
-    def __init__(self, user_id: int, username: str, socket_id='', team_id: int = 0):
+    def __init__(self, user_id: str, username: str, socket_id='', team_id: int = 0):
         super().__init__(user_id, username)
         self.socket_id = socket_id
         self.gamer_id: int = 0
-        self.user_id: int = user_id
+        self.user_id: str = user_id
         self.is_alive: bool = True
         self.is_joined_game: bool = False
         self.is_disconnected: bool = False
@@ -16,44 +16,6 @@ class GamerModel(UserModel):
         self.report_charge: int = 5
         self.reconnect_charge: int = 3
         self.team_id: int = team_id
-
-        # self.role: int = 0
-        # self.letAct: bool = True
-        # this use when if user can act after use it this flag become true . this use for when if a user leave game when he most act his role
-        # self.actDone: bool = False
-        # self.deathType: DeathMoldels = DeathMoldels.none
-        # self.isMafia = False
-        # self.score : int = 0
-
-    def reset_day(self):
-        pass
-
-    async def talk(self):
-        pass
-        # return await self.communication.receive_voice_bytes()
-
-    async def listen(self, bytes):
-        pass
-
-    async def request_challenge(self, return_function, timeout):
-        pass
-        # await self.communication.send_command_message({'id': 'RequestChallenge'})
-        # try:
-        #     message = await asyncio.wait_for(self.communication.receive_command_message(), timeout=timeout)
-        #     if message is not None and message['id'] == 'RequestChallenge' and message['data']:
-        #         await return_function(self.gamer_id)
-        # except TimeoutError:
-        #     pass
-
-    async def accept_challenge(self, return_function, timeout):
-        pass
-        # await self.communication.send_command_message({'id': 'AcceptChallenge'})
-        # try:
-        #     message = await asyncio.wait_for(self.communication.receive_command_message(), timeout=timeout)
-        #     if message is not None and message['id'] == 'AcceptChallenge' and message['data']:
-        #         return_function(self.gamer_id)
-        # except TimeoutError:
-        #     pass
 
     def join_game(self, socket_id):
         self.is_joined_game = True
@@ -67,3 +29,6 @@ class GamerModel(UserModel):
     def disconnect(self):
         self.is_disconnected = True
         self.socket_id = ""
+
+    def to_json(self):
+        return {'gamer_id': self.gamer_id, 'name': self.username, 'user_id': self.user_id}
