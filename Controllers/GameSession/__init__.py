@@ -2,12 +2,11 @@ import asyncio
 import threading
 import time
 
-from Commons.static_functions import make_command_json
 from Commons import commands
-from Entities.Games.TicTacToe import TicTacToeGameClass
+from Commons.static_functions import make_command_json
+from Entities.Games.base_game_class import BaseGameClass
 from Entities.TimerClass import TimerClass
 from Models.Gamer import GamerModel
-from Entities.Games.base_game_class import BaseGameClass
 
 
 class BaseGameSession:
@@ -50,10 +49,16 @@ class BaseGameSession:
                 return gamer
         return None
 
-    def find_gamer_from_id(self, user_id):
+    def find_gamer_from_gamer_id(self, gamer_id):
         for gamer in self.gamers:
-            if gamer.gamer_id == user_id:
+            if gamer.gamer_id == gamer_id:
                 return gamer
+        return None
+
+    def find_gamer_index_from_id(self, user_id):
+        for index in range(0, len(self.gamers)):
+            if self.gamers[index].user_id == user_id:
+                return index
         return None
 
     def add_gamer(self, gamer: GamerModel):
@@ -61,15 +66,14 @@ class BaseGameSession:
         self.gamer_idies.append(gamer.user_id)
 
     def join_gamer(self, user_id: int, socket_id):
-        for gamer_index in range(0, len(self.gamers)):
-            if self.gamers[gamer_index].user_id == user_id:
-                self.gamers[gamer_index].set_finish_reconnect_time_function(self.finish_reconnect_time)
-                if self.gamers[gamer_index].is_joined_game:
-                    self.gamers[gamer_index].reconnect(socket_id)
-                    self.send_reconnect_data(socket_id)
-                else:
-                    self.gamers[gamer_index].join_game(socket_id)
-                break
+        gamer_index = self.find_gamer_index_from_id(user_id)
+        if gamer_index is not None:
+            self.gamers[gamer_index].set_finish_reconnect_time_function(self.finish_reconnect_time)
+            if self.gamers[gamer_index].is_joined_game:
+                self.gamers[gamer_index].reconnect(socket_id)
+                self.send_reconnect_data(socket_id)
+            else:
+                self.gamers[gamer_index].join_game(socket_id)
 
     def send_game_data(self):
         game_data = {'gamers': []}
@@ -104,11 +108,13 @@ class BaseGameSession:
         await send_command(command=make_command_json(id=command_id, data=command_data), game_id=self.game_id)
 
     async def send_private_command(self, command_id, command_data, gamer_id):
-        socket_id = self.find_gamer_from_id(gamer_id).socket_id
-        from Entities.SocketIOManagerClass import send_private_command
-        asyncio.new_event_loop().run_until_complete(
-            send_private_command(command=make_command_json(id=command_id, data=command_data),
-                                 socket_id=socket_id, game_id=self.game_id))
+        data = self.find_gamer_from_gamer_id(gamer_id)
+        if data is not None:
+            socket_id = data.socket_id
+            from Entities.SocketIOManagerClass import send_private_command
+            asyncio.new_event_loop().run_until_complete(
+                send_private_command(command=make_command_json(id=command_id, data=command_data),
+                                     socket_id=socket_id, game_id=self.game_id))
 
     async def command_received(self, data, socket_id):
         if not self.is_game_running:
@@ -126,9 +132,11 @@ class BaseGameSession:
         return gamer_id
 
     async def reaction_received(self, data, socket_id):
-        gamer_id = self.find_gamer_from_socket(socket_id).gamer_id
-        from Entities.SocketIOManagerClass import send_reaction
-        await send_reaction(reaction_id=data, player_id=gamer_id, game_id=self.game_id)
+        data = self.find_gamer_from_socket(socket_id)
+        if data is not None:
+            gamer_id = data.gamer_id
+            from Entities.SocketIOManagerClass import send_reaction
+            await send_reaction(reaction_id=data, player_id=gamer_id, game_id=self.game_id)
 
     def send_current_turn(self):
         pass
@@ -139,10 +147,8 @@ class BaseGameSession:
                 self.gamers[gamer_index].disconnect()
                 break
 
-    def finish_reconnect_time(self, gamer_id):
-        pass
-
-        # from Entities.SocketIOManagerClass import send_command
-        # if data['id'] == commands.Game_Data:
-        #     gamer_id = self.find_gamer_from_socket(socket_id).gamer_id
-        #     self.timer.stop()
+    def finish_reconnect_time(self, user_id):
+        asyncio.new_event_loop().run_until_complete(
+            self.send_command(commands.Finish_Reconnect_Time, {"user_id": user_id}))
+        self.game_controller.finish_reconnect_time(user_id)
+        self.timer.stop()

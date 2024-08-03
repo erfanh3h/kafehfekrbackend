@@ -4,16 +4,19 @@ import time
 
 
 class UserDisconnectTimerClass:
-    def __init__(self, max_time: int = 120, return_function=None):
+    def __init__(self, user_id: str, max_time: int = 20, ):
         self.timerCounting = True
         self.max_time = max_time
-        self.return_function = return_function
+        self.finish_timer_function = None
         self.is_canceled = False
         self.timer = threading.Timer(1, self.start_timer)
+        self.user_id = user_id
 
-    def start(self, return_function=None):
+    def set_finish_timer_function(self, finish_timer_function):
+        self.finish_timer_function = finish_timer_function
+
+    def start(self):
         self.is_canceled = False
-        self.return_function = return_function
         self.timer = threading.Timer(1, self.start_timer)
         self.timer.start()
 
@@ -21,12 +24,14 @@ class UserDisconnectTimerClass:
         self.is_canceled = True
 
     def start_timer(self):
-        if self.max_time <= 0 or self.is_canceled:
+        if self.max_time <= 0:
             self.timer.cancel()
-            if self.return_function is not None:
-                self.return_function()
+            if self.finish_timer_function is not None:
+                self.finish_timer_function(self.user_id)
+        elif self.is_canceled:
+            self.timer.cancel()
         else:
             self.max_time -= 1
-            print(self.max_time)
+            print(self.user_id, self.max_time)
             self.timer = threading.Timer(1, self.start_timer)
             self.timer.start()

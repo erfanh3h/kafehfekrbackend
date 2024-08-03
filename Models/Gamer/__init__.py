@@ -11,7 +11,7 @@ class GamerModel(UserModel):
         self.socket_id = socket_id
         self.gamer_id: int = 0
         self.user_id: str = user_id
-        self.timer = UserDisconnectTimerClass()
+        self.timer = UserDisconnectTimerClass(user_id=user_id)
         self.finish_reconnect_time_function = finish_reconnect_time_function
         self.is_alive: bool = True
         self.is_joined_game: bool = False
@@ -23,6 +23,7 @@ class GamerModel(UserModel):
 
     def set_finish_reconnect_time_function(self, finish_reconnect_time_function):
         self.finish_reconnect_time_function = finish_reconnect_time_function
+        self.timer.set_finish_timer_function(finish_reconnect_time_function)
 
     def join_game(self, socket_id):
         self.is_joined_game = True
@@ -40,4 +41,5 @@ class GamerModel(UserModel):
         self.timer.start()
 
     def to_json(self):
-        return {'gamer_id': self.gamer_id, 'name': self.username, 'user_id': self.user_id}
+        return {'gamer_id': self.gamer_id, 'name': self.username, 'user_id': self.user_id,
+                'remain_dc_time': self.timer.max_time, 'is_disconnected': self.is_disconnected, }

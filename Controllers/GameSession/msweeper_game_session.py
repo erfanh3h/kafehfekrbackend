@@ -42,12 +42,11 @@ class MSweeperGameSession(BaseGameSession):
         reconnect_data = {'gamers': []}
         for gamer in self.gamers:
             reconnect_data['gamers'].append(gamer.to_json())
-        gamer_id = self.find_gamer_from_socket(socket_id).gamer_id
-        reconnect_data['game_data'] = self.game_controller.get_game_data_msweeper(gamer_id)
-        if self.timer.is_user_turn:
-            reconnect_data['timer_data'] = {'is_user_turn': True, 'time': self.timer.counter + 1}
-        else:
-            reconnect_data['timer_data'] = {'is_user_turn': False, 'time': 0}
+        gamer_data = self.find_gamer_from_socket(socket_id)
+        if gamer_data is not None:
+            gamer_id = gamer_data.gamer_id
+            reconnect_data['game_data'] = self.game_controller.get_game_data_msweeper(gamer_id)
+        reconnect_data['timer_data'] = {'is_user_turn': True, 'time': self.timer.counter + 1}
         from Entities.SocketIOManagerClass import send_private_command
         asyncio.new_event_loop().run_until_complete(
             send_private_command(command=make_command_json(id=commands.Reconnect_Data, data=reconnect_data),
