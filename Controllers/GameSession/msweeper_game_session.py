@@ -41,7 +41,7 @@ class MSweeperGameSession(BaseGameSession):
     def send_reconnect_data(self, socket_id):
         reconnect_data = {'gamers': []}
         for gamer in self.gamers:
-            reconnect_data['gamers'].append({'id': gamer.gamer_id, 'name': gamer.username})
+            reconnect_data['gamers'].append(gamer.to_json())
         gamer_id = self.find_gamer_from_socket(socket_id).gamer_id
         reconnect_data['game_data'] = self.game_controller.get_game_data_msweeper(gamer_id)
         if self.timer.is_user_turn:

@@ -81,7 +81,7 @@ class BaseGameSession:
     def send_reconnect_data(self, socket_id):
         reconnect_data = {'gamers': []}
         for gamer in self.gamers:
-            reconnect_data['gamers'].append({'id': gamer.gamer_id, 'name': gamer.username})
+            reconnect_data['gamers'].append(gamer.to_json())
         reconnect_data['game_data'] = self.game_controller.get_game_data()
         if self.timer.is_user_turn:
             reconnect_data['timer_data'] = {'is_user_turn': True, 'time': self.timer.counter + 1}
