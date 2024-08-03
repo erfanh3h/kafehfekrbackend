@@ -44,17 +44,17 @@ class BaseGameSession:
                 break
             time.sleep(2)
 
-    def find_gamer_from_socket(self, socket_id) -> GamerModel:
+    def find_gamer_from_socket(self, socket_id):
         for gamer in self.gamers:
             if gamer.socket_id == socket_id:
                 return gamer
-        return self.gamers[0]
+        return None
 
-    def find_gamer_from_id(self, user_id) -> GamerModel:
+    def find_gamer_from_id(self, user_id):
         for gamer in self.gamers:
             if gamer.gamer_id == user_id:
                 return gamer
-        return self.gamers[0]
+        return None
 
     def add_gamer(self, gamer: GamerModel):
         self.gamers.append(gamer)
@@ -111,7 +111,19 @@ class BaseGameSession:
                                  socket_id=socket_id, game_id=self.game_id))
 
     async def command_received(self, data, socket_id):
-        pass
+        if not self.is_game_running:
+            print("game not started yet")
+            return None
+        gamer_data = self.find_gamer_from_socket(socket_id)
+        if gamer_data is None:
+            return None
+        else:
+            gamer_id = gamer_data.gamer_id
+        if data['id'] == commands.Surrender:
+            await self.game_controller.surrender(gamer_id)
+            self.timer.stop()
+            return None
+        return gamer_id
 
     async def reaction_received(self, data, socket_id):
         gamer_id = self.find_gamer_from_socket(socket_id).gamer_id
