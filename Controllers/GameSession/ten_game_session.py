@@ -28,24 +28,39 @@ class TenGameSession(BaseGameSession):
         if gamer_id is None:
             return
         if data['id'] == commands.Solve:
-            data = data['data']
-            is_selection_correct = self.game_controller.check_authority(data, gamer_id)
+            is_selection_correct = self.game_controller.check_authority("", gamer_id)
             if is_selection_correct:
                 await self.game_controller.recieve_data(data['id'], data, gamer_id)
                 if self.game_controller.is_round_finished:
                     self.timer.stop()
                     self.change_round()
 
+    def finish_round_time(self):
+        if self.game_controller.is_game_finished or self.game_controller.is_round_finished:
+            return
+        from Entities.SocketIOManagerClass import send_command
+        self.game_controller.round_time_finished()
+        if self.game_controller.is_round_finished:
+            asyncio.new_event_loop().run_until_complete(
+                send_command(
+                    command=make_command_json(id=commands.Finish_Round, data={"Winner": 0}), game_id=self.game_id))
+        elif self.game_controller.is_game_finished:
+            game_winner = self.game_controller.get_game_winner()
+            asyncio.new_event_loop().run_until_complete(
+                send_command(
+                    command=make_command_json(id=commands.Finish_Game, data={"Winner": game_winner}),
+                    game_id=self.game_id))
+        self.change_round()
+
     def send_current_turn(self):
         if self.game_controller.is_game_finished or self.game_controller.is_round_finished:
             return
-        self.game_controller.change_turn()
         from Entities.SocketIOManagerClass import send_command
         asyncio.new_event_loop().run_until_complete(
             send_command(
                 command=make_command_json(id=commands.Current_Turn, data=self.game_controller.current_round_numbers),
                 game_id=self.game_id))
-        self.timer.start(Ten_Round_Time, self.send_current_turn)
+        self.timer.start(Ten_Round_Time, self.finish_round_time)
 
     def change_round(self):
         time.sleep(Ten_Sleep_Round_Time)

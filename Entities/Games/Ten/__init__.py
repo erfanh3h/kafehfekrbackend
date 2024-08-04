@@ -1,9 +1,10 @@
 import random
 
+from Entities.Games.Ten.ten_games import ten_games_list
 from Entities.Games.base_game_class import BaseGameClass
 from Commons import commands
 from Entities.Games.game_rounds import TicTacToe_Round_Count, Ten_Round_Count
-from ten_games import ten_games_list
+
 
 class TenGameClass(BaseGameClass):
     def __init__(self, send_data_function):
@@ -17,6 +18,7 @@ class TenGameClass(BaseGameClass):
         self.max_round = 3
         self.gamer1_score = 0
         self.gamer2_score = 0
+        self.init_games()
 
     def init_games(self):
         indexes = []
@@ -38,35 +40,36 @@ class TenGameClass(BaseGameClass):
         self.current_round_numbers = self.rounds_list[self.current_round]
         self.current_round += 1
 
-
     async def recieve_data(self, command_id, data, gamer_id):
         print(command_id, data, gamer_id)
-        # peace_number = data
-        # self.counter += 1
-        # if gamer_id == 1:
-        #     self.board[peace_number] = self.symbol_1
-        # else:
-        #     self.board[peace_number] = self.symbol_2
-        # await self.send_data_function(commands.Peace_Selected, {'user': gamer_id, 'target_peace': peace_number})
-        # winner = self.check_winner()
-        # if winner is not None or self.counter == 9:
-        #     if self.current_round == self.round_count:
-        #         game_winner = self.get_game_winner()
-        #         await self.send_data_function(commands.Finish_Game, {"Winner": game_winner})
-        #         self.is_game_finished = True
-        #     else:
-        #         self.is_round_finished = True
-        #         await self.send_data_function(commands.Finish_Round, {"Winner": winner})
+        if gamer_id == 1:
+            self.gamer1_score += 1
+        else:
+            self.gamer2_score += 1
+        winner = gamer_id
+        if self.current_round == self.round_count:
+            game_winner = self.get_game_winner()
+            await self.send_data_function(commands.Finish_Game, {"Winner": game_winner})
+            self.is_game_finished = True
+        else:
+            self.is_round_finished = True
+            await self.send_data_function(commands.Finish_Round, {"Winner": winner})
+
+    def round_time_finished(self):
+        if self.current_round == self.round_count:
+            self.is_game_finished = True
+        else:
+            self.is_round_finished = True
 
     def check_authority(self, data, gamer_id: int):
-        if (self.current_turn == 1 and gamer_id != 1) or (self.current_turn == 2 and gamer_id != 2):
-            print("not turn of : ", gamer_id)
-            return False
+        # if (self.current_turn == 1 and gamer_id != 1) or (self.current_turn == 2 and gamer_id != 2):
+        #     print("not turn of : ", gamer_id)
+        #     return False
         # peace_number = data
         # # Check if players' selection is out of range
         # if peace_number < 0 or peace_number > 8:
         #     return False
-            # Check if the square is already filled
+        # Check if the square is already filled
         # if (self.board[peace_number] == self.symbol_1) or (self.board[peace_number] == self.symbol_2):
         #     return False
 
@@ -81,4 +84,3 @@ class TenGameClass(BaseGameClass):
             return self.symbol_2
         else:
             return None
-
