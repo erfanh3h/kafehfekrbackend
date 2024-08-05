@@ -39,7 +39,11 @@ class TicTacToeGameSession(BaseGameSession):
                     self.change_round()
 
     def send_current_turn(self):
-        if self.game_controller.is_game_finished or self.game_controller.is_round_finished:
+        if self.game_controller.is_game_finished:
+            winner_id = self.game_controller.get_game_winner()
+            self.finish_game(winner_id)
+            return
+        if self.game_controller.is_round_finished:
             return
         self.game_controller.change_turn()
         from Entities.SocketIOManagerClass import send_command

@@ -33,12 +33,16 @@ class TenGameSession(BaseGameSession):
             is_selection_correct = self.game_controller.check_authority("", gamer_id)
             if is_selection_correct:
                 await self.game_controller.recieve_data(data['id'], data, gamer_id)
+                self.timer.stop()
                 if self.game_controller.is_round_finished:
-                    self.timer.stop()
                     self.change_round()
 
     def finish_round_time(self):
-        if self.game_controller.is_game_finished or self.game_controller.is_round_finished:
+        if self.game_controller.is_game_finished:
+            winner_id = self.game_controller.get_game_winner()
+            self.finish_game(winner_id)
+            return
+        if self.game_controller.is_round_finished:
             return
         from Entities.SocketIOManagerClass import send_command
         self.game_controller.round_time_finished()
@@ -55,7 +59,11 @@ class TenGameSession(BaseGameSession):
         self.change_round()
 
     def send_current_turn(self):
-        if self.game_controller.is_game_finished or self.game_controller.is_round_finished:
+        if self.game_controller.is_game_finished:
+            winner_id = self.game_controller.get_game_winner()
+            self.finish_game(winner_id)
+            return
+        if self.game_controller.is_round_finished:
             return
         from Entities.SocketIOManagerClass import send_command
         asyncio.new_event_loop().run_until_complete(

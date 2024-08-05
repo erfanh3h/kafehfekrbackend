@@ -13,3 +13,6 @@ class ScoreManagerClass:
         self.player1_user_id = player1_user_id
         self.player2_user_id = player2_user_id
         self.game_type = game_type
+
+    def finish_game(self, winner_gamer_id):
+        print("winner  :  ", winner_gamer_id)

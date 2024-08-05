@@ -47,5 +47,7 @@ class MNumbersGameSession(BaseGameSession):
             self.timer.start(MNumbers_Turn_Time, self.send_current_turn)
 
         if self.game_controller.is_game_finished:
+            winner_id = self.game_controller.get_game_winner()
+            self.finish_game(winner_id)
             return
         self.timer.start(MNumbers_Show_Result_Time, wait_get_data)

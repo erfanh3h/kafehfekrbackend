@@ -3,7 +3,7 @@ import random
 from Entities.Games.Ten.ten_games import ten_games_list
 from Entities.Games.base_game_class import BaseGameClass
 from Commons import commands
-from Entities.Games.game_rounds import TicTacToe_Round_Count, Ten_Round_Count
+from Entities.Games.game_rounds import Ten_Round_Count
 
 
 class TenGameClass(BaseGameClass):
@@ -47,7 +47,7 @@ class TenGameClass(BaseGameClass):
         else:
             self.gamer2_score += 1
         winner = gamer_id
-        if self.current_round == self.round_count:
+        if self.check_game_ended():
             game_winner = self.get_game_winner()
             await self.send_data_function(commands.Finish_Game, {"Winner": game_winner})
             self.is_game_finished = True
@@ -60,6 +60,12 @@ class TenGameClass(BaseGameClass):
             self.is_game_finished = True
         else:
             self.is_round_finished = True
+
+    def check_game_ended(self):
+        if self.current_round == self.round_count:
+            return True
+        # if self.gamer1_score.__float__() >= self.round_count / 2
+        return False
 
     def check_authority(self, data, gamer_id: int):
         # if (self.current_turn == 1 and gamer_id != 1) or (self.current_turn == 2 and gamer_id != 2):
@@ -78,9 +84,9 @@ class TenGameClass(BaseGameClass):
         return True
 
     def get_game_winner(self):
+        winner = 0
         if self.gamer1_score > self.gamer2_score:
-            return self.symbol_1
+            winner = self.symbol_1
         elif self.gamer2_score > self.gamer1_score:
-            return self.symbol_2
-        else:
-            return None
+            winner = self.symbol_2
+        return winner

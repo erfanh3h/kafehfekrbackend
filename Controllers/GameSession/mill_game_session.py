@@ -49,6 +49,8 @@ class MillGameSession(BaseGameSession):
     def send_current_turn(self):
         from Entities.SocketIOManagerClass import send_command
         if self.game_controller.is_game_finished:
+            winner_id = self.game_controller.get_game_winner()
+            self.finish_game(winner_id)
             return
         if self.game_controller.current_remover == 0:
             self.game_controller.change_turn()

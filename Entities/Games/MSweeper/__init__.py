@@ -209,12 +209,12 @@ class MSweeperGameClass(BaseGameClass):
         return False
 
     def get_game_winner(self):
+        winner = 0
         if self.player1_score > self.player2_score:
-            return self.symbol_1
+            winner = self.symbol_1
         elif self.player2_score > self.player1_score:
-            return self.symbol_2
-        else:
-            return 0
+            winner = self.symbol_2
+        return winner
 
     def finish_game(self):
         self.is_game_finished = True

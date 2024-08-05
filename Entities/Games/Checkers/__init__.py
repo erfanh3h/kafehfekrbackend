@@ -73,20 +73,28 @@ class CheckersGameClass(BaseGameClass):
                     "select_data": {'s_c_index': source_column_index, 's_r_index': source_row_index,
                                     't_c_index': target_column_index, 't_r_index': target_row_index,
                                     'gamer_id': gamer_id}, })
-                winner = self.get_game_winner()
-                if winner is not None:
+                is_game_ended = self.check_game_ended()
+                if is_game_ended:
+                    winner = self.get_game_winner()
                     self.is_game_finished = True
                     await self.send_data_function(commands.Finish_Game, {"Winner": winner})
                 return True
         return False
 
     def get_game_winner(self):
-        winner = None
+        winner = 0
         if self.player1_pawns <= 0:
             winner = self.symbol_2
         elif self.player2_pawns <= 0:
             winner = self.symbol_1
         return winner
+
+    def check_game_ended(self):
+        if self.player1_pawns <= 0:
+            return True
+        elif self.player2_pawns <= 0:
+            return True
+        return False
 
     def finish_game(self):
         self.is_game_finished = True

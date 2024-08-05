@@ -164,3 +164,6 @@ class BaseGameSession:
             self.send_command(commands.Finish_Reconnect_Time, {"user_id": user_id}))
         self.game_controller.finish_reconnect_time(user_id)
         self.timer.stop()
+
+    def finish_game(self, winner_gamer_id):
+        self.score_manager.finish_game(winner_gamer_id)

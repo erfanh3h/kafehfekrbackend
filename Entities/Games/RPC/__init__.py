@@ -1,6 +1,5 @@
 from Entities.Games.RPC.rpc_model import RPCModel, string_to_rpc_enum
 from Entities.Games.base_game_class import BaseGameClass
-from Commons import commands
 from Entities.Games.game_rounds import RPC_Round_Count, RPC_Turn_Round_Count
 
 
@@ -59,10 +58,10 @@ class RPCGameClass(BaseGameClass):
                 self.gamer1_total_score += 1
             elif self.gamer2_round_score > self.gamer1_round_score:
                 self.gamer2_total_score += 1
-            if self.current_round != self.round_count:
-                self.is_round_finished = True
-            else:
+            if self.check_game_ended():
                 self.is_game_finished = True
+            else:
+                self.is_round_finished = True
         else:
             self.is_turn_round_finished = True
         return winner
@@ -84,6 +83,12 @@ class RPCGameClass(BaseGameClass):
                 self.gamer2_round_score += 1
                 break
         return winner
+
+    def check_game_ended(self):
+        if self.current_round == self.round_count:
+            return True
+        # if self.gamer1_score.__float__() >= self.round_count / 2
+        return False
 
     def get_round_winner(self):
         if self.gamer1_round_score > self.gamer2_round_score:

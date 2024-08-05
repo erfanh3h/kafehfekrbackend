@@ -51,7 +51,7 @@ class MNumbersGameClass(BaseGameClass):
                                            'value1': self.board[first_peace_index].value,
                                            'index2': second_peace_index, 'value2': self.board[second_peace_index].value,
                                            'is_correct': is_correct})
-            is_game_finished = self.check_end_game()
+            is_game_finished = self.check_game_ended()
             if is_game_finished:
                 self.is_game_finished = True
                 winner = self.get_game_winner()
@@ -73,12 +73,12 @@ class MNumbersGameClass(BaseGameClass):
         return True
 
     def get_game_winner(self):
+        winner = 0
         if self.player1_score > self.player2_score:
-            return self.symbol_1
+            winner = self.symbol_1
         elif self.player2_score > self.player1_score:
-            return self.symbol_2
-        else:
-            return 0
+            winner = self.symbol_2
+        return winner
 
     def change_turn(self):
         if self.current_turn == 1:
@@ -111,7 +111,7 @@ class MNumbersGameClass(BaseGameClass):
         self.board[index1].equipped_user = user_label
         self.board[index2].equipped_user = user_label
 
-    def check_end_game(self):
+    def check_game_ended(self):
         is_game_finished = True
         for index in range(0, len(self.board)):
             if self.is_peace_available(index):

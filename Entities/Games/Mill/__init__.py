@@ -70,8 +70,9 @@ class MillGameClass(BaseGameClass):
                 self.player1_removed_peaces += 1
             self.current_remover = 0
             await self.send_data_function(commands.Peace_Removed, {'user': gamer_id, 'target_peace': peace_number})
-            winner = self.check_winner()
-            if winner is not None:
+            is_game_ended = self.check_game_ended()
+            if is_game_ended:
+                winner = self.get_game_winner()
                 await self.send_data_function(commands.Finish_Game, {"Winner": winner})
                 self.is_game_finished = True
 
@@ -83,8 +84,8 @@ class MillGameClass(BaseGameClass):
             return False
         return True
 
-    def check_winner(self):
-        winner = None
+    def get_game_winner(self):
+        winner = 0
         if self.player1_peaces - self.player1_removed_peaces < 3:
             print(f"Player{self.symbol_2} win game.")
             winner = self.symbol_2
@@ -93,8 +94,12 @@ class MillGameClass(BaseGameClass):
             winner = self.symbol_1
         return winner
 
-    def get_game_winner(self):
-        pass
+    def check_game_ended(self):
+        if self.player1_peaces - self.player1_removed_peaces < 3:
+            return True
+        elif self.player2_peaces - self.player2_removed_peaces < 3:
+            return True
+        return False
 
     def change_turn(self):
         self.current_remover = 0

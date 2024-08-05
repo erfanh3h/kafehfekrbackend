@@ -14,13 +14,6 @@ class RPCGameSession(BaseGameSession):
     def __init__(self, game_id: str, game_score_type):
         super().__init__(game_id, game_score_type)
 
-    async def send_command(self, command_id, command_data):
-        if command_id == commands.Finish_Game:
-            self.timer.stop()
-        elif command_id == commands.Finish_Round:
-            pass
-        await super().send_command(command_id, command_data)
-
     def start_game_timer(self):
         self.game_controller = RPCGameClass(send_data_function=self.send_command)
         self.game_type = GameTypesEnum.RPC
@@ -65,6 +58,8 @@ class RPCGameSession(BaseGameSession):
             asyncio.new_event_loop().run_until_complete(
                 send_command(command=make_command_json(id=commands.Finish_Game, data={"Winner": game_winner}),
                              game_id=self.game_id))
+            winner_id = self.game_controller.get_game_winner()
+            self.finish_game(winner_id)
         elif self.game_controller.is_round_finished:
             self.check_and_send_turn_round_winner()
             time.sleep(3)

@@ -2,6 +2,7 @@ from Entities.Games.base_game_class import BaseGameClass
 from Commons import commands
 from Entities.Games.game_rounds import TicTacToe_Round_Count
 
+
 class TicTacToeGameClass(BaseGameClass):
     def __init__(self, send_data_function):
         super().__init__(send_data_function)
@@ -41,7 +42,7 @@ class TicTacToeGameClass(BaseGameClass):
         await self.send_data_function(commands.Peace_Selected, {'user': gamer_id, 'target_peace': peace_number})
         winner = self.check_winner()
         if winner is not None or self.counter == 9:
-            if self.current_round == self.round_count:
+            if self.check_game_ended():
                 game_winner = self.get_game_winner()
                 await self.send_data_function(commands.Finish_Game, {"Winner": game_winner})
                 self.is_game_finished = True
@@ -78,13 +79,22 @@ class TicTacToeGameClass(BaseGameClass):
                 break
         return winner
 
+    def check_game_ended(self):
+        if self.current_round == self.round_count:
+            return True
+        # if self.gamer1_score.__float__() >= self.round_count / 2
+        return False
+
     def get_game_winner(self):
         if self.gamer1_score > self.gamer2_score:
             return self.symbol_1
         elif self.gamer2_score > self.gamer1_score:
             return self.symbol_2
         else:
-            return None
+            return 0
+
+    def is_game_finished(self):
+        pass
 
     def change_turn(self):
         if self.current_turn == 1:
