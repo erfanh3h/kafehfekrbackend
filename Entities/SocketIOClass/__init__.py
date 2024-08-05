@@ -15,11 +15,11 @@ Socket_Server = socketio.AsyncServer(async_mode='asgi')
 
 current_game_id = "gameId"
 # gameSession = MillGameSession(game_id=current_game_id, game_score_type=GameScoreTypesEnum.NORMAL)
-gameSession = MNumbersGameSession(game_id=current_game_id, game_score_type=GameScoreTypesEnum.NORMAL)
+# gameSession = MNumbersGameSession(game_id=current_game_id, game_score_type=GameScoreTypesEnum.NORMAL)
 # gameSession = CheckersGameSession(game_id=current_game_id, game_score_type=GameScoreTypesEnum.NORMAL)
 # gameSession = TenGameSession(game_id=current_game_id, game_score_type=GameScoreTypesEnum.NORMAL)
 # gameSession = TicTacToeGameSession(game_id=current_game_id, game_score_type=GameScoreTypesEnum.NORMAL)
-# gameSession = RPCGameSession(game_id=current_game_id, game_score_type=GameScoreTypesEnum.NORMAL)
+gameSession = RPCGameSession(game_id=current_game_id, game_score_type=GameScoreTypesEnum.NORMAL)
 # gameSession = MSweeperGameSession(game_id=current_game_id, game_score_type=GameScoreTypesEnum.NORMAL)
 
 gameSession.add_gamer(GamerModel(user_id="0", username='test'))

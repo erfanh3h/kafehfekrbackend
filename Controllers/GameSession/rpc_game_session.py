@@ -53,7 +53,6 @@ class RPCGameSession(BaseGameSession):
             time.sleep(3)
             self.check_and_send_round_winner()
             time.sleep(3)
-            print("end game ")
             game_winner = self.game_controller.get_game_winner()
             asyncio.new_event_loop().run_until_complete(
                 send_command(command=make_command_json(id=commands.Finish_Game, data={"Winner": game_winner}),
