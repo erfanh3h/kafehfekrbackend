@@ -9,8 +9,8 @@ class MillGameClass(BaseGameClass):
         self.symbol_2 = 2
         self.board = [0 for i in range(24)]
         self.current_round = 1
-        self.player1_peaces = 10
-        self.player2_peaces = 10
+        self.player1_peaces = 4
+        self.player2_peaces = 4
         self.player1_played_peaces = 0
         self.player2_played_peaces = 0
         self.player1_removed_peaces = 0
@@ -154,7 +154,12 @@ class MillGameClass(BaseGameClass):
             return False
         if self.board[target_peace_number] != 0:
             return False
-        if target_peace_number not in self.pieces_neighbors[source_peace_number]:
+        if gamer_id == 1:
+            current_peace_count = self.player1_peaces - self.player1_removed_peaces
+        else:
+            current_peace_count = self.player2_peaces - self.player2_removed_peaces
+        # if user have 3 peace , can swap to any place
+        if current_peace_count != 3 and target_peace_number not in self.pieces_neighbors[source_peace_number]:
             return False
         return True
 
