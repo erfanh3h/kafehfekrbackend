@@ -2,6 +2,7 @@ import asyncio
 import threading
 import time
 
+from Entities.Games.game_types import GameTypesEnum
 from Entities.Games.wait_times import MSweeper_game_Time
 from Commons.static_functions import make_command_json
 from Commons import commands
@@ -10,8 +11,8 @@ from Controllers.GameSession import BaseGameSession
 
 
 class MSweeperGameSession(BaseGameSession):
-    def __init__(self, game_id: str):
-        super().__init__(game_id)
+    def __init__(self, game_id: str, game_score_type):
+        super().__init__(game_id, game_score_type)
 
     async def send_command(self, command_id, command_data):
         if command_id == commands.Finish_Game:
@@ -21,6 +22,8 @@ class MSweeperGameSession(BaseGameSession):
     def start_game_timer(self):
         self.game_controller = MSweeperGameClass(send_data_function=self.send_command,
                                                  send_private_data_function=self.send_private_command)
+        self.game_type = GameTypesEnum.MSweeper
+        self.score_manager.set_data(self.gamers[0].user_id, self.gamers[1].user_id, self.game_type)
 
         def entrypoint():
             self.check_start_game()

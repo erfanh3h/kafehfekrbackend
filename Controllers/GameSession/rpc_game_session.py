@@ -2,6 +2,7 @@ import asyncio
 import threading
 import time
 
+from Entities.Games.game_types import GameTypesEnum
 from Entities.Games.wait_times import RPC_Turn_Round_Time, RPC_Sleep_Round_Time, RPC_Sleep_Turn_Round_Time
 from Commons.static_functions import make_command_json
 from Commons import commands
@@ -10,8 +11,8 @@ from Controllers.GameSession import BaseGameSession
 
 
 class RPCGameSession(BaseGameSession):
-    def __init__(self, game_id: str):
-        super().__init__(game_id)
+    def __init__(self, game_id: str, game_score_type):
+        super().__init__(game_id, game_score_type)
 
     async def send_command(self, command_id, command_data):
         if command_id == commands.Finish_Game:
@@ -22,6 +23,8 @@ class RPCGameSession(BaseGameSession):
 
     def start_game_timer(self):
         self.game_controller = RPCGameClass(send_data_function=self.send_command)
+        self.game_type = GameTypesEnum.RPC
+        self.score_manager.set_data(self.gamers[0].user_id, self.gamers[1].user_id, self.game_type)
 
         def entrypoint():
             self.check_start_game()

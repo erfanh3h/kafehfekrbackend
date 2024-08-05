@@ -5,12 +5,14 @@ import time
 from Commons import commands
 from Commons.static_functions import make_command_json
 from Entities.Games.base_game_class import BaseGameClass
+from Entities.Games.game_types import GameTypesEnum
+from Entities.ScoreManagerClass import ScoreManagerClass
 from Entities.TimerClass import TimerClass
 from Models.Gamer import GamerModel
 
 
 class BaseGameSession:
-    def __init__(self, game_id: str):
+    def __init__(self, game_id: str, game_score_type):
         # self.temp_gamers: list[GamerModel] = [GamerModel(user_id=i, username=str(i)) for i in range(2)]
         self.gamers: list[GamerModel] = []
         self.timer = TimerClass()
@@ -18,8 +20,12 @@ class BaseGameSession:
         self.game_id = game_id
         self.is_game_running = False
         self.gamer_idies = []
+        self.game_type: GameTypesEnum = GameTypesEnum.C
+        self.score_manager = ScoreManagerClass(game_score_type)
 
     def start_game_timer(self):
+        self.score_manager.set_data(self.gamers[0].user_id, self.gamers[1].user_id, self.game_type)
+
         def entrypoint():
             self.check_start_game()
 

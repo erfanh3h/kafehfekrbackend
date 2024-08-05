@@ -3,6 +3,7 @@ import time
 
 from Entities.Games.MNumbers import MNumbersGameClass
 from Entities.Games.Mill import MillGameClass
+from Entities.Games.game_types import GameTypesEnum
 from Entities.Games.wait_times import MNumbers_Turn_Time, MNumbers_Show_Result_Time
 from Commons.static_functions import make_command_json
 from Commons import commands
@@ -11,8 +12,8 @@ from Controllers.GameSession import BaseGameSession
 
 
 class MNumbersGameSession(BaseGameSession):
-    def __init__(self, game_id: str):
-        super().__init__(game_id)
+    def __init__(self, game_id: str, game_score_type):
+        super().__init__(game_id, game_score_type)
 
     async def send_command(self, command_id, command_data):
         if command_id == commands.Finish_Game:
@@ -21,6 +22,7 @@ class MNumbersGameSession(BaseGameSession):
 
     def start_game_timer(self):
         self.game_controller = MNumbersGameClass(send_data_function=self.send_command)
+        self.game_type = GameTypesEnum.MNUMBERS
         super().start_game_timer()
 
     async def command_received(self, data, socket_id):
