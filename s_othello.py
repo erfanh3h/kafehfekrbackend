@@ -78,21 +78,22 @@ class OthelloGameClass:
             else:
                 self.player2_score += 1
             for direction in MOVE_DIRS:
-                i = 1
-                while True:
-                    row = move[0] + direction[0] * i
-                    col = move[1] + direction[1] * i
-                    if self.board[row][col] == gamer_id:
-                        break
-                    else:
-                        self.board[row][col] = gamer_id
-                        if gamer_id == 1:
-                            self.player1_score += 1
-                            self.player2_score -= 1
+                if self.has_tile_to_flip(move, direction, gamer_id):
+                    i = 1
+                    while True:
+                        row = move[0] + direction[0] * i
+                        col = move[1] + direction[1] * i
+                        if self.board[row][col] == gamer_id:
+                            break
                         else:
-                            self.player2_score += 1
-                            self.player1_score -= 1
-                        i += 1
+                            self.board[row][col] = gamer_id
+                            if gamer_id == 1:
+                                self.player1_score += 1
+                                self.player2_score -= 1
+                            else:
+                                self.player2_score += 1
+                                self.player1_score -= 1
+                            i += 1
 
     def has_legal_move(self, gamer_id):
         for row in range(8):

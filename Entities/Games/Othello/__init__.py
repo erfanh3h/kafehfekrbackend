@@ -53,7 +53,7 @@ class OthelloGameClass(BaseGameClass):
             for j in range(8):
                 board_peaces_data.append(self.board[i][j])
         data = {"board": board_peaces_data, "pawns_count": [self.player1_pawns, self.player2_pawns],
-                "current_turn": self.current_turn}
+                "current_turn": self.current_turn, 'scores': [self.player1_score, self.player2_score]}
         return data
 
     def change_turn(self):
@@ -62,16 +62,19 @@ class OthelloGameClass(BaseGameClass):
         else:
             self.current_turn = self.symbol_1
         self.current_move_list = self.get_legal_moves(self.current_turn)
+        print(self.current_move_list)
 
     async def recieve_data(self, command_id, data, gamer_id):
         print(command_id, data, gamer_id)
         if command_id == commands.Select_Peace:
             column_index = data['c_index']
             row_index = data['r_index']
-            move = (row_index, column_index)
+            move = (column_index, row_index)
             self.flip_tiles(gamer_id, move)
+            print(self)
             await self.send_data_function(commands.Peace_Selected, {
-                "select_data": {'c_index': column_index, 'r_index': row_index, 'gamer_id': gamer_id}, })
+                "select_data": {'c_index': column_index, 'r_index': row_index, 'gamer_id': gamer_id},
+                'scores': [self.player1_score, self.player2_score]})
             is_game_finished = self.check_game_ended()
             if is_game_finished:
                 winner = self.get_game_winner()
@@ -146,21 +149,22 @@ class OthelloGameClass(BaseGameClass):
         else:
             self.player2_score += 1
         for direction in MOVE_DIRS:
-            i = 1
-            while True:
-                row = move[0] + direction[0] * i
-                col = move[1] + direction[1] * i
-                if self.board[row][col] == gamer_id:
-                    break
-                else:
-                    self.board[row][col] = gamer_id
-                    if gamer_id == 1:
-                        self.player1_score += 1
-                        self.player2_score -= 1
+            if self.has_tile_to_flip(move, direction, gamer_id):
+                i = 1
+                while True:
+                    row = move[0] + direction[0] * i
+                    col = move[1] + direction[1] * i
+                    if self.board[row][col] == gamer_id:
+                        break
                     else:
-                        self.player2_score += 1
-                        self.player1_score -= 1
-                    i += 1
+                        self.board[row][col] = gamer_id
+                        if gamer_id == 1:
+                            self.player1_score += 1
+                            self.player2_score -= 1
+                        else:
+                            self.player2_score += 1
+                            self.player1_score -= 1
+                        i += 1
 
     def has_legal_move(self, gamer_id):
         for row in range(8):
