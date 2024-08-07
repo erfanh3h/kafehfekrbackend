@@ -70,6 +70,10 @@ class OthelloGameClass(BaseGameClass):
             column_index = data['c_index']
             row_index = data['r_index']
             move = (column_index, row_index)
+            if gamer_id == 1:
+                self.player1_pawns -= 1
+            else:
+                self.player2_pawns -= 1
             self.flip_tiles(gamer_id, move)
             print(self)
             await self.send_data_function(commands.Peace_Selected, {

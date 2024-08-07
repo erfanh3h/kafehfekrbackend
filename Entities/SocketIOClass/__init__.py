@@ -22,8 +22,8 @@ current_game_id = "gameId"
 # gameSession = TenGameSession(game_id=current_game_id, game_score_type=GameScoreTypesEnum.NORMAL)
 # gameSession = TicTacToeGameSession(game_id=current_game_id, game_score_type=GameScoreTypesEnum.NORMAL)
 # gameSession = RPCGameSession(game_id=current_game_id, game_score_type=GameScoreTypesEnum.NORMAL)
-# gameSession = OthelloGameSession(game_id=current_game_id, game_score_type=GameScoreTypesEnum.NORMAL)
-gameSession = DotBoxGameSession(game_id=current_game_id, game_score_type=GameScoreTypesEnum.NORMAL)
+gameSession = OthelloGameSession(game_id=current_game_id, game_score_type=GameScoreTypesEnum.NORMAL)
+# gameSession = DotBoxGameSession(game_id=current_game_id, game_score_type=GameScoreTypesEnum.NORMAL)
 # gameSession = MSweeperGameSession(game_id=current_game_id, game_score_type=GameScoreTypesEnum.NORMAL)
 
 gameSession.add_gamer(GamerModel(user_id="0", username='test'))
