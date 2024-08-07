@@ -11,3 +11,4 @@ MNumbers_Show_Result_Time = 2
 Checkers_Turn_Time = 20
 Ten_Round_Time = 300
 Ten_Sleep_Round_Time = 5
+DotBox_Turn_Time = 15

@@ -10,4 +10,5 @@ class GameTypesEnum(Enum):
     MSweeper = "MSweeper"
     RPC = "RPC"
     TEN = "Ten"
+    DOTBOX = "DotBox"
     C = "C"
