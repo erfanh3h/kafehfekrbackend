@@ -13,13 +13,13 @@ class DotBoxGameClass(BaseGameClass):
         self.current_round = 1
         self.gamer1_score = 0
         self.gamer2_score = 0
-        self.boxes_neighbors = {0: [1, 9], 1: [0, 2, 4], 2: [1, 14], 3: [4, 10], 4: [1, 3, 5, 7], 5: [4, 13],
-                                6: [7, 11],
-                                7: [4, 6, 8], 8: [7, 12], 9: [0, 10, 21], 10: [3, 9, 11, 18], 11: [6, 10, 15],
-                                12: [8, 13, 17],
-                                13: [5, 12, 14, 20], 14: [2, 13, 23], 15: [11, 16], 16: [15, 17, 19], 17: [12, 16],
-                                18: [10, 19],
-                                19: [16, 18, 20, 22], 20: [13, 19], 21: [9, 22], 22: [19, 21, 23], 23: [14, 22]}
+        self.boxes_neighbors = {0: [0, 5, 6, 11], 1: [1, 6, 7, 12], 2: [2, 7, 8, 13], 3: [3, 8, 9, 14],
+                                4: [4, 9, 10, 15], 5: [11, 16, 17, 22], 6: [12, 17, 18, 23], 7: [13, 18, 19, 24],
+                                8: [14, 19, 20, 25], 9: [15, 20, 21, 26], 10: [22, 27, 28, 33], 11: [23, 28, 29, 34],
+                                12: [24, 29, 30, 35], 13: [25, 30, 31, 36], 14: [26, 31, 32, 37], 15: [33, 38, 39, 44],
+                                16: [34, 39, 40, 45], 17: [35, 40, 41, 46], 18: [36, 41, 42, 47], 19: [37, 42, 43, 48],
+                                20: [44, 49, 50, 55], 21: [45, 50, 51, 56], 22: [46, 51, 52, 57], 23: [47, 52, 53, 58],
+                                24: [48, 53, 54, 59]}
 
     def get_game_data(self):
         data = {"lines_board": self.lines_board, "boxes_board": self.boxes_board,
@@ -48,7 +48,14 @@ class DotBoxGameClass(BaseGameClass):
             await self.send_data_function(commands.Finish_Game, {"Winner": game_winner})
             return False
         else:
-            is_win_happen = self.check_box_win_happen(peace_number)
+            is_win_happen, win_list = self.check_box_win_happen(peace_number)
+            if is_win_happen:
+                for index in win_list:
+                    self.boxes_board[index] = gamer_id
+                if gamer_id == 1:
+                    self.gamer1_score += len(win_list)
+                else:
+                    self.gamer2_score += len(win_list)
             return is_win_happen
 
     def check_authority(self, data, gamer_id: int):
@@ -56,7 +63,7 @@ class DotBoxGameClass(BaseGameClass):
             print("not turn of : ", gamer_id)
             return False
         peace_number = data
-        if peace_number < 0 or peace_number > 8:
+        if peace_number < 0 or peace_number > 63:
             return False
         if (self.lines_board[peace_number] == self.symbol_1) or (self.lines_board[peace_number] == self.symbol_2):
             return False
@@ -76,6 +83,23 @@ class DotBoxGameClass(BaseGameClass):
         for peace in self.lines_board:
             if peace != 0:
                 return False
+        return True
+
+    def check_each_box_in_raw_happen(self, neighbors: list):
+        for neighbor_index in range(len(neighbors)):
+            if self.lines_board[neighbors[neighbor_index]] == 0:
+                return False
+        return True
 
     def check_box_win_happen(self, peace_number):
-        return True
+        lines_list_to_check = {}
+        is_win_happen = False
+        win_results = []
+        for key, value in self.boxes_neighbors.items():
+            if value.__contains__(peace_number):
+                lines_list_to_check[key] = self.boxes_neighbors[key]
+        for key, value in lines_list_to_check.items():
+            if self.check_each_box_in_raw_happen(value):
+                is_win_happen = True
+                win_results.append(key)
+        return is_win_happen, win_results
