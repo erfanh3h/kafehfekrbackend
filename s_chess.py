@@ -7,6 +7,12 @@ WHITE = "white"
 BLACK = "black"
 
 
+def is_valid_coord(row, col):
+    if 0 <= row < 8 and 0 <= col < 8:
+        return True
+    return False
+
+
 class BoardSpotClass:
     def __init__(self, r_index, c_index):
         self.position = (r_index, c_index)
@@ -23,10 +29,6 @@ class BoardSpotClass:
 
     def __str__(self):
         return self.gamer_id.__str__()
-        # if self.piece_index is None:
-        #     return self.gamer_id.__str__()
-        # else:
-        #     return self.piece_index.__str__()
 
 
 def get_piece_of_coordinate(x, y):
@@ -36,10 +38,13 @@ def get_piece_of_coordinate(x, y):
 
 class PieceClass:
     def __init__(self, index):
-        self.position = None
+        self.position: tuple = (0, 0)
         self.index = index
         self.is_removed = False
         self.gamer_id = 0
+        self.move_list: list[tuple] = []
+        self.is_multi_move = True
+        self.is_first_move = True
 
     def set_data(self, position: tuple, gamer_id: int):
         self.position = position
@@ -50,10 +55,12 @@ class PieceClass:
         self.position = None
 
     def get_move_list(self) -> list:
-        return []
+        result = []
+        return result
 
     def move_to_position(self, position: tuple):
         self.position = position
+        self.is_first_move = False
 
     def __str__(self):
         return f""
@@ -62,31 +69,61 @@ class PieceClass:
 class PawnPiece(PieceClass):
     def __init__(self, index):
         super().__init__(index)
+        self.is_multi_move = False
+
+    def get_move_list(self) -> list:
+        result = []
+        if self.gamer_id == 1:
+            result.append((0, 1))
+        else:
+            result.append((0, +1))
+        return result
 
 
 class RookPiece(PieceClass):
     def __init__(self, index):
         super().__init__(index)
 
+    def get_move_list(self) -> list:
+        result = [(0, 1), (0, -1), (1, 0), (-1, 0)]
+        return result
+
 
 class KnightPiece(PieceClass):
     def __init__(self, index):
         super().__init__(index)
+        self.is_multi_move = False
+    def get_move_list(self) -> list:
+        result = [(-2, 1), (-1, 2), (1, 2), (2, 1), (2, -1), (1, -2), (-1, -2), (-2, -1)]
+        return result
 
 
 class BishopPiece(PieceClass):
     def __init__(self, index):
         super().__init__(index)
 
+    def get_move_list(self) -> list:
+        result = [(1, 1), (1, -1), (-1, 1), (-1, -1)]
+        return result
+
 
 class QueenPiece(PieceClass):
     def __init__(self, index):
         super().__init__(index)
 
+    def get_move_list(self) -> list:
+        result = [(1, 1), (1, -1), (-1, 1), (-1, -1), (0, 1), (0, -1), (1, 0), (-1, 0)]
+        return result
+
 
 class KingPiece(PieceClass):
     def __init__(self, index):
         super().__init__(index)
+        self.is_multi_move = False
+
+    def get_move_list(self) -> list:
+        result = [(1, 1), (1, -1), (-1, 1), (-1, -1), (0, 1), (0, -1), (1, 0), (-1, 0)]
+        return result
 
 
 class ChessGameClass:
@@ -135,8 +172,41 @@ class ChessGameClass:
             self.pieces[index].set_data((7, piece_i), 2)
             index += 1
 
+    def is_target_peace_empty(self, r_index, c_index):
+        # print(c_index, r_index)
+        return self.board[c_index][r_index].gamer_id == 0
+
+    def get_moves_list(self, position, gamer_id):
+        result = []
+        piece_index = self.board[position[0]][position[1]].piece_index
+        if piece_index is not None:
+            piece_move_list = self.pieces[piece_index].get_move_list()
+            is_piece_multi_move = self.pieces[piece_index].is_multi_move
+            if is_piece_multi_move:
+                for move in piece_move_list:
+                    i = 1
+                    while True:
+                        x = position[0] + move[1] * i
+                        y = position[1] + move[0] * i
+                        if is_valid_coord(x, y):
+                            # if self.is_target_peace_empty(x, y):
+                            result.append((x, y))
+                            i += 1
+                            # else:
+                            #     break
+                        else:
+                            break
+            else:
+                for move in piece_move_list:
+                    x = position[0] + move[1]
+                    y = position[1] + move[0]
+                    if is_valid_coord(x, y):
+                        result.append((x, y))
+        print(result)
+
     def play(self):
         self.init_board()
+        self.get_moves_list((0, 3), 1)
 
 
 chess_game = ChessGameClass()
