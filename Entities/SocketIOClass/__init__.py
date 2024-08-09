@@ -1,6 +1,7 @@
 import socketio
 
 from Controllers.GameSession.checkers_game_session import CheckersGameSession
+from Controllers.GameSession.chess_game_session import ChessGameSession
 from Controllers.GameSession.dotbox_game_session import DotBoxGameSession
 from Controllers.GameSession.mill_game_session import MillGameSession
 from Controllers.GameSession.mnumbers_game_session import MNumbersGameSession
@@ -20,7 +21,8 @@ current_game_id = "gameId"
 # gameSession = MNumbersGameSession(game_id=current_game_id, game_score_type=GameScoreTypesEnum.NORMAL)
 # gameSession = CheckersGameSession(game_id=current_game_id, game_score_type=GameScoreTypesEnum.NORMAL)
 # gameSession = TenGameSession(game_id=current_game_id, game_score_type=GameScoreTypesEnum.NORMAL)
-gameSession = TicTacToeGameSession(game_id=current_game_id, game_score_type=GameScoreTypesEnum.NORMAL)
+gameSession = ChessGameSession(game_id=current_game_id, game_score_type=GameScoreTypesEnum.NORMAL)
+# gameSession = TicTacToeGameSession(game_id=current_game_id, game_score_type=GameScoreTypesEnum.NORMAL)
 # gameSession = RPCGameSession(game_id=current_game_id, game_score_type=GameScoreTypesEnum.NORMAL)
 # gameSession = OthelloGameSession(game_id=current_game_id, game_score_type=GameScoreTypesEnum.NORMAL)
 # gameSession = DotBoxGameSession(game_id=current_game_id, game_score_type=GameScoreTypesEnum.NORMAL)

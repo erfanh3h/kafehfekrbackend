@@ -7,6 +7,7 @@ class PieceClass:
         self.move_list: list[tuple] = []
         self.is_multi_move = True
         self.is_first_move = True
+        self.name = ""
 
     def set_data(self, position: tuple, gamer_id: int):
         self.position = position
@@ -29,7 +30,7 @@ class PieceClass:
 
     def to_json(self):
         return {"index": self.index, "is_removed": self.is_removed, "gamer_id": self.gamer_id,
-                "is_first_move": self.is_first_move}
+                "is_first_move": self.is_first_move, "name": self.name}
 
     def __str__(self):
         return f""

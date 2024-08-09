@@ -5,6 +5,7 @@ class PawnPiece(PieceClass):
     def __init__(self, index):
         super().__init__(index)
         self.is_multi_move = False
+        self.name = 'Pawn'
 
     def get_move_list(self) -> list:
         result = []

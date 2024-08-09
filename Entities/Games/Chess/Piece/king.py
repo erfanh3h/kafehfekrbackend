@@ -5,6 +5,7 @@ class KingPiece(PieceClass):
     def __init__(self, index):
         super().__init__(index)
         self.is_multi_move = False
+        self.name = 'King'
 
     def get_move_list(self) -> list:
         result = [(1, 0), (-1, 0), (0, 1), (0, -1), (-1, 1), (1, 1), (1, -1), (-1, -1)]
