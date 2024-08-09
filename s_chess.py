@@ -7,7 +7,7 @@ WHITE = "white"
 BLACK = "black"
 
 
-def is_valid_coord(row, col):
+def is_valid_coord(col, row):
     if 0 <= row < 8 and 0 <= col < 8:
         return True
     return False
@@ -58,6 +58,9 @@ class PieceClass:
         result = []
         return result
 
+    def get_hit_list(self) -> list:
+        return self.get_move_list()
+
     def move_to_position(self, position: tuple):
         self.position = position
         self.is_first_move = False
@@ -74,9 +77,17 @@ class PawnPiece(PieceClass):
     def get_move_list(self) -> list:
         result = []
         if self.gamer_id == 1:
-            result.append((0, 1))
+            result.append((1, 0))
         else:
-            result.append((0, +1))
+            result.append((-1, 0))
+        return result
+
+    def get_hit_list(self) -> list:
+        result = []
+        if self.gamer_id == 1:
+            result = [(1, -1), (1, 1)]
+        else:
+            result = [(-1, -1), (-1, 1)]
         return result
 
 
@@ -85,7 +96,7 @@ class RookPiece(PieceClass):
         super().__init__(index)
 
     def get_move_list(self) -> list:
-        result = [(0, 1), (0, -1), (1, 0), (-1, 0)]
+        result = [(1, 0), (-1, 0), (0, 1), (0, -1)]
         return result
 
 
@@ -93,6 +104,7 @@ class KnightPiece(PieceClass):
     def __init__(self, index):
         super().__init__(index)
         self.is_multi_move = False
+
     def get_move_list(self) -> list:
         result = [(-2, 1), (-1, 2), (1, 2), (2, 1), (2, -1), (1, -2), (-1, -2), (-2, -1)]
         return result
@@ -103,7 +115,7 @@ class BishopPiece(PieceClass):
         super().__init__(index)
 
     def get_move_list(self) -> list:
-        result = [(1, 1), (1, -1), (-1, 1), (-1, -1)]
+        result = [(-1, 1), (1, 1), (1, -1), (-1, -1)]
         return result
 
 
@@ -112,7 +124,7 @@ class QueenPiece(PieceClass):
         super().__init__(index)
 
     def get_move_list(self) -> list:
-        result = [(1, 1), (1, -1), (-1, 1), (-1, -1), (0, 1), (0, -1), (1, 0), (-1, 0)]
+        result = [(1, 0), (-1, 0), (0, 1), (0, -1), (-1, 1), (1, 1), (1, -1), (-1, -1)]
         return result
 
 
@@ -122,7 +134,7 @@ class KingPiece(PieceClass):
         self.is_multi_move = False
 
     def get_move_list(self) -> list:
-        result = [(1, 1), (1, -1), (-1, 1), (-1, -1), (0, 1), (0, -1), (1, 0), (-1, 0)]
+        result = [(1, 0), (-1, 0), (0, 1), (0, -1), (-1, 1), (1, 1), (1, -1), (-1, -1)]
         return result
 
 
@@ -157,6 +169,7 @@ class ChessGameClass:
             index += 1
         for i in range(8):
             self.pieces.append(PawnPiece(index))
+            # self.board[1][i].set_data(index, (-1, -1), 0)
             self.board[1][i].set_data(index, (1, i), 1)
             self.pieces[index].set_data((1, i), 1)
             index += 1
@@ -172,9 +185,11 @@ class ChessGameClass:
             self.pieces[index].set_data((7, piece_i), 2)
             index += 1
 
-    def is_target_peace_empty(self, r_index, c_index):
-        # print(c_index, r_index)
+    def is_target_peace_empty(self, c_index, r_index):
         return self.board[c_index][r_index].gamer_id == 0
+
+    def is_target_peace_enemey(self, c_index, r_index, gamer_id):
+        return self.board[c_index][r_index].gamer_id != 0 and self.board[c_index][r_index].gamer_id != gamer_id
 
     def get_moves_list(self, position, gamer_id):
         result = []
@@ -186,29 +201,64 @@ class ChessGameClass:
                 for move in piece_move_list:
                     i = 1
                     while True:
-                        x = position[0] + move[1] * i
-                        y = position[1] + move[0] * i
+                        y = position[0] + move[0] * i
+                        x = position[1] + move[1] * i
                         if is_valid_coord(x, y):
-                            # if self.is_target_peace_empty(x, y):
-                            result.append((x, y))
-                            i += 1
-                            # else:
-                            #     break
+                            if not self.is_target_peace_empty(y, x):
+                                break
+                            else:
+                                result.append((y, x))
+                                i += 1
                         else:
                             break
             else:
                 for move in piece_move_list:
-                    x = position[0] + move[1]
-                    y = position[1] + move[0]
-                    if is_valid_coord(x, y):
-                        result.append((x, y))
+                    y = position[0] + move[0]
+                    x = position[1] + move[1]
+                    if is_valid_coord(y, x) and self.is_target_peace_empty(y, x):
+                        result.append((y, x))
         print(result)
+        return result
+
+    def get_hit_list(self, position, gamer_id):
+        result = []
+        piece_index = self.board[position[0]][position[1]].piece_index
+        if piece_index is not None:
+            piece_move_list = self.pieces[piece_index].get_hit_list()
+            is_piece_multi_move = self.pieces[piece_index].is_multi_move
+            if is_piece_multi_move:
+                for move in piece_move_list:
+                    i = 1
+                    while True:
+                        y = position[0] + move[0] * i
+                        x = position[1] + move[1] * i
+                        if is_valid_coord(x, y):
+                            if self.is_target_peace_enemey(y, x, gamer_id):
+                                result.append((y, x))
+                                break
+                            elif not self.is_target_peace_empty(y, x):
+                                break
+                            else:
+                                i += 1
+                        else:
+                            break
+            else:
+                for move in piece_move_list:
+                    y = position[0] + move[0]
+                    x = position[1] + move[1]
+                    if is_valid_coord(x, y):
+                        if self.is_target_peace_enemey(y, x, gamer_id):
+                            result.append((y, x))
+        print(result)
+        return result
 
     def play(self):
         self.init_board()
-        self.get_moves_list((0, 3), 1)
+        print(self)
+        # self.get_moves_list((1, 0), 1)
+        self.get_hit_list((0, 7), 1)
 
 
 chess_game = ChessGameClass()
 chess_game.play()
-print(chess_game)
+# print(chess_game)
