@@ -2,8 +2,8 @@ from Entities.Games.Chess.Piece import PieceClass
 
 
 class QueenPiece(PieceClass):
-    def __init__(self, index):
-        super().__init__(index)
+    def __init__(self, gamer_id):
+        super().__init__(gamer_id)
         self.name = 'Queen'
 
     def get_move_list(self) -> list:

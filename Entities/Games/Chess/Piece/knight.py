@@ -2,8 +2,8 @@ from Entities.Games.Chess.Piece import PieceClass
 
 
 class KnightPiece(PieceClass):
-    def __init__(self, index):
-        super().__init__(index)
+    def __init__(self, gamer_id):
+        super().__init__(gamer_id)
         self.is_multi_move = False
         self.name = 'knight'
 

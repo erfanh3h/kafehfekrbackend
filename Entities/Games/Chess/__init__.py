@@ -33,9 +33,6 @@ class ChessGameClass(BaseGameClass):
         self.symbol_1 = 1
         self.symbol_2 = 2
         self.board = [[BoardSpotClass(i, j) for i in range(8)] for j in range(8)]
-        self.pieces: list[PieceClass] = []
-        self.player1_pawns = 16
-        self.player2_pawns = 16
         self.check_move_list = []
         self.init_board()
         print(self)
@@ -62,10 +59,7 @@ class ChessGameClass(BaseGameClass):
         for i in range(8):
             for j in range(8):
                 board_data.append(self.board[i][j].to_json())
-        for i in range(len(self.pieces)):
-            board_data.append(self.pieces[i].to_json())
         data = {"board_data": board_data, "pieces_data": pieces_data,
-                "pawns_count": [self.player1_pawns, self.player2_pawns],
                 "current_turn": self.current_turn}
         return data
 
@@ -111,17 +105,17 @@ class ChessGameClass(BaseGameClass):
 
     def get_game_winner(self):
         winner = 0
-        if self.player1_pawns <= 0:
-            winner = self.symbol_2
-        elif self.player2_pawns <= 0:
-            winner = self.symbol_1
+        # if self.player1_pawns <= 0:
+        #     winner = self.symbol_2
+        # elif self.player2_pawns <= 0:
+        #     winner = self.symbol_1
         return winner
 
     def check_game_ended(self):
-        if self.player1_pawns <= 0:
-            return True
-        elif self.player2_pawns <= 0:
-            return True
+        # if self.player1_pawns <= 0:
+        #     return True
+        # elif self.player2_pawns <= 0:
+        #     return True
         return False
 
     def finish_game(self):
@@ -139,46 +133,38 @@ class ChessGameClass(BaseGameClass):
         return True
 
     def is_target_piece_empty(self, c_index, r_index):
-        return self.board[c_index][r_index].gamer_id == 0
+        return self.board[c_index][r_index].piece.gamer_id == 0
 
-    def is_target_piece_enemey(self, c_index, r_index, gamer_id: int):
-        return self.board[c_index][r_index].gamer_id != 0 and self.board[c_index][r_index].gamer_id != gamer_id
+    def is_target_piece_enemey(self, c_index, r_index, gamer_id):
+        return self.board[c_index][r_index].piece.gamer_id == 0 and self.board[c_index][
+            r_index].piece.gamer_id != gamer_id
 
     def is_target_piece_mine(self, position: tuple, gamer_id: int):
-        return self.board[position[0]][position[1]].gamer_id == gamer_id
+        return self.board[position[0]][position[1]].piece.gamer_id == gamer_id
 
     def init_board(self):
         pieces_list = [RookPiece, KnightPiece, BishopPiece, QueenPiece, KingPiece, BishopPiece, KnightPiece, RookPiece]
         index = 0
         for piece in pieces_list:
-            self.pieces.append(piece(index))
-            self.board[0][index].set_data(index, (0, index), 1)
-            self.pieces[index].set_data((0, index), 1)
+            self.board[0][index].set_data(piece(1))
             index += 1
         for i in range(8):
-            self.pieces.append(PawnPiece(index))
-            # self.board[1][i].set_data(index, (-1, -1), 0)
-            self.board[1][i].set_data(index, (1, i), 1)
-            self.pieces[index].set_data((1, i), 1)
+            self.board[1][i].set_data(PawnPiece(1))
             index += 1
         for i in range(8):
-            self.pieces.append(PawnPiece(index))
-            self.board[6][i].set_data(index, (6, i), 2)
-            self.pieces[index].set_data((6, i), 2)
+            self.board[6][i].set_data(PawnPiece(2))
             index += 1
         pieces_list.reverse()
         for piece_i in range(len(pieces_list)):
-            self.pieces.append(pieces_list[piece_i](index))
-            self.board[7][piece_i].set_data(index, (7, piece_i), 2)
-            self.pieces[index].set_data((7, piece_i), 2)
+            self.board[7][piece_i].set_data(pieces_list[piece_i](2))
             index += 1
 
     def get_moves_list(self, position, gamer_id):
         result = []
-        piece_index = self.board[position[0]][position[1]].piece_index
-        if piece_index is not None:
-            piece_move_list = self.pieces[piece_index].get_move_list()
-            is_piece_multi_move = self.pieces[piece_index].is_multi_move
+        piece = self.board[position[0]][position[1]].piece
+        if piece is not None:
+            piece_move_list = piece.get_move_list()
+            is_piece_multi_move = piece.is_multi_move
             if is_piece_multi_move:
                 for move in piece_move_list:
                     i = 1
@@ -204,10 +190,10 @@ class ChessGameClass(BaseGameClass):
 
     def get_hit_list(self, position, gamer_id):
         result = []
-        piece_index = self.board[position[0]][position[1]].piece_index
-        if piece_index is not None:
-            piece_move_list = self.pieces[piece_index].get_hit_list()
-            is_piece_multi_move = self.pieces[piece_index].is_multi_move
+        piece = self.board[position[0]][position[1]].piece
+        if piece is not None:
+            piece_move_list = piece.get_hit_list()
+            is_piece_multi_move = piece.is_multi_move
             if is_piece_multi_move:
                 for move in piece_move_list:
                     i = 1
@@ -234,23 +220,14 @@ class ChessGameClass(BaseGameClass):
         print(result)
         return result
 
-    def remove_pawn(self, c_index, r_index, gamer_id):
-        self.board[r_index][c_index].remove_pawn_gamer()
-        if gamer_id == 1:
-            self.player2_pawns -= 1
-        else:
-            self.player1_pawns -= 1
-
     def move_piece(self, source_position, target_position, gamer_id):
-        piece_index = self.board[source_position[0]][source_position[1]].piece_index
-        self.board[source_position[0]][source_position[1]].set_gamer_id(0)
-        self.board[target_position[0]][target_position[1]].set_gamer_id(gamer_id, piece_index)
-        self.pieces[piece_index].move_to_position(target_position)
+        piece = self.board[source_position[0]][source_position[1]].piece
+        piece.move()
+        self.board[source_position[0]][source_position[1]].set_data(PieceClass(0))
+        self.board[target_position[0]][target_position[1]].set_data(piece)
 
     def hit_piece(self, source_position, target_position, gamer_id):
-        source_piece_index = self.board[source_position[0]][source_position[1]].piece_index
-        target_piece_index = self.board[target_position[0]][target_position[1]].piece_index
-        self.board[source_position[0]][source_position[1]].set_gamer_id(0)
-        self.board[target_position[0]][target_position[1]].set_gamer_id(gamer_id, source_piece_index)
-        self.pieces[target_piece_index].remove_piece()
-        self.pieces[source_piece_index].move_to_position(target_position)
+        piece = self.board[source_position[0]][source_position[1]].piece
+        piece.move()
+        self.board[source_position[0]][source_position[1]].set_data(PieceClass(0))
+        self.board[target_position[0]][target_position[1]].set_data(piece)
