@@ -24,6 +24,10 @@ class BoardSpotClass:
         self.gamer_id = gamer_id
         self.position = position
 
+    def set_gamer_id(self, gamer_id: int, piece_id: int = None):
+        self.gamer_id = gamer_id
+        self.piece_index = piece_id
+
     def remove_pawn_gamer(self):
         self.piece_index = None
 
@@ -252,11 +256,19 @@ class ChessGameClass:
         print(result)
         return result
 
+    def move_piece(self, source_position, target_position, gamer_id):
+        piece_index = self.board[source_position[0]][source_position[1]].piece_index
+        self.board[source_position[0]][source_position[1]].set_gamer_id(0)
+        self.board[target_position[0]][target_position[1]].set_gamer_id(gamer_id, piece_index)
+        self.pieces[piece_index].move_to_position(target_position)
+
     def play(self):
         self.init_board()
         print(self)
-        # self.get_moves_list((1, 0), 1)
+        move_result = self.get_moves_list((1, 0), 1)
         self.get_hit_list((0, 7), 1)
+        self.move_piece((1, 7), (2, 7), 1)
+        print(self)
 
 
 chess_game = ChessGameClass()

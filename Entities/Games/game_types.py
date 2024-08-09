@@ -4,6 +4,7 @@ from enum import Enum
 class GameTypesEnum(Enum):
     TIC_TAC_TOE = "TicTacToe"
     CHECKERS = "Checkers"
+    CHESS = "Chess"
     OTHELLO = "Othello"
     MILL = "Mill"
     MNUMBERS = "MNumbers"
