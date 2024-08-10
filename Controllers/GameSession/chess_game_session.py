@@ -32,7 +32,7 @@ class ChessGameSession(BaseGameSession):
             piece_data = data['data']
             is_selection_authorized = self.game_controller.check_authority(piece_data, gamer_id)
             if is_selection_authorized:
-                is_selection_correct = await self.game_controller.recieve_data(data['id'], peace_id, gamer_id)
+                is_selection_correct = await self.game_controller.recieve_data(data['id'], piece_data, gamer_id)
                 if is_selection_correct:
                     self.timer.stop()
 

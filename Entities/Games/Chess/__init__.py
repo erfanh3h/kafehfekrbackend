@@ -55,12 +55,10 @@ class ChessGameClass(BaseGameClass):
 
     def get_game_data(self):
         board_data = []
-        pieces_data = []
         for i in range(8):
             for j in range(8):
                 board_data.append(self.board[i][j].to_json())
-        data = {"board_data": board_data, "pieces_data": pieces_data,
-                "current_turn": self.current_turn}
+        data = {"board_data": board_data, "current_turn": self.current_turn}
         return data
 
     def change_turn(self):
@@ -72,20 +70,26 @@ class ChessGameClass(BaseGameClass):
     async def recieve_data(self, command_id, data, gamer_id):
         print(command_id, data, gamer_id)
         if command_id == commands.Select_Peace:
-            source_position = data['s_position']
-            target_position = data['t_position']
+            source_column_index = data['s_c_index']
+            source_row_index = data['s_r_index']
+            target_column_index = data['t_c_index']
+            target_row_index = data['t_r_index']
+            source_position = (source_column_index, source_row_index)
+            target_position = (target_column_index, target_row_index)
             move_list = self.get_moves_list(source_position, gamer_id)
             if move_list.__contains__(target_position):
                 self.move_piece(source_position, target_position, gamer_id)
                 await self.send_data_function(commands.Peace_Selected, {
-                    "select_data": {'s_position': source_position, 't_position': target_position,
+                    "select_data": {'s_c_index': source_column_index, 's_r_index': source_row_index,
+                                    't_c_index': target_column_index, 't_r_index': target_row_index,
                                     'gamer_id': gamer_id, 'type': 'move'}, })
                 return True
             hit_list = self.get_hit_list(source_position, gamer_id)
             if hit_list.__contains__(target_position):
                 self.hit_piece(source_position, target_position, gamer_id)
                 await self.send_data_function(commands.Peace_Selected, {
-                    "select_data": {'s_position': source_position, 't_position': target_position,
+                    "select_data": {'s_c_index': source_column_index, 's_r_index': source_row_index,
+                                    't_c_index': target_column_index, 't_r_index': target_row_index,
                                     'gamer_id': gamer_id, 'type': 'hit'}, })
                 return True
             # is_move_correct = self.move_pawn(source_column_index, source_row_index, target_column_index,
@@ -127,7 +131,9 @@ class ChessGameClass(BaseGameClass):
             return False
         if self.is_game_finished:
             return False
-        source_position = data['s_position']
+        source_column_index = data['s_c_index']
+        source_row_index = data['s_r_index']
+        source_position = (source_column_index, source_row_index)
         if not self.is_target_piece_mine(source_position, gamer_id):
             return False
         return True

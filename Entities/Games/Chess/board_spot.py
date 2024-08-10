@@ -16,5 +16,4 @@ class BoardSpotClass:
             return ""
 
     def to_json(self):
-        return {}
-        # return {"gamer_id": self.gamer_id, "piece_index": self.piece_index, "position": self.position}
+        return self.piece.to_json()
