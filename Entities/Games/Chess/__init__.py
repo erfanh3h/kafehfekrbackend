@@ -154,7 +154,6 @@ class ChessGameClass(BaseGameClass):
         for i in range(8):
             self.board[6][i].set_data(PawnPiece(2))
             index += 1
-        pieces_list.reverse()
         for piece_i in range(len(pieces_list)):
             self.board[7][piece_i].set_data(pieces_list[piece_i](2))
             index += 1
@@ -162,7 +161,7 @@ class ChessGameClass(BaseGameClass):
     def get_moves_list(self, position, gamer_id):
         result = []
         piece = self.board[position[0]][position[1]].piece
-        if piece is not None:
+        if piece.gamer_id != 0:
             piece_move_list = piece.get_move_list()
             is_piece_multi_move = piece.is_multi_move
             if is_piece_multi_move:
@@ -191,7 +190,7 @@ class ChessGameClass(BaseGameClass):
     def get_hit_list(self, position, gamer_id):
         result = []
         piece = self.board[position[0]][position[1]].piece
-        if piece is not None:
+        if piece.gamer_id != 0:
             piece_move_list = piece.get_hit_list()
             is_piece_multi_move = piece.is_multi_move
             if is_piece_multi_move:
@@ -225,6 +224,10 @@ class ChessGameClass(BaseGameClass):
         piece.move()
         self.board[source_position[0]][source_position[1]].set_data(PieceClass(0))
         self.board[target_position[0]][target_position[1]].set_data(piece)
+        if source_position == (7, 4) and target_position == (7, 2):
+            self.move_piece((7, 0), (7, 3), gamer_id)
+        if source_position == (7, 4) and target_position == (7, 6):
+            self.move_piece((7, 7), (7, 5), gamer_id)
 
     def hit_piece(self, source_position, target_position, gamer_id):
         piece = self.board[source_position[0]][source_position[1]].piece

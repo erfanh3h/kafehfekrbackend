@@ -9,4 +9,7 @@ class KingPiece(PieceClass):
 
     def get_move_list(self) -> list:
         result = [(1, 0), (-1, 0), (0, 1), (0, -1), (-1, 1), (1, 1), (1, -1), (-1, -1)]
+        if self.is_first_move:
+            result.append((0, 2))
+            result.append((0, -2))
         return result

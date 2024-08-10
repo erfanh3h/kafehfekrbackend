@@ -11,8 +11,12 @@ class PawnPiece(PieceClass):
         result = []
         if self.gamer_id == 1:
             result.append((1, 0))
+            if self.is_first_move:
+                result.append((2, 0))
         else:
             result.append((-1, 0))
+            if self.is_first_move:
+                result.append((-2, 0))
         return result
 
     def get_hit_list(self) -> list:

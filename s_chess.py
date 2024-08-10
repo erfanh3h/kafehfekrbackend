@@ -14,13 +14,8 @@ def is_valid_coord(col, row):
 class PieceClass:
     def __init__(self, gamer_id):
         self.gamer_id = gamer_id
-        self.move_list: list[tuple] = []
-        self.is_removed = False
         self.is_multi_move = True
         self.is_first_move = True
-
-    def remove_piece(self):
-        self.is_removed = True
 
     def get_move_list(self) -> list:
         result = []
@@ -157,7 +152,6 @@ class ChessGameClass:
         for i in range(8):
             self.board[6][i].set_data(PawnPiece(2))
             index += 1
-        pieces_list.reverse()
         for piece_i in range(len(pieces_list)):
             self.board[7][piece_i].set_data(pieces_list[piece_i](2))
             index += 1
