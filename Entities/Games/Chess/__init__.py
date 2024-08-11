@@ -33,7 +33,10 @@ class ChessGameClass(BaseGameClass):
         self.symbol_1 = 1
         self.symbol_2 = 2
         self.board = [[BoardSpotClass(i, j) for i in range(8)] for j in range(8)]
-        self.check_move_list = []
+        self.king1_position = (0, 0)
+        self.king2_position = (0, 0)
+        self.king1_checks = []
+        self.king2_checks = []
         self.init_board()
         print(self)
 
@@ -79,6 +82,7 @@ class ChessGameClass(BaseGameClass):
             move_list = self.get_moves_list(source_position, gamer_id)
             if move_list.__contains__(target_position):
                 self.move_piece(source_position, target_position, gamer_id)
+                self.get_king_checks(gamer_id)
                 await self.send_data_function(commands.Peace_Selected, {
                     "select_data": {'s_c_index': source_column_index, 's_r_index': source_row_index,
                                     't_c_index': target_column_index, 't_r_index': target_row_index,
@@ -86,7 +90,8 @@ class ChessGameClass(BaseGameClass):
                 return True
             hit_list = self.get_hit_list(source_position, gamer_id)
             if hit_list.__contains__(target_position):
-                self.hit_piece(source_position, target_position, gamer_id)
+                self.move_piece(source_position, target_position, gamer_id)
+                self.get_king_checks(gamer_id)
                 await self.send_data_function(commands.Peace_Selected, {
                     "select_data": {'s_c_index': source_column_index, 's_r_index': source_row_index,
                                     't_c_index': target_column_index, 't_r_index': target_row_index,
@@ -142,7 +147,7 @@ class ChessGameClass(BaseGameClass):
         return self.board[c_index][r_index].piece.gamer_id == 0
 
     def is_target_piece_enemey(self, c_index, r_index, gamer_id):
-        return self.board[c_index][r_index].piece.gamer_id == 0 and self.board[c_index][
+        return self.board[c_index][r_index].piece.gamer_id != 0 and self.board[c_index][
             r_index].piece.gamer_id != gamer_id
 
     def is_target_piece_mine(self, position: tuple, gamer_id: int):
@@ -163,6 +168,8 @@ class ChessGameClass(BaseGameClass):
         for piece_i in range(len(pieces_list)):
             self.board[7][piece_i].set_data(pieces_list[piece_i](2))
             index += 1
+        self.king1_position = (0, 4)
+        self.king2_position = (7, 4)
 
     def get_moves_list(self, position, gamer_id):
         result = []
@@ -205,11 +212,11 @@ class ChessGameClass(BaseGameClass):
                     while True:
                         y = position[0] + move[0] * i
                         x = position[1] + move[1] * i
-                        if is_valid_coord(x, y):
+                        if is_valid_coord(y, x):
                             if self.is_target_piece_enemey(y, x, gamer_id):
                                 result.append((y, x))
                                 break
-                            elif not self.is_target_piece_empty(y, x):
+                            elif self.is_target_piece_mine((y, x), gamer_id):
                                 break
                             else:
                                 i += 1
@@ -219,24 +226,52 @@ class ChessGameClass(BaseGameClass):
                 for move in piece_move_list:
                     y = position[0] + move[0]
                     x = position[1] + move[1]
-                    if is_valid_coord(x, y):
+                    print(y, x)
+                    if is_valid_coord(y, x):
                         if self.is_target_piece_enemey(y, x, gamer_id):
                             result.append((y, x))
         print(result)
         return result
+
+    def get_king_checks(self, gamer_id: int):
+        self.king1_checks.clear()
+        self.king2_checks.clear()
+        if gamer_id == 1:
+            target_king_position = self.king2_position
+        else:
+            target_king_position = self.king1_position
+        for i in range(8):
+            for j in range(8):
+                position = (i, j)
+                if self.is_target_piece_mine(position, gamer_id):
+                    result_list = self.get_hit_list(position, gamer_id)
+                    if result_list.__contains__(target_king_position):
+                        if gamer_id == 1:
+                            self.king2_checks.append(position)
+                        else:
+                            self.king1_checks.append(position)
 
     def move_piece(self, source_position, target_position, gamer_id):
         piece = self.board[source_position[0]][source_position[1]].piece
         piece.move()
         self.board[source_position[0]][source_position[1]].set_data(PieceClass(0))
         self.board[target_position[0]][target_position[1]].set_data(piece)
+
+        # chech king rook special move
         if source_position == (7, 4) and target_position == (7, 2):
             self.move_piece((7, 0), (7, 3), gamer_id)
         if source_position == (7, 4) and target_position == (7, 6):
             self.move_piece((7, 7), (7, 5), gamer_id)
+        ###
 
-    def hit_piece(self, source_position, target_position, gamer_id):
-        piece = self.board[source_position[0]][source_position[1]].piece
-        piece.move()
-        self.board[source_position[0]][source_position[1]].set_data(PieceClass(0))
-        self.board[target_position[0]][target_position[1]].set_data(piece)
+        # change king position
+        if gamer_id == 1 and source_position == self.king1_position:
+            self.king1_position = target_position
+        if gamer_id == 2 and target_position == self.king2_position:
+            self.king2_position = target_position
+
+    # def hit_piece(self, source_position, target_position, gamer_id):
+    #     piece = self.board[source_position[0]][source_position[1]].piece
+    #     piece.move()
+    #     self.board[source_position[0]][source_position[1]].set_data(PieceClass(0))
+    #     self.board[target_position[0]][target_position[1]].set_data(piece)
