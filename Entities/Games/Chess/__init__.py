@@ -37,6 +37,8 @@ class ChessGameClass(BaseGameClass):
         self.king2_position = (0, 0)
         self.current_moves = {}
         self.current_hits = {}
+        self.player1_hitted_pawns = 0
+        self.player2_hitted_pawns = 0
         self.init_board()
 
     def __str__(self):
@@ -102,7 +104,9 @@ class ChessGameClass(BaseGameClass):
 
     def get_game_winner(self):
         winner = 0
-        if self.current_turn == 1:
+        if self.player1_hitted_pawns == 15 and self.player2_hitted_pawns == 15:
+            winner = 0
+        elif self.current_turn == 1:
             winner = self.symbol_2
         else:
             winner = self.symbol_1
@@ -110,6 +114,8 @@ class ChessGameClass(BaseGameClass):
 
     def check_game_ended(self):
         if len(self.current_moves.keys()) == 0 and len(self.current_hits.keys()) == 0:
+            return True
+        if self.player1_hitted_pawns == 15 and self.player2_hitted_pawns == 15:
             return True
         return False
 
@@ -336,7 +342,6 @@ class ChessGameClass(BaseGameClass):
                 self.current_hits[position] = hits
 
     def move_piece(self, source_position, target_position, gamer_id):
-
         # change pawn to queen when reach last col
         if (source_position[0] == 6 and target_position[0] == 7 and
                 self.board[source_position[0]][source_position[1]].piece.name == 'Pawn'):
@@ -346,12 +351,20 @@ class ChessGameClass(BaseGameClass):
                 self.board[source_position[0]][source_position[1]].piece.name == 'Pawn'):
             gamer_id = self.board[source_position[0]][source_position[1]].piece.gamer_id
             self.board[source_position[0]][source_position[1]].set_data(QueenPiece(gamer_id))
+        ##########
+        # apply remove pawns count
+        if not self.is_target_piece_empty(target_position[0], target_position[1]):
+            if self.board[target_position[0]][target_position[1]].piece.gamer_id == 1:
+                self.player1_hitted_pawns += 1
+            else:
+                self.player2_hitted_pawns += 1
+        ##########
+        # swap piece data
         piece = self.board[source_position[0]][source_position[1]].piece
         piece.move()
         self.board[source_position[0]][source_position[1]].set_data(PieceClass(0))
         self.board[target_position[0]][target_position[1]].set_data(piece)
-        ##########
-
+        #########
         # chech king rook special move
         if source_position == (7, 4) and target_position == (7, 2):
             self.move_piece((7, 0), (7, 3), gamer_id)
@@ -361,13 +374,13 @@ class ChessGameClass(BaseGameClass):
             self.move_piece((0, 7), (5, 5), gamer_id)
         if source_position == (4, 4) and target_position == (0, 2):
             self.move_piece((0, 0), (0, 3), gamer_id)
-        ###
-
+        ##########
         # change king position
         if gamer_id == 1 and source_position == self.king1_position:
             self.king1_position = target_position
         if gamer_id == 2 and target_position == self.king2_position:
             self.king2_position = target_position
+        ##########
 
     # def get_king_checks(self, gamer_id: int):
     #     self.king1_checks.clear()
