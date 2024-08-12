@@ -71,6 +71,7 @@ class ChessGameClass(BaseGameClass):
         else:
             self.current_turn = self.symbol_1
         self.set_current_movements()
+        self.is_game_finished = self.check_game_ended()
 
     async def recieve_data(self, command_id, data, gamer_id):
         print(command_id, data, gamer_id)
@@ -101,17 +102,15 @@ class ChessGameClass(BaseGameClass):
 
     def get_game_winner(self):
         winner = 0
-        # if self.player1_pawns <= 0:
-        #     winner = self.symbol_2
-        # elif self.player2_pawns <= 0:
-        #     winner = self.symbol_1
+        if self.current_turn == 1:
+            winner = self.symbol_2
+        else:
+            winner = self.symbol_1
         return winner
 
     def check_game_ended(self):
-        # if self.player1_pawns <= 0:
-        #     return True
-        # elif self.player2_pawns <= 0:
-        #     return True
+        if len(self.current_moves.keys()) == 0 and len(self.current_hits.keys()) == 0:
+            return True
         return False
 
     def finish_game(self):
@@ -329,14 +328,29 @@ class ChessGameClass(BaseGameClass):
         else:
             king_position = self.king1_position
         for position in current_gamer_pieces:
-            self.current_moves[position] = self.add_possible_moves(position, enemy_id, king_position)
-            self.current_hits[position] = self.add_possible_hits(position, enemy_id, king_position)
+            moves = self.add_possible_moves(position, enemy_id, king_position)
+            hits = self.add_possible_hits(position, enemy_id, king_position)
+            if len(moves) != 0:
+                self.current_moves[position] = moves
+            if len(hits) != 0:
+                self.current_hits[position] = hits
 
     def move_piece(self, source_position, target_position, gamer_id):
+
+        # change pawn to queen when reach last col
+        if (source_position[0] == 6 and target_position[0] == 7 and
+                self.board[source_position[0]][source_position[1]].piece.name == 'Pawn'):
+            gamer_id = self.board[source_position[0]][source_position[1]].piece.gamer_id
+            self.board[source_position[0]][source_position[1]].set_data(QueenPiece(gamer_id))
+        if (source_position[0] == 1 and target_position[0] == 0 and
+                self.board[source_position[0]][source_position[1]].piece.name == 'Pawn'):
+            gamer_id = self.board[source_position[0]][source_position[1]].piece.gamer_id
+            self.board[source_position[0]][source_position[1]].set_data(QueenPiece(gamer_id))
         piece = self.board[source_position[0]][source_position[1]].piece
         piece.move()
         self.board[source_position[0]][source_position[1]].set_data(PieceClass(0))
         self.board[target_position[0]][target_position[1]].set_data(piece)
+        ##########
 
         # chech king rook special move
         if source_position == (7, 4) and target_position == (7, 2):

@@ -43,7 +43,14 @@ class ChessGameSession(BaseGameSession):
             return
         self.game_controller.change_turn()
         from Entities.SocketIOManagerClass import send_command
-        asyncio.new_event_loop().run_until_complete(
-            send_command(command=make_command_json(id=commands.Current_Turn, data=self.game_controller.current_turn),
-                         game_id=self.game_id))
-        self.timer.start(Chess_Turn_Time, self.send_current_turn)
+        if self.game_controller.is_game_finished:
+            winner = self.game_controller.get_game_winner()
+            asyncio.new_event_loop().run_until_complete(
+                send_command(
+                    command=make_command_json(id=commands.Finish_Game, data={"Winner": winner}),
+                    game_id=self.game_id))
+        else:
+            asyncio.new_event_loop().run_until_complete(
+                send_command(command=make_command_json(id=commands.Current_Turn, data=self.game_controller.current_turn),
+                             game_id=self.game_id))
+            self.timer.start(Chess_Turn_Time, self.send_current_turn)
