@@ -12,4 +12,5 @@ class GameTypesEnum(Enum):
     RPC = "RPC"
     TEN = "Ten"
     DOTBOX = "DotBox"
+    YATZY = "Yatzy"
     C = "C"
