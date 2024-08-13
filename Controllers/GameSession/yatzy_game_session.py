@@ -1,4 +1,5 @@
 import asyncio
+import time
 
 from Entities.Games.Yatzy import YatzyGameClass
 from Entities.Games.game_types import GameTypesEnum
@@ -25,6 +26,30 @@ class YatzyGameSession(BaseGameSession):
         self.game_type = GameTypesEnum.YATZY
         super().start_game_timer()
 
+    def check_start_game(self):
+        while True:
+            if self.check_all_players_joined():
+                self.is_game_running = True
+                self.prepare_gamers()
+                self.send_game_data()
+                self.send_current_turn()
+                break
+            time.sleep(2)
+
+    def send_reconnect_data(self, socket_id):
+        reconnect_data = {'gamers': []}
+        for gamer in self.gamers:
+            reconnect_data['gamers'].append(gamer.to_json())
+        gamer_data = self.find_gamer_from_socket(socket_id)
+        if gamer_data is not None:
+            gamer_id = gamer_data.gamer_id
+            reconnect_data['game_data'] = self.game_controller.get_game_data_yatzy(gamer_id)
+        reconnect_data['timer_data'] = {'is_user_turn': True, 'time': self.timer.counter + 1}
+        from Entities.SocketIOManagerClass import send_private_command
+        asyncio.new_event_loop().run_until_complete(
+            send_private_command(command=make_command_json(id=commands.Reconnect_Data, data=reconnect_data),
+                                 socket_id=socket_id, game_id=self.game_id))
+
     async def command_received(self, data, socket_id):
         gamer_id = await super().command_received(data, socket_id)
         if gamer_id is None:
@@ -35,12 +60,33 @@ class YatzyGameSession(BaseGameSession):
             await self.game_controller.recieve_data(data['id'], peace_id, gamer_id)
 
     def send_current_turn(self):
+        from Entities.SocketIOManagerClass import send_private_command, send_command
+        # check to if user didn't select this turn , automattically select first piece of him
+        if self.game_controller.current_round != 0:
+            check_player1_index = self.game_controller.check_player_played_this_round(1)
+            if check_player1_index != -1:
+                asyncio.new_event_loop().run_until_complete(send_command(
+                    command=make_command_json(id=commands.Peace_Selected,
+                                              data={'gamer_id': 1, 'selected_index': check_player1_index,
+                                                    'score': 0, 'player1_score': self.game_controller.player1_score,
+                                                    'player2_score': self.game_controller.player2_score}),
+                    game_id=self.game_id, ))
+            check_player2_index = self.game_controller.check_player_played_this_round(2)
+            if check_player2_index != -1:
+                asyncio.new_event_loop().run_until_complete(send_command(
+                    command=make_command_json(id=commands.Peace_Selected,
+                                              data={'gamer_id': 2, 'selected_index': check_player2_index,
+                                                    'score': 0, 'player1_score': self.game_controller.player1_score,
+                                                    'player2_score': self.game_controller.player2_score}),
+                    game_id=self.game_id, ))
+        self.game_controller.change_turn()
         if self.game_controller.is_game_finished:
             winner_id = self.game_controller.get_game_winner()
+            asyncio.new_event_loop().run_until_complete(send_command(
+                command=make_command_json(id=commands.Finish_Game, data={"Winner": winner_id}),
+                game_id=self.game_id, ))
             self.finish_game(winner_id)
             return
-        self.game_controller.change_turn()
-        from Entities.SocketIOManagerClass import send_private_command
         gamer1_data = self.find_gamer_from_gamer_id(1)
         gamer2_data = self.find_gamer_from_gamer_id(2)
         if gamer1_data is not None:

@@ -11,3 +11,6 @@ class boardSpot:
     def select(self, score):
         self.score = score
         self.is_selected = True
+
+    def to_json(self):
+        return {"is_selected": self.is_selected, "score": self.score, "gamer_id": self.gamer_id, }
