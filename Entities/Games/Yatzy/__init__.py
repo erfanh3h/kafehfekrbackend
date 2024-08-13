@@ -30,6 +30,9 @@ class YatzyGameClass(BaseGameClass):
         self.player2_rolled_dice_time = 0
         self.is_player1_round_done = False
         self.is_player2_round_done = False
+        self.current_round = 0
+        self.player1_selected_dice_type = 0
+        self.player2_selected_dice_type = 0
 
     def get_game_data(self):
         board_data = []
@@ -46,17 +49,56 @@ class YatzyGameClass(BaseGameClass):
 
     async def recieve_data(self, command_id, data, gamer_id):
         print(command_id, data, gamer_id)
+        if command_id == commands.Roll_Dice:
+            selected_indexes = data['selected_indexes']
+            if gamer_id == 1:
+                pre_dices = self.player1_current_dices
+                current_dice_count = self.player1_rolled_dice_time
+            else:
+                pre_dices = self.player2_current_dices
+                current_dice_count = self.player2_rolled_dice_time
+            if current_dice_count == 3:
+                return
+            new_roll_data = roll_dices(5)
+            result = []
+            for index in range(len(new_roll_data)):
+                if selected_indexes.__contains__(index):
+                    result.append(pre_dices[index])
+                else:
+                    result.append(new_roll_data[index])
+            if gamer_id == 1:
+                self.player1_current_dices = result
+                self.player1_rolled_dice_time += 1
+            else:
+                self.player2_current_dices = result
+                self.player2_rolled_dice_time += 1
+            await self.send_private_data_function(commands.Roll_Result, {'dices': result}, gamer_id)
         if command_id == commands.Select_Peace:
-            first_peace_index = data['index1']
-            second_peace_index = data['index2']
-            # is_correct = self.check_match_two(first_peace_index, second_peace_index)
-            # if is_correct:
-            #     self.submit_peaces_for_user(first_peace_index, second_peace_index, gamer_id)
-            # await self.send_data_function(commands.Peace_Selected,
-            #                               {'user': gamer_id, 'index1': first_peace_index,
-            #                                'value1': self.board[first_peace_index].value,
-            #                                'index2': second_peace_index, 'value2': self.board[second_peace_index].value,
-            #                                'is_correct': is_correct})
+            user_dices = data['dices']
+            user_selected_index = data['index']
+            let_broadcast = False
+            score = 0
+            if gamer_id == 1:
+                if not self.player1_board[user_selected_index].is_selected:
+                    self.player1_current_dices = user_dices
+                    self.player1_selected_dice_type = user_selected_index
+                    score = self.calculate_score(1)
+                    self.player1_board[user_selected_index].select(score)
+                    self.is_player1_round_done = True
+                    let_broadcast = True
+            else:
+                if not self.player2_board[user_selected_index].is_selected:
+                    self.player2_current_dices = user_dices
+                    self.player2_selected_dice_type = user_selected_index
+                    score = self.calculate_score(2)
+                    self.player2_board[user_selected_index].select(score)
+                    self.is_player2_round_done = True
+                    let_broadcast = True
+            if let_broadcast:
+                await self.send_data_function(commands.Peace_Selected,
+                                              {'gamer_id': gamer_id, 'selected_index': user_selected_index,
+                                               'score': score}, )
+
             # is_game_finished = self.check_game_ended()
             # if is_game_finished:
             #     self.is_game_finished = True
@@ -80,6 +122,7 @@ class YatzyGameClass(BaseGameClass):
         return winner
 
     def change_turn(self):
+        self.current_round += 1
         self.player1_submitted_dices = [0 for i in range(5)]
         self.player2_submitted_dices = [0 for i in range(5)]
         self.player1_current_dices = roll_dices(5)
@@ -88,7 +131,25 @@ class YatzyGameClass(BaseGameClass):
         self.player2_rolled_dice_time = 0
         self.is_player1_round_done = False
         self.is_player2_round_done = False
+        self.player1_selected_dice_type = self.get_first_empty_index(1)
+        self.player2_selected_dice_type = self.get_first_empty_index(2)
 
     def check_game_ended(self):
-        is_game_finished = False
-        return is_game_finished
+        if self.current_round > 12:
+            return True
+        return False
+
+    def get_first_empty_index(self, gamer_id):
+        if gamer_id == 1:
+            for i in range(12):
+                if not self.player1_board[i].is_selected:
+                    return i
+            return 0
+        else:
+            for i in range(12):
+                if not self.player2_board[i].is_selected:
+                    return i
+            return 0
+
+    def calculate_score(self, gamer_id):
+        return 0

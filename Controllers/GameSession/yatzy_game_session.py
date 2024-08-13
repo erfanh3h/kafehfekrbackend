@@ -29,11 +29,10 @@ class YatzyGameSession(BaseGameSession):
         gamer_id = await super().command_received(data, socket_id)
         if gamer_id is None:
             return
-        if data['id'] == commands.Select_Peace:
-            peace_id = data['data']
-            is_selection_correct = self.game_controller.check_authority(peace_id, gamer_id)
-            if is_selection_correct:
-                await self.game_controller.recieve_data(data['id'], peace_id, gamer_id)
+        peace_id = data['data']
+        is_selection_correct = self.game_controller.check_authority(peace_id, gamer_id)
+        if is_selection_correct:
+            await self.game_controller.recieve_data(data['id'], peace_id, gamer_id)
 
     def send_current_turn(self):
         if self.game_controller.is_game_finished:
@@ -47,13 +46,13 @@ class YatzyGameSession(BaseGameSession):
         if gamer1_data is not None:
             asyncio.new_event_loop().run_until_complete(send_private_command(
                 command=make_command_json(id=commands.Current_Turn,
-                                          data={"current_turn": self.game_controller.current_turn,
+                                          data={"current_turn": self.game_controller.current_round,
                                                 "dices": self.game_controller.player1_current_dices}),
                 game_id=self.game_id, socket_id=gamer1_data.socket_id))
         if gamer2_data is not None:
             asyncio.new_event_loop().run_until_complete(send_private_command(
                 command=make_command_json(id=commands.Current_Turn,
-                                          data={"current_turn": self.game_controller.current_turn,
+                                          data={"current_turn": self.game_controller.current_round,
                                                 "dices": self.game_controller.player2_current_dices}),
                 game_id=self.game_id, socket_id=gamer2_data.socket_id))
         self.timer.start(Yatzy_Turn_Time, self.send_current_turn)

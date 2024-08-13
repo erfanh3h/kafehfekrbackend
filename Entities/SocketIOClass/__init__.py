@@ -10,6 +10,7 @@ from Controllers.GameSession.othello_game_session import OthelloGameSession
 from Controllers.GameSession.rpc_game_session import RPCGameSession
 from Controllers.GameSession.ten_game_session import TenGameSession
 from Controllers.GameSession.tictactoe_game_session import TicTacToeGameSession
+from Controllers.GameSession.yatzy_game_session import YatzyGameSession
 from Entities.ScoreManagerClass import GameScoreTypesEnum
 from Models.Gamer import GamerModel
 from Commons import static_functions
@@ -21,7 +22,8 @@ current_game_id = "gameId"
 # gameSession = MNumbersGameSession(game_id=current_game_id, game_score_type=GameScoreTypesEnum.NORMAL)
 # gameSession = CheckersGameSession(game_id=current_game_id, game_score_type=GameScoreTypesEnum.NORMAL)
 # gameSession = TenGameSession(game_id=current_game_id, game_score_type=GameScoreTypesEnum.NORMAL)
-gameSession = ChessGameSession(game_id=current_game_id, game_score_type=GameScoreTypesEnum.NORMAL)
+# gameSession = ChessGameSession(game_id=current_game_id, game_score_type=GameScoreTypesEnum.NORMAL)
+gameSession = YatzyGameSession(game_id=current_game_id, game_score_type=GameScoreTypesEnum.NORMAL)
 # gameSession = TicTacToeGameSession(game_id=current_game_id, game_score_type=GameScoreTypesEnum.NORMAL)
 # gameSession = RPCGameSession(game_id=current_game_id, game_score_type=GameScoreTypesEnum.NORMAL)
 # gameSession = OthelloGameSession(game_id=current_game_id, game_score_type=GameScoreTypesEnum.NORMAL)
