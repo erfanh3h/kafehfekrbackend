@@ -9,6 +9,7 @@ class BaseGameClass:
         self.is_round_finished = False
         self.is_turn_round_finished = False
         self.leaver_id = 0
+        self.is_finish_message_delivered = False
 
     def get_game_data(self):
         pass
@@ -45,6 +46,7 @@ class BaseGameClass:
 
     async def surrender(self, gamer_id):
         self.is_game_finished = True
+        self.is_finish_message_delivered = True
         await self.send_data_function(commands.Surrender, {"gamer_id": gamer_id})
 
     def finish_reconnect_time(self, gamer_id):

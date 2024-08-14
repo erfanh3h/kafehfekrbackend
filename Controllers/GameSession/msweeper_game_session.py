@@ -89,9 +89,10 @@ class MSweeperGameSession(BaseGameSession):
         time.sleep(2)
         self.game_controller.finish_game()
         winner = self.game_controller.get_game_winner()
-        from Entities.SocketIOManagerClass import send_command
-        asyncio.new_event_loop().run_until_complete(
-            send_command(command=make_command_json(id=commands.Finish_Game, data={"Winner": winner}),
-                         game_id=self.game_id))
+        if not self.game_controller.is_finish_message_delivered:
+            from Entities.SocketIOManagerClass import send_command
+            asyncio.new_event_loop().run_until_complete(
+                send_command(command=make_command_json(id=commands.Finish_Game, data={"Winner": winner}),
+                             game_id=self.game_id))
         winner_id = self.game_controller.get_game_winner()
         self.finish_game(winner_id)

@@ -62,7 +62,7 @@ class YatzyGameSession(BaseGameSession):
     def send_current_turn(self):
         from Entities.SocketIOManagerClass import send_private_command, send_command
         # check to if user didn't select this turn , automattically select first piece of him
-        if self.game_controller.current_round != 0:
+        if self.game_controller.current_round != 0 and not self.game_controller.is_game_finished:
             check_player1_index = self.game_controller.check_player_played_this_round(1)
             if check_player1_index != -1:
                 asyncio.new_event_loop().run_until_complete(send_command(
@@ -82,10 +82,11 @@ class YatzyGameSession(BaseGameSession):
         self.game_controller.change_turn()
         if self.game_controller.is_game_finished:
             winner_id = self.game_controller.get_game_winner()
-            asyncio.new_event_loop().run_until_complete(send_command(
-                command=make_command_json(id=commands.Finish_Game, data={"Winner": winner_id}),
-                game_id=self.game_id, ))
             self.finish_game(winner_id)
+            if not self.game_controller.is_finish_message_delivered:
+                asyncio.new_event_loop().run_until_complete(send_command(
+                    command=make_command_json(id=commands.Finish_Game, data={"Winner": winner_id}),
+                    game_id=self.game_id, ))
             return
         gamer1_data = self.find_gamer_from_gamer_id(1)
         gamer2_data = self.find_gamer_from_gamer_id(2)
