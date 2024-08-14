@@ -13,4 +13,5 @@ class GameTypesEnum(Enum):
     TEN = "Ten"
     DOTBOX = "DotBox"
     YATZY = "Yatzy"
+    FOURINROW = "FourInRow"
     C = "C"
