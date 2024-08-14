@@ -175,8 +175,7 @@ class MSweeperGameClass(BaseGameClass):
                 self.finish_game()
                 game_winner = self.get_game_winner()
                 await self.send_data_function(commands.Finish_Game, {"Winner": game_winner})
-            print(self.show_board())
-            print(self.show_player1_board())
+                return True
         elif command_id == commands.Select_Mine:
             await self.select_mine(x, y, gamer_id)
             is_game_finished = self.check_end_game()
@@ -184,16 +183,8 @@ class MSweeperGameClass(BaseGameClass):
                 self.finish_game()
                 game_winner = self.get_game_winner()
                 await self.send_data_function(commands.Finish_Game, {"Winner": game_winner})
-        # await self.send_data_function(commands.Peace_Selected, {'user': gamer_id, 'target_peace': peace_number})
-        # winner = self.check_winner()
-        # if winner is not None or self.counter == 9:
-        #     if self.current_round == self.round_count:
-        #         game_winner = self.get_game_winner()
-        #         await self.send_data_function(commands.Finish_Game, {"Winner": game_winner})
-        #         self.is_game_finished = True
-        #     else:
-        #         self.is_round_finished = True
-        #         await self.send_data_function(commands.Finish_Round, {"Winner": winner})
+                return True
+        return False
 
     def check_end_game(self):
         if self.player1_selectable_mines == 0 and self.player2_selectable_mines == 0:

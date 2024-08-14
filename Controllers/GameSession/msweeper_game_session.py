@@ -63,12 +63,16 @@ class MSweeperGameSession(BaseGameSession):
             peace_id = data['data']
             is_selection_correct = self.game_controller.check_select_peace_authority(peace_id, gamer_id)
             if is_selection_correct:
-                await self.game_controller.recieve_data(data['id'], peace_id, gamer_id)
+                is_game_finished = await self.game_controller.recieve_data(data['id'], peace_id, gamer_id)
+                if is_game_finished:
+                    self.timer.stop()
         elif data['id'] == commands.Select_Mine:
             peace_id = data['data']
             is_selection_correct = self.game_controller.check_select_mine_authority(peace_id, gamer_id)
             if is_selection_correct:
-                await self.game_controller.recieve_data(data['id'], peace_id, gamer_id)
+                is_game_finished = await self.game_controller.recieve_data(data['id'], peace_id, gamer_id)
+                if is_game_finished:
+                    self.timer.stop()
 
     def send_start_game(self):
         self.game_controller.change_turn()

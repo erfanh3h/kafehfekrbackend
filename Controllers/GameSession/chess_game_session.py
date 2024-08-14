@@ -45,6 +45,7 @@ class ChessGameSession(BaseGameSession):
         from Entities.SocketIOManagerClass import send_command
         if self.game_controller.is_game_finished:
             winner = self.game_controller.get_game_winner()
+            self.finish_game(winner)
             asyncio.new_event_loop().run_until_complete(
                 send_command(
                     command=make_command_json(id=commands.Finish_Game, data={"Winner": winner}),

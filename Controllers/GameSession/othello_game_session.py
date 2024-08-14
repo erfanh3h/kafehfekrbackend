@@ -42,8 +42,6 @@ class OthelloGameSession(BaseGameSession):
             winner_id = self.game_controller.get_game_winner()
             self.finish_game(winner_id)
             return
-        if self.game_controller.is_round_finished:
-            return
         self.game_controller.change_turn()
         from Entities.SocketIOManagerClass import send_command
         asyncio.new_event_loop().run_until_complete(
