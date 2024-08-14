@@ -70,7 +70,8 @@ class FourInRowGameClass(BaseGameClass):
         if command_id == commands.Select_Peace:
             row_index = data['r_index']
             column_index = self.get_possible_piece_column(row_index)
-            if column_index == -1:
+            print(column_index)
+            if column_index != -1:
                 self.submit_piece(column_index, row_index, gamer_id)
                 await self.send_data_function(commands.Peace_Selected, {
                     "select_data": {'c_index': column_index, 'r_index': row_index, 'gamer_id': gamer_id}, })
