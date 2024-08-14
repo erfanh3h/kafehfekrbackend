@@ -15,3 +15,4 @@ Ten_Sleep_Round_Time = 5
 DotBox_Turn_Time = 15
 Yatzy_Turn_Time = 60
 Four_In_Row_Turn_Time = 15
+Sudoku_game_Time = 600
