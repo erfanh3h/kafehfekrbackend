@@ -74,7 +74,9 @@ class MNumbersGameClass(BaseGameClass):
 
     def get_game_winner(self):
         winner = 0
-        if self.player1_score > self.player2_score:
+        if self.leaver_id != 0:
+            winner = self.get_opponent_id(self.leaver_id)
+        elif self.player1_score > self.player2_score:
             winner = self.symbol_1
         elif self.player2_score > self.player1_score:
             winner = self.symbol_2

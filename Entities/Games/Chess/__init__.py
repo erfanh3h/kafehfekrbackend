@@ -104,7 +104,9 @@ class ChessGameClass(BaseGameClass):
 
     def get_game_winner(self):
         winner = 0
-        if self.player1_hitted_pawns == 15 and self.player2_hitted_pawns == 15:
+        if self.leaver_id != 0:
+            winner = self.get_opponent_id(self.leaver_id)
+        elif self.player1_hitted_pawns == 15 and self.player2_hitted_pawns == 15:
             winner = 0
         elif self.current_turn == 1:
             winner = self.symbol_2

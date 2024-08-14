@@ -26,7 +26,6 @@ class CheckersGameClass(BaseGameClass):
         self.player2_pawns = 12
         self.check_move_list = []
         self.add_pawns_to_board()
-        print(self)
 
     def __str__(self):
         board = """"""
@@ -83,7 +82,9 @@ class CheckersGameClass(BaseGameClass):
 
     def get_game_winner(self):
         winner = 0
-        if self.player1_pawns <= 0:
+        if self.leaver_id != 0:
+            winner = self.get_opponent_id(self.leaver_id)
+        elif self.player1_pawns <= 0:
             winner = self.symbol_2
         elif self.player2_pawns <= 0:
             winner = self.symbol_1
@@ -233,7 +234,7 @@ class CheckersGameClass(BaseGameClass):
                 del self.check_move_list[0]
             return temp_list
 
-        def get_direction2_movees(r_index, c_index, gamer_id):
+        def get_direction2_moves(r_index, c_index, gamer_id):
             temp_list = []
             right_result = self.get_direction2_right_pawn_move(r_index, c_index, gamer_id)
             left_result = self.get_direction2_left_pawn_move(r_index, c_index, gamer_id)
@@ -253,12 +254,12 @@ class CheckersGameClass(BaseGameClass):
         moves = []
         if self.board[c_index][r_index].is_super_pawn:
             list1 = get_direction1_moves(r_index, c_index, gamer_id)
-            list2 = get_direction2_movees(r_index, c_index, gamer_id)
+            list2 = get_direction2_moves(r_index, c_index, gamer_id)
             temp_move_list = list1 + list2
         elif gamer_id == 1:
             temp_move_list = get_direction1_moves(r_index, c_index, gamer_id)
         else:
-            temp_move_list = get_direction2_movees(r_index, c_index, gamer_id)
+            temp_move_list = get_direction2_moves(r_index, c_index, gamer_id)
         print(temp_move_list)
         for move in temp_move_list:
             if move[0] is not None:

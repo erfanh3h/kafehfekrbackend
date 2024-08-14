@@ -91,12 +91,14 @@ class RPCGameClass(BaseGameClass):
         return False
 
     def get_round_winner(self):
-        if self.gamer1_round_score > self.gamer2_round_score:
-            return self.symbol_1
+        winner = 0
+        if self.leaver_id != 0:
+            winner = self.get_opponent_id(self.leaver_id)
+        elif self.gamer1_round_score > self.gamer2_round_score:
+            winner = self.symbol_1
         elif self.gamer2_round_score > self.gamer1_round_score:
-            return self.symbol_2
-        else:
-            return 0
+            winner = self.symbol_2
+        return winner
 
     def get_game_winner(self):
         if self.gamer1_total_score > self.gamer2_total_score:

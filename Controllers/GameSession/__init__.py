@@ -67,6 +67,12 @@ class BaseGameSession:
                 return index
         return None
 
+    def find_gamer_id_from_user_id(self, user_id):
+        for index in range(0, len(self.gamers)):
+            if self.gamers[index].user_id == user_id:
+                return self.gamers[index].gamer_id
+        return 0
+
     def add_gamer(self, gamer: GamerModel):
         self.gamers.append(gamer)
         self.gamer_idies.append(gamer.user_id)
@@ -162,7 +168,8 @@ class BaseGameSession:
     def finish_reconnect_time(self, user_id):
         asyncio.new_event_loop().run_until_complete(
             self.send_command(commands.Finish_Reconnect_Time, {"user_id": user_id}))
-        self.game_controller.finish_reconnect_time(user_id)
+        gamer_id = self.find_gamer_id_from_user_id(user_id)
+        self.game_controller.finish_reconnect_time(gamer_id)
         self.timer.stop()
 
     def finish_game(self, winner_gamer_id):
