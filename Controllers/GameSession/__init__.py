@@ -161,7 +161,8 @@ class BaseGameSession:
                 user_data = self.find_gamer_from_socket(socket_id)
                 if user_data is not None:
                     asyncio.new_event_loop().run_until_complete(
-                        self.send_command(commands.User_Disconnected, {"user_id": user_data.user_id}))
+                        self.send_command(commands.User_Disconnected,
+                                          {"user_id": user_data.user_id, "time": user_data.timer.max_time}))
                 self.gamers[gamer_index].disconnect()
                 break
 
