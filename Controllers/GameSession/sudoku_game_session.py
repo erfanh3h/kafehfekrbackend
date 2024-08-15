@@ -60,25 +60,27 @@ class SudokuGameSession(BaseGameSession):
         if gamer_id is None:
             return
         if data['id'] == commands.Select_Peace:
-            peace_id = data['data']
-            is_selection_correct = self.game_controller.check_authority(peace_id, gamer_id)
+            is_selection_correct = self.game_controller.check_authority(data, gamer_id)
             if is_selection_correct:
-                is_game_finished = await self.game_controller.recieve_data(data['id'], peace_id, gamer_id)
+                is_game_finished = await self.game_controller.recieve_data(data['id'], data, gamer_id)
                 if is_game_finished:
                     self.timer.stop()
         elif data['id'] == commands.Remove_Peace:
-            peace_id = data['data']
-            is_selection_correct = self.game_controller.check_authority(peace_id, gamer_id)
+            is_selection_correct = self.game_controller.check_authority(data, gamer_id)
             if is_selection_correct:
-                is_game_finished = await self.game_controller.recieve_data(data['id'], peace_id, gamer_id)
+                is_game_finished = await self.game_controller.recieve_data(data['id'], data, gamer_id)
                 if is_game_finished:
                     self.timer.stop()
 
     def send_start_game(self):
         self.game_controller.change_turn()
-        from Entities.SocketIOManagerClass import send_command
-        asyncio.new_event_loop().run_until_complete(
-            send_command(command=make_command_json(id=commands.Start_Game, data=None), game_id=self.game_id))
+        from Entities.SocketIOManagerClass import send_private_command
+        for gamer in self.gamers:
+            asyncio.new_event_loop().run_until_complete(
+                send_private_command(command=make_command_json(id=commands.Start_Game,
+                                                               data=self.game_controller.get_game_data_sudoku(
+                                                                   gamer.gamer_id)), game_id=self.game_id,
+                                     socket_id=gamer.socket_id), )
         self.timer.start(Sudoku_game_Time, self.check_winner)
 
     def check_winner(self):

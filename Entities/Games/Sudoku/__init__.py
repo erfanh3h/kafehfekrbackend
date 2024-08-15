@@ -12,7 +12,7 @@ def get_coordinate_of_peace(peace_number):
 
 
 def get_peace_of_coordinate(x, y):
-    peace_number = y * 8 + x
+    peace_number = y * 9 + x
     return peace_number
 
 
@@ -68,20 +68,21 @@ class SudokuGameClass(BaseGameClass):
 
     def submit_piece(self, position, gamer_id, number):
         if gamer_id == 1:
-            if not self.player1_board[position[0]][position[1]].is_base_number:
-                self.player1_board[position[0]][position[1]].set_number(number)
+            if not self.player1_board[position[1]][position[0]].is_base_number:
+                self.player1_board[position[1]][position[0]].set_number(number)
         else:
-            if not self.player2_board[position[0]][position[1]].is_base_number:
-                self.player2_board[position[0]][position[1]].set_number(number)
+            if not self.player2_board[position[1]][position[0]].is_base_number:
+                self.player2_board[position[1]][position[0]].set_number(number)
 
     async def recieve_data(self, command_id, data, gamer_id):
         print(command_id, data, gamer_id)
-        column_index = data['c_index']
-        row_index = data['r_index']
+        piece_id = data['piece_id']
+        row_index, column_index = get_coordinate_of_peace(piece_id)
         if command_id == commands.Select_Peace:
-            pass
+            number = data['number']
+            self.submit_piece((column_index, row_index), gamer_id, number)
         elif command_id == commands.Remove_Peace:
-            pass
+            self.submit_piece((column_index, row_index), gamer_id, 0)
         is_game_finished = self.check_game_ended()
         if is_game_finished:
             self.finish_game()
@@ -103,11 +104,11 @@ class SudokuGameClass(BaseGameClass):
         self.is_game_finished = True
 
     def check_authority(self, data, gamer_id: int):
-        column_index = data['c_index']
-        row_index = data['r_index']
-        if gamer_id == 1 and self.player1_board[column_index][row_index].is_base_number:
+        piece_id = data['piece_id']
+        row_index, column_index = get_coordinate_of_peace(piece_id)
+        if gamer_id == 1 and self.player1_board[row_index][column_index].is_base_number:
             return False
-        elif gamer_id == 2 and self.player2_board[column_index][row_index].is_base_number:
+        if gamer_id == 2 and self.player2_board[row_index][column_index].is_base_number:
             return False
         if self.is_game_finished:
             return False
