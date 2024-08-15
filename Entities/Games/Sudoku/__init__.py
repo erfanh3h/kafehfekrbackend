@@ -27,6 +27,7 @@ class SudokuGameClass(BaseGameClass):
         self.player2_board = [[BoardSpotClass() for i in range(9)] for j in range(9)]
         self.make_board()
         self.make_players_board()
+        self.winner_id = 0
 
     def get_game_data_sudoku(self, gamer_id):
         board_peaces_data = []
@@ -61,7 +62,7 @@ class SudokuGameClass(BaseGameClass):
         base = 3
         side = base * base
         squares = side * side
-        empties = 50
+        empties = 45
         for p in random.sample(range(squares), empties):
             self.player1_board[p // side][p % side].clear_number()
             self.player2_board[p // side][p % side].clear_number()
@@ -76,26 +77,30 @@ class SudokuGameClass(BaseGameClass):
 
     async def recieve_data(self, command_id, data, gamer_id):
         print(command_id, data, gamer_id)
-        piece_id = data['piece_id']
-        row_index, column_index = get_coordinate_of_peace(piece_id)
         if command_id == commands.Select_Peace:
+            piece_id = data['piece_id']
+            row_index, column_index = get_coordinate_of_peace(piece_id)
             number = data['number']
             self.submit_piece((column_index, row_index), gamer_id, number)
         elif command_id == commands.Remove_Peace:
+            piece_id = data['piece_id']
+            row_index, column_index = get_coordinate_of_peace(piece_id)
             self.submit_piece((column_index, row_index), gamer_id, 0)
-        is_game_finished = self.check_game_ended()
-        if is_game_finished:
-            self.finish_game()
-            game_winner = self.get_game_winner()
-            await self.send_data_function(commands.Finish_Game, {"Winner": game_winner})
-            return True
+        elif command_id == commands.Solve:
+            if not self.is_game_finished:
+                self.finish_game()
+                self.winner_id = gamer_id
+                await self.send_data_function(commands.Finish_Game, {"Winner": gamer_id})
+                return True
+            else:
+                await self.send_private_data_function(commands.Wrong_Solve, None, gamer_id)
         return False
 
     def check_game_ended(self):
         return False
 
     def get_game_winner(self):
-        winner = 0
+        winner = self.winner_id
         if self.leaver_id != 0:
             winner = self.get_opponent_id(self.leaver_id)
         return winner
@@ -113,6 +118,44 @@ class SudokuGameClass(BaseGameClass):
         if self.is_game_finished:
             return False
         return True
+
+    def check_solve_authority(self, gamer_id):
+        if self.is_game_finished:
+            return False
+        is_win_happened = self.check_win_happened(gamer_id)
+        if not is_win_happened:
+            return False
+        return True
+
+    def check_win_happened(self, gamer_id):
+        if gamer_id == 1:
+            board = self.player1_board
+        else:
+            board = self.player2_board
+        is_win = True
+        row_list = []
+        for i in range(9):
+            check_list = []
+            for j in range(9):
+                check_list.append(board[i][j].number)
+            row_list.append(check_list)
+        col_list = [[] for i in range(9)]
+        for data in row_list:
+            for i in range(9):
+                col_list[i].append(data[i])
+        for data in row_list:
+            if not is_win:
+                break
+            for i in range(1, 10):
+                if not data.__contains__(i):
+                    is_win = False
+        for data in col_list:
+            if not is_win:
+                break
+            for i in range(1, 10):
+                if not data.__contains__(i):
+                    is_win = False
+        return is_win
 
     def show_player1_board(self, player_board):
         board = """"""

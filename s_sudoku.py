@@ -78,7 +78,39 @@ class SudokuGameClass:
             if not self.player2_board[position[0]][position[1]].is_base_number:
                 self.player2_board[position[0]][position[1]].set_number(number)
 
+    def check_win(self, gamer_id):
+        if gamer_id == 1:
+            board = self.player1_board
+        else:
+            board = self.player2_board
+        is_win = True
+        row_list = []
+        for i in range(9):
+            check_list = []
+            for j in range(9):
+                check_list.append(board[i][j].number)
+            row_list.append(check_list)
+        col_list = [[] for i in range(9)]
+        for data in row_list:
+            for i in range(9):
+                col_list[i].append(data[i])
+        for data in row_list:
+            if not is_win:
+                break
+            for i in range(1, 10):
+                if not data.__contains__(i):
+                    is_win = False
+        for data in col_list:
+            if not is_win:
+                break
+            for i in range(1, 10):
+                if not data.__contains__(i):
+                    is_win = False
+        return is_win
+
 
 sudokoGame = SudokuGameClass()
-sudokoGame.submit_piece((8, 8), 1, 8)
-sudokoGame.print(sudokoGame.player1_board)
+sudokoGame.print(sudokoGame.board)
+print(sudokoGame.check_win(1))
+# sudokoGame.submit_piece((8, 8), 1, 8)
+# sudokoGame.print(sudokoGame.player1_board)

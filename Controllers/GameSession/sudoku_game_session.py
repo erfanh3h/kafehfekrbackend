@@ -59,13 +59,13 @@ class SudokuGameSession(BaseGameSession):
         gamer_id = await super().command_received(data, socket_id)
         if gamer_id is None:
             return
-        if data['id'] == commands.Select_Peace:
-            is_selection_correct = self.game_controller.check_authority(data, gamer_id)
+        if data['id'] == commands.Solve:
+            is_selection_correct = self.game_controller.check_solve_authority(gamer_id)
             if is_selection_correct:
                 is_game_finished = await self.game_controller.recieve_data(data['id'], data, gamer_id)
                 if is_game_finished:
                     self.timer.stop()
-        elif data['id'] == commands.Remove_Peace:
+        else:
             is_selection_correct = self.game_controller.check_authority(data, gamer_id)
             if is_selection_correct:
                 is_game_finished = await self.game_controller.recieve_data(data['id'], data, gamer_id)
