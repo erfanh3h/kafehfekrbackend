@@ -28,6 +28,8 @@ class SudokuGameClass(BaseGameClass):
         self.make_board()
         self.make_players_board()
         self.winner_id = 0
+        self.player1_solve_limit = 2
+        self.player2_solve_limit = 2
 
     def get_game_data_sudoku(self, gamer_id):
         board_peaces_data = []
@@ -87,7 +89,8 @@ class SudokuGameClass(BaseGameClass):
             row_index, column_index = get_coordinate_of_peace(piece_id)
             self.submit_piece((column_index, row_index), gamer_id, 0)
         elif command_id == commands.Solve:
-            if not self.is_game_finished:
+            is_win_happened = self.check_win_happened(gamer_id)
+            if not self.is_game_finished and is_win_happened:
                 self.finish_game()
                 self.winner_id = gamer_id
                 await self.send_data_function(commands.Finish_Game, {"Winner": gamer_id})
@@ -121,9 +124,6 @@ class SudokuGameClass(BaseGameClass):
 
     def check_solve_authority(self, gamer_id):
         if self.is_game_finished:
-            return False
-        is_win_happened = self.check_win_happened(gamer_id)
-        if not is_win_happened:
             return False
         return True
 
