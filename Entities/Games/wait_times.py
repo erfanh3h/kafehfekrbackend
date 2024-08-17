@@ -16,3 +16,5 @@ DotBox_Turn_Time = 15
 Yatzy_Turn_Time = 60
 Four_In_Row_Turn_Time = 15
 Sudoku_game_Time = 600
+BattleShip_Board_Time = 60
+BattleShip_Turn_Time = 15
