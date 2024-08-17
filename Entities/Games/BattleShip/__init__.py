@@ -32,13 +32,24 @@ class BattleShipGameClass(BaseGameClass):
         self.init_boards()
 
     def init_boards(self):
-        ships = [0, 1, 2, 3, 8, 9, 10, 11, 16, 17, 18, 24, 25, 32]
-        self.player1_ships = ships
-        self.player2_ships = ships
-        for ship_index in ships:
+        self.player1_ships = [0, 1, 2, 3, 8, 9, 10, 11, 16, 17, 18, 24, 25, 32]
+        self.player2_ships = [0, 1, 2, 3, 8, 9, 10, 11, 16, 17, 18, 24, 25, 32]
+        for ship_index in [0, 8, 16, 24, 32]:
             y, x = get_coordinate_of_peace(ship_index)
-            self.player1_board[y][x].set_number(1)
-            self.player2_board[y][x].set_number(1)
+            self.player1_board[y][x].set_number(5)
+            self.player2_board[y][x].set_number(5)
+        for ship_index in [1, 9, 17, 25]:
+            y, x = get_coordinate_of_peace(ship_index)
+            self.player1_board[y][x].set_number(4)
+            self.player2_board[y][x].set_number(4)
+        for ship_index in [2, 10, 18]:
+            y, x = get_coordinate_of_peace(ship_index)
+            self.player1_board[y][x].set_number(3)
+            self.player2_board[y][x].set_number(3)
+        for ship_index in [3, 11]:
+            y, x = get_coordinate_of_peace(ship_index)
+            self.player1_board[y][x].set_number(2)
+            self.player2_board[y][x].set_number(2)
 
     def get_game_data_battleship(self, gamer_id):
         player1_board_data = []
@@ -77,24 +88,27 @@ class BattleShipGameClass(BaseGameClass):
 
     def save_board(self, data, gamer_id):
         if gamer_id == 1:
-            self.player1_ships = data
+            self.player1_ships.clear()
             self.player1_board = [[boardSpot() for i in range(8)] for j in range(8)]
-            for raw_data in data:
-                y, x = get_coordinate_of_peace(raw_data)
-                self.player1_board[y][x].set_number(1)
+            for raw_key in data.keys():
+                for raw_data in data[raw_key]:
+                    y, x = get_coordinate_of_peace(raw_data)
+                    self.player1_board[y][x].set_number(int(raw_key))
+                    self.player1_ships.append(raw_data)
             self.player1_board_rdy = True
         else:
-            self.player2_ships = data
+            self.player2_ships.clear()
             self.player2_board = [[boardSpot() for i in range(8)] for j in range(8)]
-            for raw_data in data:
-                y, x = get_coordinate_of_peace(raw_data)
-                self.player2_board[y][x].set_number(1)
+            for raw_key in data.keys():
+                for raw_data in data[raw_key]:
+                    y, x = get_coordinate_of_peace(raw_data)
+                    self.player2_board[y][x].set_number(int(raw_key))
+                    self.player2_ships.append(raw_data)
             self.player2_board_rdy = True
 
     async def recieve_data(self, command_id, data, gamer_id):
         print(command_id, data, gamer_id)
         if command_id == commands.Save_Board:
-            print(data)
             self.save_board(data, gamer_id)
             if self.player1_board_rdy or self.player2_board_rdy:
                 self.is_play_phase = True
@@ -154,5 +168,7 @@ class BattleShipGameClass(BaseGameClass):
         if gamer_id == 1 and self.player1_board_rdy:
             return False
         if gamer_id == 2 and self.player2_board_rdy:
+            return False
+        if len(data.keys()) != 4:
             return False
         return True
