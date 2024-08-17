@@ -14,7 +14,7 @@ class boardSpot(object):
         return str(self.number)
 
     def is_ship(self):
-        if self.number == 0:
+        if self.number != 0:
             return True
         return False
 

@@ -29,6 +29,16 @@ class BattleShipGameClass(BaseGameClass):
         self.player2_board_rdy = False
         self.is_play_phase = False
         self.current_turn = 2
+        self.init_boards()
+
+    def init_boards(self):
+        ships = [0, 1, 2, 3, 8, 9, 10, 11, 16, 17, 18, 24, 25, 32]
+        self.player1_ships = ships
+        self.player2_ships = ships
+        for ship_index in ships:
+            y, x = get_coordinate_of_peace(ship_index)
+            self.player1_board[y][x].set_number(1)
+            self.player2_board[y][x].set_number(1)
 
     def get_game_data_battleship(self, gamer_id):
         player1_board_data = []
@@ -49,7 +59,6 @@ class BattleShipGameClass(BaseGameClass):
         return data
 
     def select_piece(self, index, gamer_id):
-        number = 0
         if gamer_id == 1:
             y, x = get_coordinate_of_peace(index)
             self.player2_board[y][x].select()
@@ -69,12 +78,14 @@ class BattleShipGameClass(BaseGameClass):
     def save_board(self, data, gamer_id):
         if gamer_id == 1:
             self.player1_ships = data
+            self.player1_board = [[boardSpot() for i in range(8)] for j in range(8)]
             for raw_data in data:
                 y, x = get_coordinate_of_peace(raw_data)
                 self.player1_board[y][x].set_number(1)
             self.player1_board_rdy = True
         else:
             self.player2_ships = data
+            self.player2_board = [[boardSpot() for i in range(8)] for j in range(8)]
             for raw_data in data:
                 y, x = get_coordinate_of_peace(raw_data)
                 self.player2_board[y][x].set_number(1)
@@ -85,7 +96,7 @@ class BattleShipGameClass(BaseGameClass):
         if command_id == commands.Save_Board:
             print(data)
             self.save_board(data, gamer_id)
-            if self.player1_board_rdy and self.player2_board_rdy:
+            if self.player1_board_rdy or self.player2_board_rdy:
                 self.is_play_phase = True
                 return True
             return False
