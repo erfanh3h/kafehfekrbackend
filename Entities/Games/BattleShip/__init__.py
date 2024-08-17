@@ -31,34 +31,40 @@ class BattleShipGameClass(BaseGameClass):
         self.current_turn = 2
 
     def get_game_data_battleship(self, gamer_id):
-        board_peaces_data = []
+        player1_board_data = []
+        player2_board_data = []
+        for j in range(8):
+            for i in range(8):
+                player1_board_data.append(self.player1_board[i][j].to_json())
+        for j in range(8):
+            for i in range(8):
+                player2_board_data.append(self.player2_board[i][j].to_json())
         if gamer_id == 1:
             is_player_rdy = self.player1_board_rdy
-            for j in range(8):
-                for i in range(8):
-                    board_peaces_data.append(self.player1_board[i][j].to_json())
         else:
             is_player_rdy = self.player2_board_rdy
-            for j in range(8):
-                for i in range(8):
-                    board_peaces_data.append(self.player2_board[i][j].to_json())
-        data = {"board": board_peaces_data, "scores": [self.player1_score, self.player2_score],
+        data = {"player1_board": player1_board_data, "player2_board": player2_board_data,
+                "scores": [self.player1_score, self.player2_score],
                 "is_play_phase": self.is_play_phase, "is_player_rdy": is_player_rdy, "current_turn": self.current_turn}
         return data
 
     def select_piece(self, index, gamer_id):
+        number = 0
         if gamer_id == 1:
             y, x = get_coordinate_of_peace(index)
             self.player2_board[y][x].select()
+            number = self.player2_board[y][x].number
             if self.player2_board[y][x].is_ship():
                 self.player2_ships.remove(index)
                 self.player1_score += 1
         else:
             y, x = get_coordinate_of_peace(index)
             self.player1_board[y][x].select()
+            number = self.player1_board[y][x].number
             if self.player1_board[y][x].is_ship():
                 self.player1_ships.remove(index)
                 self.player2_score += 1
+        return number
 
     def save_board(self, data, gamer_id):
         if gamer_id == 1:
@@ -77,13 +83,16 @@ class BattleShipGameClass(BaseGameClass):
     async def recieve_data(self, command_id, data, gamer_id):
         print(command_id, data, gamer_id)
         if command_id == commands.Save_Board:
+            print(data)
             self.save_board(data, gamer_id)
             if self.player1_board_rdy and self.player2_board_rdy:
                 self.is_play_phase = True
                 return True
             return False
         elif command_id == commands.Select_Peace:
-            self.select_piece(data, gamer_id)
+            number = self.select_piece(data, gamer_id)
+            await self.send_data_function(commands.Peace_Selected, {
+                "select_data": {'index': data, 'gamer_id': gamer_id, 'number': number}})
             is_game_finished = self.check_end_game()
             if is_game_finished:
                 self.finish_game()

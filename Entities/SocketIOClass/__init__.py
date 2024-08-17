@@ -1,5 +1,6 @@
 import socketio
 
+from Controllers.GameSession.battleship_game_session import BattleShipGameSession
 from Controllers.GameSession.checkers_game_session import CheckersGameSession
 from Controllers.GameSession.chess_game_session import ChessGameSession
 from Controllers.GameSession.dotbox_game_session import DotBoxGameSession
@@ -27,7 +28,8 @@ current_game_id = "gameId"
 # gameSession = ChessGameSession(game_id=current_game_id, game_score_type=GameScoreTypesEnum.NORMAL)
 # gameSession = YatzyGameSession(game_id=current_game_id, game_score_type=GameScoreTypesEnum.NORMAL)
 # gameSession = FourInRowGameSession(game_id=current_game_id, game_score_type=GameScoreTypesEnum.NORMAL)
-gameSession = SudokuGameSession(game_id=current_game_id, game_score_type=GameScoreTypesEnum.NORMAL)
+# gameSession = SudokuGameSession(game_id=current_game_id, game_score_type=GameScoreTypesEnum.NORMAL)
+gameSession = BattleShipGameSession(game_id=current_game_id, game_score_type=GameScoreTypesEnum.NORMAL)
 # gameSession = TicTacToeGameSession(game_id=current_game_id, game_score_type=GameScoreTypesEnum.NORMAL)
 # gameSession = RPCGameSession(game_id=current_game_id, game_score_type=GameScoreTypesEnum.NORMAL)
 # gameSession = OthelloGameSession(game_id=current_game_id, game_score_type=GameScoreTypesEnum.NORMAL)
