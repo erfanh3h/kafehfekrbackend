@@ -35,7 +35,7 @@ class BoxFourGameClass:
 
     def init_board(self):
         self.board[2][1].set_value(3, 1)
-        self.board[1][2].set_value(3, 2)
+        self.board[2][3].set_value(3, 2)
 
     def is_peace_available(self, position: tuple):
         return self.board[position[0]][position[1]].equipped_user == 0

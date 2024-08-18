@@ -35,7 +35,7 @@ class BoxFourGameClass(BaseGameClass):
 
     def init_board(self):
         self.board[2][1].set_value(3, 1)
-        self.board[1][2].set_value(3, 2)
+        self.board[2][3].set_value(3, 2)
 
     def get_game_data(self):
         board_pieces_data = []
@@ -55,7 +55,7 @@ class BoxFourGameClass(BaseGameClass):
             self.player1_score = self.get_player_score(1)
             self.player2_score = self.get_player_score(2)
             await self.send_data_function(commands.Peace_Selected,
-                                          {'user': gamer_id, 'c_index': c_index, 'r_index': r_index})
+                                          {'gamer_id': gamer_id, 'c_index': c_index, 'r_index': r_index})
             is_game_finished = self.check_game_ended()
             if is_game_finished:
                 self.finish_game()
