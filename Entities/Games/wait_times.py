@@ -19,3 +19,4 @@ Sudoku_game_Time = 600
 BattleShip_Board_Time = 60
 BattleShip_Wait_Time = 4
 BattleShip_Turn_Time = 15
+BoxFour_Turn_Time = 15

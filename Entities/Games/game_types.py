@@ -16,4 +16,5 @@ class GameTypesEnum(Enum):
     FOURINROW = "FourInRow"
     SUDOKU = "Sudoku"
     BATTLESHIP = "BattleShip"
+    BOXFOUR = "BoxFour"
     C = "C"

@@ -153,9 +153,6 @@ class BattleShipGameClass(BaseGameClass):
             winner = self.symbol_2
         return winner
 
-    def finish_game(self):
-        self.is_game_finished = True
-
     def check_authority(self, data, gamer_id: int):
         if (self.current_turn == 1 and gamer_id != 1) or (self.current_turn == 2 and gamer_id != 2):
             print("not turn of : ", gamer_id)

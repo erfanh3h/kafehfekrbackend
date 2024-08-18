@@ -44,6 +44,9 @@ class BaseGameClass:
     def check_game_ended(self):
         pass
 
+    def finish_game(self):
+        self.is_game_finished = True
+
     async def surrender(self, gamer_id):
         self.is_game_finished = True
         self.is_finish_message_delivered = True
