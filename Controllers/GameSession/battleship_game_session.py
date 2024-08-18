@@ -4,7 +4,7 @@ import time
 
 from Entities.Games.BattleShip import BattleShipGameClass
 from Entities.Games.game_types import GameTypesEnum
-from Entities.Games.wait_times import BattleShip_Turn_Time, BattleShip_Board_Time , BattleShip_Wait_Time
+from Entities.Games.wait_times import BattleShip_Turn_Time, BattleShip_Board_Time, BattleShip_Wait_Time
 from Commons.static_functions import make_command_json
 from Commons import commands
 from Controllers.GameSession import BaseGameSession
@@ -73,24 +73,30 @@ class BattleShipGameSession(BaseGameSession):
                 self.timer.stop()
 
     def send_start_game(self):
-        self.game_controller.change_turn()
         from Entities.SocketIOManagerClass import send_command
         asyncio.new_event_loop().run_until_complete(
             send_command(command=make_command_json(id=commands.Start_Game, data=None), game_id=self.game_id))
         self.timer.start(BattleShip_Board_Time, self.send_current_turn)
 
     def send_current_turn(self):
+        from Entities.SocketIOManagerClass import send_command
+
         def function():
             if self.game_controller.is_game_finished:
                 winner_id = self.game_controller.get_game_winner()
                 self.finish_game(winner_id)
                 return
             self.game_controller.change_turn()
-            from Entities.SocketIOManagerClass import send_command
             asyncio.new_event_loop().run_until_complete(
                 send_command(
                     command=make_command_json(id=commands.Current_Turn, data=self.game_controller.current_turn),
                     game_id=self.game_id))
             self.timer.start(BattleShip_Turn_Time, self.send_current_turn)
-        self.timer.start(BattleShip_Wait_Time, function)
 
+        if self.game_controller.is_turn_win_happened:
+            self.timer.start(BattleShip_Turn_Time, self.send_current_turn)
+        else:
+            asyncio.new_event_loop().run_until_complete(
+                send_command(
+                    command=make_command_json(id=commands.Wait_Time, data=BattleShip_Wait_Time), game_id=self.game_id))
+            self.timer.start(BattleShip_Wait_Time, function)

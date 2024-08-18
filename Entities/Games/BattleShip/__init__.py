@@ -28,7 +28,8 @@ class BattleShipGameClass(BaseGameClass):
         self.player1_board_rdy = False
         self.player2_board_rdy = False
         self.is_play_phase = False
-        self.current_turn = 2
+        self.current_turn = 1
+        self.is_turn_win_happened = False
         self.init_boards()
 
     def init_boards(self):
@@ -70,6 +71,7 @@ class BattleShipGameClass(BaseGameClass):
         return data
 
     def select_piece(self, index, gamer_id):
+        self.is_turn_win_happened = False
         if gamer_id == 1:
             y, x = get_coordinate_of_peace(index)
             self.player2_board[y][x].select()
@@ -77,6 +79,7 @@ class BattleShipGameClass(BaseGameClass):
             if self.player2_board[y][x].is_ship():
                 self.player2_ships.remove(index)
                 self.player1_score += 1
+                self.is_turn_win_happened = True
         else:
             y, x = get_coordinate_of_peace(index)
             self.player1_board[y][x].select()
@@ -84,6 +87,7 @@ class BattleShipGameClass(BaseGameClass):
             if self.player1_board[y][x].is_ship():
                 self.player1_ships.remove(index)
                 self.player2_score += 1
+                self.is_turn_win_happened = True
         return number
 
     def save_board(self, data, gamer_id):
@@ -110,14 +114,14 @@ class BattleShipGameClass(BaseGameClass):
         print(command_id, data, gamer_id)
         if command_id == commands.Save_Board:
             self.save_board(data, gamer_id)
-            if self.player1_board_rdy or self.player2_board_rdy:
-                self.is_play_phase = True
+            if self.player1_board_rdy and self.player2_board_rdy:
                 return True
             return False
         elif command_id == commands.Select_Peace:
             number = self.select_piece(data, gamer_id)
             await self.send_data_function(commands.Peace_Selected, {
-                "select_data": {'index': data, 'gamer_id': gamer_id, 'number': number}})
+                "select_data": {'index': data, 'gamer_id': gamer_id, 'number': number,
+                                'is_turn_win_happened': self.is_turn_win_happened}})
             is_game_finished = self.check_end_game()
             if is_game_finished:
                 self.finish_game()
@@ -127,13 +131,15 @@ class BattleShipGameClass(BaseGameClass):
         return False
 
     def change_turn(self):
+        self.is_play_phase = True
+        self.is_turn_win_happened = False
         if self.current_turn == 1:
             self.current_turn = self.symbol_2
         else:
             self.current_turn = self.symbol_1
 
     def check_end_game(self):
-        if len(self.player1_ships) == 0 and len(self.player2_ships) == 0:
+        if len(self.player1_ships) == 0 or len(self.player2_ships) == 0:
             return True
         return False
 
