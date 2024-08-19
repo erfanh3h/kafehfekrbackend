@@ -15,6 +15,12 @@ def roll_dices():
     return result
 
 
+def is_valid_index(index):
+    if 0 <= index < 24:
+        return True
+    return False
+
+
 class BackGammonGameClass(BaseGameClass):
     def __init__(self, send_data_function):
         super().__init__(send_data_function)
@@ -53,16 +59,31 @@ class BackGammonGameClass(BaseGameClass):
         print(command_id, data, gamer_id)
         if command_id == commands.Select_Peace:
             index = data['index']
-            dice = data['dice']
-            is_correct = self.move_piece(index, dice, gamer_id)
+            dice_index = data['dice_index']
+            is_correct = self.move_piece(index, self.current_dices[dice_index], gamer_id)
             await self.send_data_function(commands.Peace_Selected,
-                                          {'gamer_id': gamer_id, 'index': index, 'dice': dice,
+                                          {'gamer_id': gamer_id, 'index': index, 'dice_index': dice_index,
                                            'is_correct': is_correct})
+            self.current_dices.remove(self.current_dices[dice_index])
+            return len(self.current_dices) == 0
             # is_game_finished = self.check_game_ended()
             # if is_game_finished:
             #     self.is_game_finished = True
             #     winner = self.get_game_winner()
             #     await self.send_data_function(commands.Finish_Game, {'Winner': winner})
+        return False
+
+    def check_source_can_move_n_count(self, index, count, gamer_id):
+        if gamer_id == 1:
+            multiple = 1
+        else:
+            multiple = -1
+        destination = index + (count * multiple)
+        if not is_valid_index(destination):
+            return False
+        if self.board[destination].is_enemy_spot(gamer_id):
+            return False
+        return True
 
     def check_authority(self, data, gamer_id: int):
         if (self.current_turn == 1 and gamer_id != 1) or (self.current_turn == 2 and gamer_id != 2):
@@ -70,9 +91,13 @@ class BackGammonGameClass(BaseGameClass):
             return False
         if self.is_game_finished:
             return False
-
+        if len(self.current_dices) == 0:
+            return False
         index = data['index']
-        dice = data['dice']
+        dice_index = data['dice_index']
+        if not self.check_source_can_move_n_count(index, self.current_dices[dice_index], gamer_id):
+            return False
+
         return True
 
     def get_game_winner(self):
@@ -92,29 +117,17 @@ class BackGammonGameClass(BaseGameClass):
         else:
             self.current_turn = self.symbol_1
 
-    def is_peace_available(self, index):
-        return self.board[index].equipped_user == 0
-
-    def is_peace_have_selection(self, index):
-        return self.board[index].equipped_user != 0
-
-    def get_value_of_location(self, input_value):
-        return self.board[input_value]
-
     def check_game_ended(self):
-        is_game_finished = True
-        for index in range(0, len(self.board)):
-            if self.is_peace_available(index):
-                is_game_finished = False
-                break
-        if not is_game_finished:
-            return is_game_finished
-        else:
-            return True
+        is_game_finished = False
+        return is_game_finished
 
     def move_piece(self, index, dice, gamer_id):
         self.board[index].remove_piece()
-        target_index = index + dice
+        if gamer_id == 1:
+            multiple = 1
+        else:
+            multiple = -1
+        target_index = index + (dice * multiple)
         if self.board[target_index].is_enemy_spot(gamer_id):
             if self.board[target_index].is_single():
                 if gamer_id == 1:

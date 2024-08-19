@@ -30,8 +30,9 @@ class BackGammonGameSession(BaseGameSession):
             selection_data = data['data']
             is_selection_correct = self.game_controller.check_authority(selection_data, gamer_id)
             if is_selection_correct:
-                await self.game_controller.recieve_data(data['id'], selection_data, gamer_id)
-                self.timer.stop()
+                is_turn_finished = await self.game_controller.recieve_data(data['id'], selection_data, gamer_id)
+                if is_turn_finished:
+                    self.timer.stop()
 
     def send_current_turn(self):
         if self.game_controller.is_game_finished:

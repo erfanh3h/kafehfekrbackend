@@ -31,8 +31,8 @@ async def start():
     await sio.connect('http://localhost:5000', wait_timeout=1, auth={'user_id': "0", 'game_id': 'gameId'})
     await asyncio.sleep(1)
     while True:
-        message = input("select peace : ")
-        await sio.emit('userCommand', {'id': 'SelectPeace', 'data': int(message)})
+        message = input("select piece : ")
+        await sio.emit('userCommand', {'id': 'SelectPeace', 'data': {'index': int(message), 'dice_index': 0}})
         await asyncio.sleep(.15)
 
     # await sio.wait()
