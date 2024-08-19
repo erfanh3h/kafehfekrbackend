@@ -52,7 +52,8 @@ class BackGammonGameClass(BaseGameClass):
             board_data.append(self.board[index].to_json())
 
         data = {"board": board_data, "scores": [self.player1_score, self.player2_score],
-                "current_turn": self.current_turn, "out_pieces": [self.player1_out_pieces, self.player2_out_pieces]}
+                "current_turn": self.current_turn, "out_pieces": [self.player1_out_pieces, self.player2_out_pieces],
+                "current_dices": self.current_dices}
         return data
 
     async def recieve_data(self, command_id, data, gamer_id):
@@ -81,7 +82,7 @@ class BackGammonGameClass(BaseGameClass):
         destination = index + (count * multiple)
         if not is_valid_index(destination):
             return False
-        if self.board[destination].is_enemy_spot(gamer_id):
+        if self.board[destination].is_enemy_spot(gamer_id) and not self.board[destination].is_single():
             return False
         return True
 
@@ -132,11 +133,13 @@ class BackGammonGameClass(BaseGameClass):
             if self.board[target_index].is_single():
                 if gamer_id == 1:
                     self.player2_out_pieces += 1
+                    print("a")
                 else:
                     self.player1_out_pieces += 1
                 self.board[target_index].remove_piece()
                 self.board[target_index].add_piece(gamer_id)
             else:
+                print("b")
                 return False
         else:
             self.board[target_index].add_piece(gamer_id)
