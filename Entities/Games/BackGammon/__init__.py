@@ -21,6 +21,16 @@ def is_valid_index(index):
     return False
 
 
+def is_valid_index_in_end_phase(index, gamer_id):
+    if gamer_id == 1:
+        if 0 <= index <= 24:
+            return True
+    if gamer_id == 2:
+        if -1 <= index < 24:
+            return True
+    return False
+
+
 class BackGammonGameClass(BaseGameClass):
     def __init__(self, send_data_function):
         super().__init__(send_data_function)
@@ -34,6 +44,8 @@ class BackGammonGameClass(BaseGameClass):
         self.current_dices = []
         self.player1_out_pieces = 0
         self.player2_out_pieces = 0
+        self.player1_is_in_end_phase = False
+        self.player2_is_in_end_phase = False
 
     def init_board(self):
         self.board[0].add_piece(1, 2)
@@ -44,6 +56,14 @@ class BackGammonGameClass(BaseGameClass):
         self.board[16].add_piece(1, 3)
         self.board[11].add_piece(1, 5)
         self.board[12].add_piece(2, 5)
+        # self.board[19].add_piece(1, 2)
+        # self.board[23].add_piece(2, 2)
+        # self.board[5].add_piece(2, 5)
+        # self.board[20].add_piece(1, 5)
+        # self.board[7].add_piece(2, 3)
+        # self.board[21].add_piece(1, 3)
+        # self.board[22].add_piece(1, 5)
+        # self.board[12].add_piece(2, 5)
 
     def get_game_data(self):
         board_data = []
@@ -53,10 +73,18 @@ class BackGammonGameClass(BaseGameClass):
 
         data = {"board": board_data, "scores": [self.player1_score, self.player2_score],
                 "current_turn": self.current_turn, "out_pieces": [self.player1_out_pieces, self.player2_out_pieces],
-                "current_dices": self.current_dices}
+                "current_dices": self.current_dices,
+                "end_phases": [self.player1_is_in_end_phase, self.player2_is_in_end_phase]}
         return data
 
     async def recieve_data(self, command_id, data, gamer_id):
+        async def check_game_finish():
+            is_game_finished = self.check_game_ended()
+            if is_game_finished:
+                self.is_game_finished = True
+                winner = self.get_game_winner()
+                await self.send_data_function(commands.Finish_Game, {'Winner': winner})
+
         print(command_id, data, gamer_id)
         if command_id == commands.Select_Peace:
             index = data['index']
@@ -76,18 +104,17 @@ class BackGammonGameClass(BaseGameClass):
                     await self.send_data_function(commands.Peace_Selected,
                                                   {'gamer_id': gamer_id, 'index': index, 'dice_index': dice_index})
                     self.current_dices.remove(self.current_dices[dice_index])
+                    await check_game_finish()
             else:
                 is_correct = self.move_piece(index, self.current_dices[dice_index], gamer_id)
                 if is_correct:
                     await self.send_data_function(commands.Peace_Selected,
                                                   {'gamer_id': gamer_id, 'index': index, 'dice_index': dice_index})
                     self.current_dices.remove(self.current_dices[dice_index])
+                    await check_game_finish()
+
             return len(self.current_dices) == 0
-            # is_game_finished = self.check_game_ended()
-            # if is_game_finished:
-            #     self.is_game_finished = True
-            #     winner = self.get_game_winner()
-            #     await self.send_data_function(commands.Finish_Game, {'Winner': winner})
+
         return False
 
     def check_gamer_piece_is_out(self, gamer_id):
@@ -103,10 +130,22 @@ class BackGammonGameClass(BaseGameClass):
         else:
             multiple = -1
         destination = index + (count * multiple)
-        if not is_valid_index(destination):
-            return False
-        if self.board[destination].is_enemy_spot(gamer_id) and not self.board[destination].is_single():
-            return False
+        is_in_end_phase = False
+        if gamer_id == 1 and self.player1_is_in_end_phase:
+            is_in_end_phase = True
+        elif gamer_id == 2 and self.player2_is_in_end_phase:
+            is_in_end_phase = True
+        if is_in_end_phase:
+            if not is_valid_index_in_end_phase(destination, gamer_id):
+                return False
+            if (destination != -1 and destination != 24 and self.board[destination].is_enemy_spot(gamer_id) and
+                    not self.board[destination].is_single()):
+                return False
+        else:
+            if not is_valid_index(destination):
+                return False
+            if self.board[destination].is_enemy_spot(gamer_id) and not self.board[destination].is_single():
+                return False
         return True
 
     def check_authority(self, data, gamer_id: int):
@@ -128,9 +167,9 @@ class BackGammonGameClass(BaseGameClass):
         winner = 0
         if self.leaver_id != 0:
             winner = self.get_opponent_id(self.leaver_id)
-        elif self.player1_score > self.player2_score:
+        elif self.player1_score == 15:
             winner = self.symbol_1
-        elif self.player2_score > self.player1_score:
+        elif self.player2_score == 15:
             winner = self.symbol_2
         return winner
 
@@ -142,10 +181,26 @@ class BackGammonGameClass(BaseGameClass):
             self.current_turn = self.symbol_1
 
     def check_game_ended(self):
-        is_game_finished = False
-        return is_game_finished
+        if self.player1_score == 15 or self.player2_score == 15:
+            return True
+        return False
+
+    def check_gamer_is_in_end_phase(self, gamer_id):
+        if gamer_id == 1:
+            if (self.board[18].count + self.board[19].count + self.board[20].count + self.board[21].count +
+                    self.board[22].count + self.board[23].count + self.player1_score == 15):
+                self.player1_is_in_end_phase = True
+            else:
+                self.player1_is_in_end_phase = False
+        else:
+            if (self.board[0].count + self.board[1].count + self.board[2].count + self.board[3].count +
+                    self.board[4].count + self.board[5].count + self.player2_score == 15):
+                self.player2_is_in_end_phase = True
+            else:
+                self.player2_is_in_end_phase = False
 
     def move_piece(self, index, dice, gamer_id):
+        result = True
         if index == -1 or index == 24:
             pass
         else:
@@ -155,50 +210,31 @@ class BackGammonGameClass(BaseGameClass):
         else:
             multiple = -1
         target_index = index + (dice * multiple)
-        if self.board[target_index].is_enemy_spot(gamer_id):
-            if self.board[target_index].is_single():
-                if gamer_id == 1:
-                    self.player2_out_pieces += 1
-                    print("a")
-                else:
-                    self.player1_out_pieces += 1
-                self.board[target_index].remove_piece()
-                self.board[target_index].add_piece(gamer_id)
+        is_in_end_phase = False
+        if gamer_id == 1 and self.player1_is_in_end_phase:
+            is_in_end_phase = True
+        elif gamer_id == 2 and self.player2_is_in_end_phase:
+            is_in_end_phase = True
+        # check player is in end phae
+        if is_in_end_phase and (target_index == -1 or target_index == 24):
+            if gamer_id == 1:
+                self.player1_score += 1
             else:
-                print("b")
-                return False
+                self.player2_score += 1
         else:
-            self.board[target_index].add_piece(gamer_id)
-        return True
+            if self.board[target_index].is_enemy_spot(gamer_id):
+                if self.board[target_index].is_single():
+                    if gamer_id == 1:
+                        self.player2_out_pieces += 1
+                    else:
+                        self.player1_out_pieces += 1
+                    self.board[target_index].remove_piece()
+                    self.board[target_index].add_piece(gamer_id)
+                else:
+                    result = False
+            else:
+                self.board[target_index].add_piece(gamer_id)
 
-    def print_game(self):
-        print(f"""
-        {self.board[0]}----------{self.board[23]}
-        {self.board[1]}----------{self.board[22]}
-        {self.board[2]}----------{self.board[21]}
-        {self.board[3]}----------{self.board[20]}
-        {self.board[4]}----------{self.board[19]}
-        {self.board[5]}----------{self.board[18]}
-        {self.board[6]}----------{self.board[17]}
-        {self.board[7]}----------{self.board[16]}
-        {self.board[8]}----------{self.board[15]}
-        {self.board[9]}----------{self.board[14]}
-        {self.board[10]}----------{self.board[13]}
-        {self.board[11]}----------{self.board[12]}
-        """)
-
-    def print_equippes(self):
-        print(f"""
-        {self.board[0].equipped_user}----------{self.board[23].equipped_user}
-        {self.board[1].equipped_user}----------{self.board[22].equipped_user}
-        {self.board[2].equipped_user}----------{self.board[21].equipped_user}
-        {self.board[3].equipped_user}----------{self.board[20].equipped_user}
-        {self.board[4].equipped_user}----------{self.board[19].equipped_user}
-        {self.board[5].equipped_user}----------{self.board[18].equipped_user}
-        {self.board[6].equipped_user}----------{self.board[17].equipped_user}
-        {self.board[7].equipped_user}----------{self.board[16].equipped_user}
-        {self.board[8].equipped_user}----------{self.board[15].equipped_user}
-        {self.board[9].equipped_user}----------{self.board[14].equipped_user}
-        {self.board[10].equipped_user}----------{self.board[13].equipped_user}
-        {self.board[11].equipped_user}----------{self.board[12].equipped_user}
-        """)
+        if result:
+            self.check_gamer_is_in_end_phase(gamer_id)
+        return result
