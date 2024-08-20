@@ -61,17 +61,40 @@ class BackGammonGameClass(BaseGameClass):
         if command_id == commands.Select_Peace:
             index = data['index']
             dice_index = data['dice_index']
-            is_correct = self.move_piece(index, self.current_dices[dice_index], gamer_id)
-            await self.send_data_function(commands.Peace_Selected,
-                                          {'gamer_id': gamer_id, 'index': index, 'dice_index': dice_index,
-                                           'is_correct': is_correct})
-            self.current_dices.remove(self.current_dices[dice_index])
+            is_piece_out = self.check_gamer_piece_is_out(gamer_id)
+            if is_piece_out:
+                if gamer_id == 1:
+                    index = -1
+                else:
+                    index = 24
+                is_correct = self.move_piece(index, self.current_dices[dice_index], gamer_id)
+                if is_correct:
+                    if gamer_id == 1:
+                        self.player1_out_pieces -= 1
+                    else:
+                        self.player2_out_pieces -= 1
+                    await self.send_data_function(commands.Peace_Selected,
+                                                  {'gamer_id': gamer_id, 'index': index, 'dice_index': dice_index})
+                    self.current_dices.remove(self.current_dices[dice_index])
+            else:
+                is_correct = self.move_piece(index, self.current_dices[dice_index], gamer_id)
+                if is_correct:
+                    await self.send_data_function(commands.Peace_Selected,
+                                                  {'gamer_id': gamer_id, 'index': index, 'dice_index': dice_index})
+                    self.current_dices.remove(self.current_dices[dice_index])
             return len(self.current_dices) == 0
             # is_game_finished = self.check_game_ended()
             # if is_game_finished:
             #     self.is_game_finished = True
             #     winner = self.get_game_winner()
             #     await self.send_data_function(commands.Finish_Game, {'Winner': winner})
+        return False
+
+    def check_gamer_piece_is_out(self, gamer_id):
+        if gamer_id == 1 and self.player1_out_pieces > 0:
+            return True
+        if gamer_id == 2 and self.player2_out_pieces > 0:
+            return True
         return False
 
     def check_source_can_move_n_count(self, index, count, gamer_id):
@@ -123,7 +146,10 @@ class BackGammonGameClass(BaseGameClass):
         return is_game_finished
 
     def move_piece(self, index, dice, gamer_id):
-        self.board[index].remove_piece()
+        if index == -1 or index == 24:
+            pass
+        else:
+            self.board[index].remove_piece()
         if gamer_id == 1:
             multiple = 1
         else:
