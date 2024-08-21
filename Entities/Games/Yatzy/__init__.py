@@ -243,7 +243,7 @@ class YatzyGameClass(BaseGameClass):
         calculated_score = 0
         for i in range(1, 7):
             if self.calculate_repeatness(i, 5, gamer_id):
-                calculated_score += self.calculate_all_dices(gamer_id)
+                calculated_score += 50
                 break
         return calculated_score
 
