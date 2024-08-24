@@ -1,6 +1,15 @@
 import asyncio
+import string
+import random
 
 import socketio
+
+
+def create_random_str() -> str:
+    char_set = string.ascii_uppercase + string.digits
+    random_name = ''.join(random.sample(char_set * 6, 6))
+    return random_name
+
 
 sio = socketio.AsyncClient(logger=True, engineio_logger=True)
 
@@ -28,7 +37,7 @@ async def disconnect():
 
 
 async def start():
-    await sio.connect('http://localhost:5000', wait_timeout=1, auth={'user_id': "0", 'game_id': 'gameId'},
+    await sio.connect('http://localhost:5000', wait_timeout=1, auth={'user_id': create_random_str()},
                       namespaces="/queue")
     await asyncio.sleep(1)
     while True:
@@ -37,23 +46,6 @@ async def start():
         await asyncio.sleep(.15)
 
     # await sio.wait()
-
-
-# tictactoe
-# message = input("select peace : ")
-# await sio.emit('userCommand', {'id': 'SelectPeace', 'data': int(message)})
-# await asyncio.sleep(.15)
-
-# RPC
-# message = input("select peace type : ")
-# selection = "rock"
-# if message == "0":
-#     selection = "rock"
-# elif message == "1":
-#     selection = "paper"
-# elif message == "2":
-#     selection = "cutter"
-# await sio.emit('userCommand', {'id': 'SelectPeace', 'data': selection})
 
 # MNumbers
 # msg = input("select peace : ")
