@@ -29,3 +29,7 @@ async def send_reaction(player_id, reaction_id, game_id, namespace="/game", skip
 
 async def send_private_command(command, socket_id, game_id, namespace="/game"):
     await Socket_Server.emit('command', command, to=socket_id, room=game_id, namespace=namespace)
+
+
+async def send_queue_command(command, socket_id, namespace="/queue"):
+    await Socket_Server.emit('command', command, to=socket_id, namespace=namespace)

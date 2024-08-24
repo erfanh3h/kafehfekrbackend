@@ -32,20 +32,32 @@ current_game_id = "gameId"
 # gameSession = SudokuGameSession(game_id=current_game_id, game_score_type=GameScoreTypesEnum.NORMAL)
 # gameSession = BattleShipGameSession(game_id=current_game_id, game_score_type=GameScoreTypesEnum.NORMAL)
 # gameSession = BoxFourGameSession(game_id=current_game_id, game_score_type=GameScoreTypesEnum.NORMAL)
-gameSession = BackGammonGameSession(game_id=current_game_id, game_score_type=GameScoreTypesEnum.NORMAL)
+# gameSession = BackGammonGameSession(game_id=current_game_id, game_score_type=GameScoreTypesEnum.NORMAL)
 # gameSession = TicTacToeGameSession(game_id=current_game_id, game_score_type=GameScoreTypesEnum.NORMAL)
 # gameSession = RPCGameSession(game_id=current_game_id, game_score_type=GameScoreTypesEnum.NORMAL)
 # gameSession = OthelloGameSession(game_id=current_game_id, game_score_type=GameScoreTypesEnum.NORMAL)
 # gameSession = DotBoxGameSession(game_id=current_game_id, game_score_type=GameScoreTypesEnum.NORMAL)
 # gameSession = MSweeperGameSession(game_id=current_game_id, game_score_type=GameScoreTypesEnum.NORMAL)
 
-gameSession.add_gamer(GamerModel(user_id="0", username='test'))
-gameSession.add_gamer(GamerModel(user_id="1", username='mobile'))
-gameSession.start_game_timer()
+# gameSession.add_gamer(GamerModel(user_id="0", username='test'))
+# gameSession.add_gamer(GamerModel(user_id="1", username='mobile'))
+# gameSession.start_game_timer()
 
-games = {current_game_id: gameSession}
-game_idies = [current_game_id]
+# games = {current_game_id: gameSession}
+# game_idies = [current_game_id]
+
+games = {}
+game_idies = []
 socketid_gameid_pairs = {}
+
+
+def add_new_game(game_id, queuers):
+    gameSession = BackGammonGameSession(game_id=game_id, game_score_type=GameScoreTypesEnum.NORMAL)
+    gameSession.add_gamer(GamerModel(user_id=queuers[0].user_id, username=queuers[0].username))
+    gameSession.add_gamer(GamerModel(user_id=queuers[1].user_id, username=queuers[1].username))
+    gameSession.start_game_timer()
+    games[game_id] = gameSession
+    game_idies.append(game_id)
 
 
 class GameSocketNameSpace(socketio.AsyncNamespace):
@@ -65,12 +77,13 @@ class GameSocketNameSpace(socketio.AsyncNamespace):
 
         from Entities.SocketIOClass import Socket_Server
         if is_game_id_valid(user_game_id):
-            if games[user_game_id].gamer_idies.__contains__(user_id):
-                await Socket_Server.enter_room(socket_id, user_game_id, namespace="/game")
-                games[user_game_id].join_gamer(user_id, socket_id)
-                socketid_gameid_pairs[socket_id] = user_game_id
-            else:
-                await Socket_Server.disconnect(socket_id, namespace="/game")
+            # TODO return this
+            # if games[user_game_id].gamer_idies.__contains__(user_id):
+            await Socket_Server.enter_room(socket_id, user_game_id, namespace="/game")
+            games[user_game_id].join_gamer(user_id, socket_id)
+            socketid_gameid_pairs[socket_id] = user_game_id
+            # else:
+            #     await Socket_Server.disconnect(socket_id, namespace="/game")
         else:
             await Socket_Server.disconnect(socket_id, namespace="/game")
 

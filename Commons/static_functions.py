@@ -9,3 +9,9 @@ def create_random_name() -> str:
     char_set = string.ascii_uppercase + string.digits
     random_name = ''.join(random.sample(char_set * 6, 6))
     return random_name
+
+
+def create_random_game_id() -> str:
+    char_set = string.ascii_uppercase + string.ascii_lowercase + string.digits
+    result = ''.join(random.sample(char_set * 6, 8))
+    return result
