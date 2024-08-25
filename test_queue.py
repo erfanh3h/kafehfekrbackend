@@ -37,8 +37,8 @@ async def disconnect():
 
 
 async def start():
-    await sio.connect('http://localhost:5000', wait_timeout=1, auth={'user_id': create_random_str()},
-                      namespaces="/queue")
+    await sio.connect('http://localhost:5000', wait_timeout=1,
+                      auth={'user_id': "0", 'game_type': "Sudoku"}, namespaces="/queue")
     await asyncio.sleep(1)
     while True:
         # message = input("select piece : ")
@@ -46,6 +46,7 @@ async def start():
         # await asyncio.sleep(.15)
 
         await sio.wait()
+
 
 if __name__ == '__main__':
     loop = asyncio.get_event_loop()

@@ -18,10 +18,11 @@ from Controllers.GameSession.sudoku_game_session import SudokuGameSession
 from Controllers.GameSession.ten_game_session import TenGameSession
 from Controllers.GameSession.tictactoe_game_session import TicTacToeGameSession
 from Controllers.GameSession.yatzy_game_session import YatzyGameSession
+from Entities.Games.game_types import GameTypesEnum
 from Entities.ScoreManagerClass import GameScoreTypesEnum
 from Models.Gamer import GamerModel
 
-current_game_id = "gameId"
+# current_game_id = "gameId"
 # gameSession = MillGameSession(game_id=current_game_id, game_score_type=GameScoreTypesEnum.NORMAL)
 # gameSession = MNumbersGameSession(game_id=current_game_id, game_score_type=GameScoreTypesEnum.NORMAL)
 # gameSession = CheckersGameSession(game_id=current_game_id, game_score_type=GameScoreTypesEnum.NORMAL)
@@ -45,14 +46,28 @@ current_game_id = "gameId"
 
 # games = {current_game_id: gameSession}
 # game_idies = [current_game_id]
+# socketid_gameid_pairs = {}
 
 games = {}
 game_idies = []
 socketid_gameid_pairs = {}
 
+game_type_class_pairs = {GameTypesEnum.TIC_TAC_TOE.value: TicTacToeGameSession,
+                         GameTypesEnum.CHECKERS.value: CheckersGameSession, GameTypesEnum.CHESS.value: ChessGameSession,
+                         GameTypesEnum.OTHELLO.value: OthelloGameSession, GameTypesEnum.MILL.value: MillGameSession,
+                         GameTypesEnum.MNUMBERS.value: MNumbersGameSession,
+                         GameTypesEnum.MSweeper.value: MSweeperGameSession,
+                         GameTypesEnum.RPC.value: RPCGameSession, GameTypesEnum.TEN.value: TenGameSession,
+                         GameTypesEnum.DOTBOX.value: DotBoxGameSession, GameTypesEnum.YATZY.value: YatzyGameSession,
+                         GameTypesEnum.FOURINROW.value: FourInRowGameSession,
+                         GameTypesEnum.SUDOKU.value: SudokuGameSession,
+                         GameTypesEnum.BATTLESHIP.value: BattleShipGameSession,
+                         GameTypesEnum.BOXFOUR.value: BoxFourGameSession,
+                         GameTypesEnum.BACKGAMMON.value: BackGammonGameSession}
 
-def add_new_game(game_id, queuers):
-    gameSession = BackGammonGameSession(game_id=game_id, game_score_type=GameScoreTypesEnum.NORMAL)
+
+def add_new_game(game_id, queuers, game_type):
+    gameSession = game_type_class_pairs[game_type](game_id=game_id, game_score_type=GameScoreTypesEnum.NORMAL)
     gameSession.add_gamer(GamerModel(user_id=queuers[0].user_id, username=queuers[0].username))
     gameSession.add_gamer(GamerModel(user_id=queuers[1].user_id, username=queuers[1].username))
     gameSession.start_game_timer()
@@ -75,23 +90,21 @@ class GameSocketNameSpace(socketio.AsyncNamespace):
         # print(Socket_Server.namespaces)
         #     await my_message(socket_id, {'Test': f'{socket_id}'})
 
-        from Entities.SocketIOClass import Socket_Server
         if is_game_id_valid(user_game_id):
             # TODO return this
             # if games[user_game_id].gamer_idies.__contains__(user_id):
-            await Socket_Server.enter_room(socket_id, user_game_id, namespace="/game")
+            await self.enter_room(socket_id, user_game_id, namespace="/game")
             games[user_game_id].join_gamer(user_id, socket_id)
             socketid_gameid_pairs[socket_id] = user_game_id
             # else:
             #     await Socket_Server.disconnect(socket_id, namespace="/game")
         else:
-            await Socket_Server.disconnect(socket_id, namespace="/game")
+            await self.disconnect(socket_id, namespace="/game")
 
     async def on_disconnect(self, socket_id):
         game_id = return_gameid_from_socketid(socket_id)
         if game_id is not None:
-            from Entities.SocketIOClass import Socket_Server
-            await Socket_Server.leave_room(socket_id, current_game_id, namespace="/game")
+            await self.leave_room(socket_id, game_id, namespace="/game")
             games[game_id].disconnect_user(socket_id)
             del socketid_gameid_pairs[socket_id]
         print('disconnect ', socket_id)

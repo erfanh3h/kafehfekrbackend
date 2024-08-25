@@ -48,6 +48,7 @@ class GameQueueSessionDetails:
                 return False
             queuers.append(queuer_data)
         game_id = static_functions.create_random_game_id()
+        # game_id = 'testgame'
         game_data = {'game_id': game_id}
         if len(queuers) == 2:
             for queuer_data in queuers:
@@ -57,7 +58,7 @@ class GameQueueSessionDetails:
                 self.queuers.remove(queuer_data)
         print(game_id, queuers_idis)
         from Entities.SocketIOClass.game import add_new_game
-        add_new_game(game_id, queuers)
+        add_new_game(game_id, queuers, self.game_type)
 
     def command_received(self, data, socket_id):
         queuer_data = self.find_gamer_from_socket(socket_id)
