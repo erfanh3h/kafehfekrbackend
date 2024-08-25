@@ -4,6 +4,8 @@ import time
 
 from Commons import commands
 from Commons.static_functions import make_command_json
+from Controllers.QueueSession.game_queue_session_details import GameQueueSessionDetails
+from Entities.Games.game_types import GameTypesEnum
 from Entities.TimerClass import TimerClass
 from Models.Queuer import QueuerModel
 from Commons import static_functions
@@ -11,71 +13,31 @@ from Commons import static_functions
 
 class BaseQueueSession:
     def __init__(self, game_score_type):
-        self.queuers: list[QueuerModel] = []
+        self.queues: dict[str, GameQueueSessionDetails] = {}
         self.timer = TimerClass()
         self.game_type = game_score_type
         self.queue_must_run = True
 
-    def start_timer(self):
+    def init_session(self):
+        games = [game.value for game in GameTypesEnum]
+        for game in games:
+            self.queues[game] = GameQueueSessionDetails(game)
+
         def check_start_new_game():
             while True:
-                if len(self.queuers) >= 2:
-                    self.start_game([self.queuers[0].user_id, self.queuers[1].user_id])
-                else:
-                    print("queuer len : ", len(self.queuers))
-                    time.sleep(10)
+                for key in self.queues.keys():
+                    if self.queues[key].queuers_length() >= 2:
+                        self.queues[key].start_game()
+                    if len(self.queues[key].queuers) > 0:
+                        print(f"{self.queues[key].game_type} queuer len : ", len(self.queues[key].queuers))
+                print("---------------------")
+                time.sleep(5)
 
         t = threading.Thread(target=check_start_new_game, daemon=True)
         t.start()
 
-    def find_gamer_from_socket(self, socket_id):
-        for queuer in self.queuers:
-            if queuer.socket_id == socket_id:
-                return queuer
-        return None
+    def join_queuer(self, user_data: QueuerModel, gamer_type: str):
+        self.queues[gamer_type].add_queuer(user_data)
 
-    def find_gamer_from_user_id(self, user_id):
-        for queuer in self.queuers:
-            if queuer.user_id == user_id:
-                return queuer
-        return None
-
-    def add_queuer(self, queuer: QueuerModel):
-        self.queuers.append(queuer)
-
-    def join_queuer(self, user_data: QueuerModel):
-        self.queuers.append(user_data)
-
-    def start_game(self, queuers_idis: list):
-        queuers = []
-        from Entities.SocketIOManagerClass import send_queue_command
-        for queuer_id in queuers_idis:
-            queuer_data = self.find_gamer_from_user_id(queuer_id)
-            if queuer_data is None:
-                print("Invalid user")
-                return False
-            queuers.append(queuer_data)
-        game_id = static_functions.create_random_game_id()
-        game_data = {'game_id': game_id}
-        if len(queuers) == 2:
-            for queuer_data in queuers:
-                asyncio.new_event_loop().run_until_complete(
-                    send_queue_command(command=make_command_json(id=commands.Start_Game, data=game_data),
-                                       socket_id=queuer_data.socket_id))
-                self.queuers.remove(queuer_data)
-        print(game_id, queuers_idis)
-        from Entities.SocketIOClass.game import add_new_game
-        add_new_game(game_id, queuers)
-
-    def command_received(self, data, socket_id):
-        queuer_data = self.find_gamer_from_socket(socket_id)
-        if queuer_data is None:
-            return None
-        else:
-            user_id = queuer_data.user_id
-        return user_id
-
-    def disconnect_user(self, socket_id):
-        queuer_data = self.find_gamer_from_socket(socket_id)
-        if queuer_data is not None:
-            self.queuers.remove(queuer_data)
+    def disconnect_user(self, socket_id, gamer_type: str):
+        self.queues[gamer_type].disconnect_user(socket_id)

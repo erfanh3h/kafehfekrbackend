@@ -18,4 +18,3 @@ class GameTypesEnum(Enum):
     BATTLESHIP = "BattleShip"
     BOXFOUR = "BoxFour"
     BACKGAMMON = "BackGammon"
-    C = "C"

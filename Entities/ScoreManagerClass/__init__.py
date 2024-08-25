@@ -6,7 +6,7 @@ class ScoreManagerClass:
     def __init__(self, game_score_type):
         self.player1_user_id = ""
         self.player2_user_id = ""
-        self.game_type = GameTypesEnum.C
+        self.game_type = GameTypesEnum.BACKGAMMON
         self.game_score_type = game_score_type
 
     def set_data(self, player1_user_id, player2_user_id, game_type):

@@ -20,7 +20,7 @@ class BaseGameSession:
         self.game_id = game_id
         self.is_game_running = False
         self.gamer_idies = []
-        self.game_type: GameTypesEnum = GameTypesEnum.C
+        self.game_type: GameTypesEnum = GameTypesEnum.BACKGAMMON
         self.score_manager = ScoreManagerClass(game_score_type)
 
     def start_game_timer(self):
