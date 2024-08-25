@@ -11,9 +11,10 @@ from Commons import static_functions
 
 
 class GameQueueSessionDetails:
-    def __init__(self, game_type):
+    def __init__(self, game_type, game_score_type):
         self.queuers: list[QueuerModel] = []
         self.game_type = game_type
+        self.game_score_type = game_type
         self.queue_must_run = True
 
     def queuers_length(self) -> int:
@@ -58,7 +59,7 @@ class GameQueueSessionDetails:
                 self.queuers.remove(queuer_data)
         print(game_id, queuers_idis)
         from Entities.SocketIOClass.game import add_new_game
-        add_new_game(game_id, queuers, self.game_type)
+        add_new_game(game_id, queuers, self.game_type, self.game_score_type)
 
     def command_received(self, data, socket_id):
         queuer_data = self.find_gamer_from_socket(socket_id)

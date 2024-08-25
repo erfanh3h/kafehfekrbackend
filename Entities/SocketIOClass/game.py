@@ -66,8 +66,8 @@ game_type_class_pairs = {GameTypesEnum.TIC_TAC_TOE.value: TicTacToeGameSession,
                          GameTypesEnum.BACKGAMMON.value: BackGammonGameSession}
 
 
-def add_new_game(game_id, queuers, game_type):
-    gameSession = game_type_class_pairs[game_type](game_id=game_id, game_score_type=GameScoreTypesEnum.NORMAL)
+def add_new_game(game_id, queuers, game_type, game_score_type):
+    gameSession = game_type_class_pairs[game_type](game_id=game_id, game_score_type=game_score_type)
     gameSession.add_gamer(GamerModel(user_id=queuers[0].user_id, username=queuers[0].username))
     gameSession.add_gamer(GamerModel(user_id=queuers[1].user_id, username=queuers[1].username))
     gameSession.start_game_timer()

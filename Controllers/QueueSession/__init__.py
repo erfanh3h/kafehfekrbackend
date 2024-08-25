@@ -15,13 +15,13 @@ class BaseQueueSession:
     def __init__(self, game_score_type):
         self.queues: dict[str, GameQueueSessionDetails] = {}
         self.timer = TimerClass()
-        self.game_type = game_score_type
+        self.game_score_type = game_score_type
         self.queue_must_run = True
 
     def init_session(self):
         games = [game.value for game in GameTypesEnum]
         for game in games:
-            self.queues[game] = GameQueueSessionDetails(game)
+            self.queues[game] = GameQueueSessionDetails(game, self.game_score_type)
 
         def check_start_new_game():
             while True:
