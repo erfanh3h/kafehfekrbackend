@@ -1,11 +1,10 @@
-import random
-import string
 from datetime import datetime
+
+from Commons.static_functions import create_random_user_id
 
 
 def create_user_json(name, phone, platform) -> dict:
-    char_set = string.ascii_uppercase + string.ascii_lowercase + string.digits
-    random_id = ''.join(random.sample(char_set * 6, 6))
+    random_id = create_random_user_id()
     return {'_id': random_id, 'phone': phone, 'username': name, "score": 0, "xp": 0, "coin": 0, "image": 0, "token": 0,
             "open_game_id": "", "platform": platform, "last_time_played": datetime(2000, 1, 1),
             "last_time_chance": datetime(2000, 1, 1), "is_active": True, "join_date": datetime.now()}

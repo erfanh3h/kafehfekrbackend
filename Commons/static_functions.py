@@ -13,5 +13,10 @@ def create_random_name() -> str:
 
 def create_random_game_id() -> str:
     char_set = string.ascii_uppercase + string.ascii_lowercase + string.digits
-    result = ''.join(random.sample(char_set * 6, 8))
+    result = ''.join(random.sample(char_set * 6, 7))
+    return result
+
+def create_random_user_id() -> str:
+    char_set = string.ascii_uppercase + string.ascii_lowercase + string.digits
+    result = ''.join(random.sample(char_set * 6, 6))
     return result
