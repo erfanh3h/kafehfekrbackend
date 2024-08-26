@@ -1,35 +1,70 @@
 import random
 import string
+from datetime import datetime
 
 
-def user_json(name, email, phone, score=0) -> dict:
+def create_user_json(name, phone, platform) -> dict:
     char_set = string.ascii_uppercase + string.ascii_lowercase + string.digits
-    result = ''.join(random.sample(char_set * 6, 6))
-    return {'_id': result, 'phone': phone, 'username': name, "email": email, "score": score}
+    random_id = ''.join(random.sample(char_set * 6, 6))
+    return {'_id': random_id, 'phone': phone, 'username': name, "score": 0, "xp": 0, "coin": 0, "image": 0, "token": 0,
+            "open_game_id": "", "platform": platform, "last_time_played": datetime(2000, 1, 1),
+            "last_time_chance": datetime(2000, 1, 1), "is_active": True, "join_date": datetime.now()}
 
 
 class UsersCollectionManager:
     def __init__(self, collection):
         self.collection = collection
 
-    def create_user(self, phone, name, email=""):
-        query = {'phone': phone}
-        if self.collection.find_one(query) is None:
-            self.collection.insert_one(user_json(phone=phone, name=name, email=email))
-            return True
+    def is_phone_avaialble(self, phone_number: str):
+        if len(phone_number) != 10:
+            return False
+        if phone_number[0] != "9":
+            return False
+        query = {'phone': phone_number}
+        return self.collection.find_one(query) is None
+
+    def create_user(self, phone, name, platform="Android"):
+        if self.is_phone_avaialble(phone):
+            user_data = create_user_json(phone=phone, name=name, platform=platform)
+            self.collection.insert_one(user_data)
+            return user_data
         else:
             print("bad number")
-            return False
+            return None
 
     def read_user(self, user_id):
         query = {'_id': user_id}
         user_Data = self.collection.find_one(query)
         return user_Data
 
-    def update_user(self, user_id):
+    def update_user(self, user_id, username=None, score=None, xp=None, coin=None, image=None, token=None,
+                    open_game_id=None, platform=None, last_time_played=None, last_time_chance=None, is_active=None):
         query = {'_id': user_id}
-        self.collection.find_one_and_update(query, {'$set': {"score": 15}})
+        update_data = {}
+        if username is not None:
+            update_data['username'] = username
+        if score is not None:
+            update_data['score'] = score
+        if xp is not None:
+            update_data['xp'] = xp
+        if coin is not None:
+            update_data['coin'] = coin
+        if image is not None:
+            update_data['image'] = image
+        if token is not None:
+            update_data['token'] = token
+        if open_game_id is not None:
+            update_data['open_game_id'] = open_game_id
+        if platform is not None:
+            update_data['platform'] = platform
+        if last_time_played is not None:
+            update_data['last_time_played'] = last_time_played
+        if last_time_chance is not None:
+            update_data['last_time_chance'] = last_time_chance
+        if is_active is not None:
+            update_data['is_active'] = is_active
+        self.collection.find_one_and_update(query, {'$set': update_data})
 
     def delete_user(self, user_id):
         query = {'_id': user_id}
-        self.user_col.delete_one(query)
+        self.collection.delete_one(query)

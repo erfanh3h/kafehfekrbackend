@@ -11,4 +11,5 @@ class DataBaseManager:
 
 
 game_databasae = DataBaseManager()
-game_databasae.users_manager.create_user("989121234567","Erfan")
+# print(game_databasae.users_manager.create_user("1221234567", "Erfan"))
+# game_databasae.users_manager.update_user("K2dWiy", xp=120, score=100)
