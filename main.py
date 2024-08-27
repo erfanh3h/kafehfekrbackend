@@ -4,7 +4,7 @@ import socketio
 import uvicorn
 
 from Entities.SocketIOClass import Socket_Server
-from Entities.Database import game_databasae
+from Entities.Database import game_database
 app = socketio.ASGIApp(Socket_Server)
 logging.basicConfig(level=logging.DEBUG)
 if __name__ == '__main__':

@@ -14,7 +14,7 @@ class GameQueueSessionDetails:
     def __init__(self, game_type, game_score_type):
         self.queuers: list[QueuerModel] = []
         self.game_type = game_type
-        self.game_score_type = game_type
+        self.game_score_type = game_score_type
         self.queue_must_run = True
 
     def queuers_length(self) -> int:

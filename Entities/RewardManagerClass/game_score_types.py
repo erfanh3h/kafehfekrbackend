@@ -4,5 +4,5 @@ from enum import Enum
 class GameScoreTypesEnum(Enum):
     RANK = "Rank"
     NORMAL = "Normal"
-    LOBBY = "LOBBY"
+    LOBBY = "Lobby"
     C = "C"

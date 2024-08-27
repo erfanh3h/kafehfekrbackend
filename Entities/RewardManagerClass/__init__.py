@@ -5,24 +5,22 @@ from datetime import datetime
 
 
 class RewardManagerClass:
-    def __init__(self, game_score_type, game_id):
+    def __init__(self, game_score_type, game_id, game_type):
         self.player1_user_id = ""
         self.player2_user_id = ""
-        self.game_type = GameTypesEnum.BACKGAMMON
         self.game_score_type = game_score_type
         self.game_id = game_id
-
-    def set_data(self, player1_user_id, player2_user_id, game_type):
-        self.player1_user_id = player1_user_id
-        self.player2_user_id = player2_user_id
         self.game_type = game_type
 
+    def set_user_data(self, player1_user_id, player2_user_id):
+        self.player1_user_id = player1_user_id
+        self.player2_user_id = player2_user_id
+
     def finish_game(self, winner_gamer_id):
-        from Entities.Database import game_databasae
+        from Entities.Database import game_database
         win_score, lose_score, draw_score, win_xp, lose_xp, draw_xp, win_coin, lose_coin, draw_coin = self.get_reward_data()
-        users_data = game_databasae.users_manager.read_users([self.player1_user_id, self.player2_user_id])
-        user1_data = users_data[0]
-        user2_data = users_data[1]
+        user1_data = game_database.users_manager.read_user(self.player1_user_id)
+        user2_data = game_database.users_manager.read_user(self.player2_user_id)
         if winner_gamer_id == 0:
             user1_new_score = user1_data['score'] + draw_score
             user1_new_xp = user1_data['xp'] + draw_xp
@@ -51,18 +49,20 @@ class RewardManagerClass:
                 user1_new_xp = user1_data['xp'] + lose_xp
                 user1_new_coin = user1_data['coin'] + lose_coin
                 user1_history = {f"{str(self.game_type.value).lower()}_lose": 1, "lose": 1}
-        game_databasae.users_manager.update_user(self.player1_user_id, score=user1_new_score, xp=user1_new_xp,
-                                                 coin=user1_new_coin, open_game_id="", last_time_played=datetime.now())
-        game_databasae.users_manager.update_user(self.player2_user_id, score=user2_new_score, xp=user2_new_xp,
-                                                 coin=user2_new_coin, open_game_id="", last_time_played=datetime.now())
-        game_databasae.user_history_manager.update_user_history(self.player1_user_id, user1_history)
-        game_databasae.user_history_manager.update_user_history(self.player2_user_id, user2_history)
-        game_databasae.game_history_manager.update_game_history(self.game_id, winner_gamer_id)
+        game_database.users_manager.update_user(self.player1_user_id, score=user1_new_score, xp=user1_new_xp,
+                                                coin=user1_new_coin, open_game_id="", last_time_played=datetime.now())
+        game_database.users_manager.update_user(self.player2_user_id, score=user2_new_score, xp=user2_new_xp,
+                                                coin=user2_new_coin, open_game_id="", last_time_played=datetime.now())
+        game_database.user_history_manager.update_user_history(self.player1_user_id, user1_history)
+        game_database.user_history_manager.update_user_history(self.player2_user_id, user2_history)
+        game_database.game_history_manager.update_game_history(self.game_id, winner_gamer_id)
         print("winner  :  ", winner_gamer_id)
 
     def get_reward_data(self):
-        is_rank = self.game_score_type == GameScoreTypesEnum.RANK
-        is_lobby = self.game_score_type == GameScoreTypesEnum.LOBBY
+        # TODO : uncomment this
+        is_rank = True
+        # is_rank = self.game_score_type == GameScoreTypesEnum.RANK
+        # is_lobby = self.game_score_type == GameScoreTypesEnum.LOBBY
         if self.game_type == GameTypesEnum.BACKGAMMON:
             if is_rank:
                 return reward_data.backgammon_rank_data()

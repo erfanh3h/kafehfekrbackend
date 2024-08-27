@@ -67,7 +67,8 @@ game_type_class_pairs = {GameTypesEnum.TIC_TAC_TOE.value: TicTacToeGameSession,
 
 
 def add_new_game(game_id, queuers, game_type, game_score_type):
-    gameSession = game_type_class_pairs[game_type](game_id=game_id, game_score_type=game_score_type)
+    gameSession = game_type_class_pairs[game_type.value](game_id=game_id, game_type=game_type,
+                                                         game_score_type=game_score_type)
     gameSession.add_gamer(GamerModel(user_id=queuers[0].user_id, username=queuers[0].username))
     gameSession.add_gamer(GamerModel(user_id=queuers[1].user_id, username=queuers[1].username))
     gameSession.start_game_timer()
@@ -91,13 +92,12 @@ class GameSocketNameSpace(socketio.AsyncNamespace):
         #     await my_message(socket_id, {'Test': f'{socket_id}'})
 
         if is_game_id_valid(user_game_id):
-            # TODO return this
-            # if games[user_game_id].gamer_idies.__contains__(user_id):
-            await self.enter_room(socket_id, user_game_id, namespace="/game")
-            games[user_game_id].join_gamer(user_id, socket_id)
-            socketid_gameid_pairs[socket_id] = user_game_id
-            # else:
-            #     await Socket_Server.disconnect(socket_id, namespace="/game")
+            if games[user_game_id].gamer_idies.__contains__(user_id):
+                await self.enter_room(socket_id, user_game_id, namespace="/game")
+                games[user_game_id].join_gamer(user_id, socket_id)
+                socketid_gameid_pairs[socket_id] = user_game_id
+            else:
+                await self.disconnect(socket_id, namespace="/game")
         else:
             await self.disconnect(socket_id, namespace="/game")
 

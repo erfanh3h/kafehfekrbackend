@@ -70,6 +70,7 @@ class UsersCollectionManager:
             update_data['last_time_chance'] = last_time_chance
         if is_active is not None:
             update_data['is_active'] = is_active
+        print(update_data)
         self.collection.find_one_and_update(query, {'$set': update_data})
 
     def delete_user(self, user_id):

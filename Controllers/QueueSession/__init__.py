@@ -19,9 +19,10 @@ class BaseQueueSession:
         self.queue_must_run = True
 
     def init_session(self):
-        games = [game.value for game in GameTypesEnum]
-        for game in games:
-            self.queues[game] = GameQueueSessionDetails(game, self.game_score_type)
+        games_values = [game.value for game in GameTypesEnum]
+        games_enums = [game for game in GameTypesEnum]
+        for index,item in enumerate(games_values):
+            self.queues[games_values[index]] = GameQueueSessionDetails(games_enums[index], self.game_score_type)
 
         def check_start_new_game():
             while True:
@@ -29,7 +30,7 @@ class BaseQueueSession:
                     if self.queues[key].queuers_length() >= 2:
                         self.queues[key].start_game()
                     if len(self.queues[key].queuers) > 0:
-                        print(f"{self.queues[key].game_type} queuer len : ", len(self.queues[key].queuers))
+                        print(f"{self.queues[key].game_type.value} queuer len : ", len(self.queues[key].queuers))
                 print("---------------------")
                 time.sleep(5)
 

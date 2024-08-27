@@ -12,7 +12,7 @@ from Models.Gamer import GamerModel
 
 
 class BaseGameSession:
-    def __init__(self, game_id: str, game_score_type):
+    def __init__(self, game_id: str, game_type, game_score_type):
         # self.temp_gamers: list[GamerModel] = [GamerModel(user_id=i, username=str(i)) for i in range(2)]
         self.gamers: list[GamerModel] = []
         self.timer = TimerClass()
@@ -20,12 +20,11 @@ class BaseGameSession:
         self.game_id = game_id
         self.is_game_running = False
         self.gamer_idies = []
-        self.game_type: GameTypesEnum = GameTypesEnum.BACKGAMMON
-        self.score_manager = RewardManagerClass(game_score_type, game_id)
+        self.game_type = game_type
+        self.game_score_type = game_score_type
+        self.score_manager = RewardManagerClass(game_score_type, game_id, game_type)
 
     def start_game_timer(self):
-        self.score_manager.set_data(self.gamers[0].user_id, self.gamers[1].user_id, self.game_type)
-
         def entrypoint():
             self.check_start_game()
 
@@ -115,7 +114,13 @@ class BaseGameSession:
         for gamer_id in range(0, len(self.gamers)):
             self.gamers[gamer_id].gamer_id = gamer_id + 1
             self.gamers[gamer_id].team_id = gamer_id + 1
-        # self.gamers.reverse()
+        self.score_manager.set_user_data(self.gamers[0].user_id, self.gamers[1].user_id)
+        from Entities.Database import game_database
+        game_database.game_history_manager.create_game_history(self.gamers[0].user_id, self.gamers[1].user_id,
+                                                               str(self.game_type.value),
+                                                               str(self.game_score_type.value))
+        game_database.users_manager.update_user(self.gamers[0].user_id, open_game_id=self.game_id, )
+        game_database.users_manager.update_user(self.gamers[1].user_id, open_game_id=self.game_id, )
 
     async def send_command(self, command_id, command_data):
         from Entities.SocketIOManagerClass import send_command
