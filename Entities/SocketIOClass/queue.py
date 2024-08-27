@@ -3,7 +3,7 @@ import socketio
 from Commons import static_functions
 from Controllers.QueueSession import BaseQueueSession
 from Entities.Games.game_types import GameTypesEnum
-from Entities.ScoreManagerClass import GameScoreTypesEnum
+from Entities.RewardManagerClass import GameScoreTypesEnum
 from Models.Queuer import QueuerModel
 
 queue_session = BaseQueueSession(GameScoreTypesEnum.NORMAL)

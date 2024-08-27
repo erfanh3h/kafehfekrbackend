@@ -28,9 +28,14 @@ class UserHistoryCollectionManager:
     def update_user_history(self, user_id, incoming_data: dict):
         query = {'_id': user_id}
         update_data = {}
+        user_data = self.read_user_history(user_id)
         for key in incoming_data.keys():
             if self.game_types.__contains__(key) or ["win", "draw", "lose"].__contains__(key):
-                update_data[key] = incoming_data[key]
+                # check prevoisly data was added
+                if user_data.keys().__contains__(key):
+                    update_data[key] = incoming_data[key] + user_data[key]
+                else:
+                    update_data[key] = incoming_data[key]
         self.collection.find_one_and_update(query, {'$set': update_data})
 
     def delete_user_history(self, user_id):

@@ -19,7 +19,7 @@ from Controllers.GameSession.ten_game_session import TenGameSession
 from Controllers.GameSession.tictactoe_game_session import TicTacToeGameSession
 from Controllers.GameSession.yatzy_game_session import YatzyGameSession
 from Entities.Games.game_types import GameTypesEnum
-from Entities.ScoreManagerClass import GameScoreTypesEnum
+from Entities.RewardManagerClass import GameScoreTypesEnum
 from Models.Gamer import GamerModel
 
 # current_game_id = "gameId"

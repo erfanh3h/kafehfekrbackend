@@ -6,7 +6,7 @@ from Commons import commands
 from Commons.static_functions import make_command_json
 from Entities.Games.base_game_class import BaseGameClass
 from Entities.Games.game_types import GameTypesEnum
-from Entities.ScoreManagerClass import ScoreManagerClass
+from Entities.RewardManagerClass import RewardManagerClass
 from Entities.TimerClass import TimerClass
 from Models.Gamer import GamerModel
 
@@ -21,7 +21,7 @@ class BaseGameSession:
         self.is_game_running = False
         self.gamer_idies = []
         self.game_type: GameTypesEnum = GameTypesEnum.BACKGAMMON
-        self.score_manager = ScoreManagerClass(game_score_type)
+        self.score_manager = RewardManagerClass(game_score_type, game_id)
 
     def start_game_timer(self):
         self.score_manager.set_data(self.gamers[0].user_id, self.gamers[1].user_id, self.game_type)

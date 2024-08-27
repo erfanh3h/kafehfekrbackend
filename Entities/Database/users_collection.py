@@ -36,6 +36,14 @@ class UsersCollectionManager:
         user_Data = self.collection.find_one(query)
         return user_Data
 
+    def read_users(self, users):
+        query = {'_id': {"$in": users}}
+        user_Data = self.collection.find(query)
+        result = []
+        for user in user_Data:
+            result.append(user)
+        return result
+
     def update_user(self, user_id, username=None, score=None, xp=None, coin=None, image=None, token=None,
                     open_game_id=None, platform=None, last_time_played=None, last_time_chance=None, is_active=None):
         query = {'_id': user_id}
