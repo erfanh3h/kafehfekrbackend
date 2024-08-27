@@ -9,8 +9,8 @@ from Controllers.GameSession import BaseGameSession
 
 
 class ChessGameSession(BaseGameSession):
-    def __init__(self, game_id: str, game_score_type):
-        super().__init__(game_id, game_score_type)
+    def __init__(self, game_id: str, game_type, game_score_type):
+        super().__init__(game_id, game_type, game_score_type)
 
     async def send_command(self, command_id, command_data):
         if command_id == commands.Finish_Game:
@@ -45,14 +45,15 @@ class ChessGameSession(BaseGameSession):
         from Entities.SocketIOManagerClass import send_command
         if self.game_controller.is_game_finished:
             winner = self.game_controller.get_game_winner()
-            self.finish_game(winner)
             if not self.game_controller.is_finish_message_delivered:
                 asyncio.new_event_loop().run_until_complete(
                     send_command(
                         command=make_command_json(id=commands.Finish_Game, data={"Winner": winner}),
                         game_id=self.game_id))
+            self.finish_game(winner)
         else:
             asyncio.new_event_loop().run_until_complete(
-                send_command(command=make_command_json(id=commands.Current_Turn, data=self.game_controller.current_turn),
-                             game_id=self.game_id))
+                send_command(
+                    command=make_command_json(id=commands.Current_Turn, data=self.game_controller.current_turn),
+                    game_id=self.game_id))
             self.timer.start(Chess_Turn_Time, self.send_current_turn)

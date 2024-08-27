@@ -9,8 +9,8 @@ from Controllers.GameSession import BaseGameSession
 
 
 class DotBoxGameSession(BaseGameSession):
-    def __init__(self, game_id: str, game_score_type):
-        super().__init__(game_id, game_score_type)
+    def __init__(self, game_id: str, game_type, game_score_type):
+        super().__init__(game_id, game_type, game_score_type)
 
     async def send_command(self, command_id, command_data):
         if command_id == commands.Finish_Game:
@@ -32,7 +32,7 @@ class DotBoxGameSession(BaseGameSession):
             peace_id = data['data']
             is_selection_correct = self.game_controller.check_authority(peace_id, gamer_id)
             if is_selection_correct:
-                is_win_box_happened =  await self.game_controller.recieve_data(data['id'], peace_id, gamer_id)
+                is_win_box_happened = await self.game_controller.recieve_data(data['id'], peace_id, gamer_id)
                 if not is_win_box_happened:
                     self.timer.stop()
 
@@ -47,4 +47,3 @@ class DotBoxGameSession(BaseGameSession):
             send_command(command=make_command_json(id=commands.Current_Turn, data=self.game_controller.current_turn),
                          game_id=self.game_id))
         self.timer.start(DotBox_Turn_Time, self.send_current_turn)
-

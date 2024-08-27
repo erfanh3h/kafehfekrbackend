@@ -116,7 +116,8 @@ class BaseGameSession:
             self.gamers[gamer_id].team_id = gamer_id + 1
         self.score_manager.set_user_data(self.gamers[0].user_id, self.gamers[1].user_id)
         from Entities.Database import game_database
-        game_database.game_history_manager.create_game_history(self.gamers[0].user_id, self.gamers[1].user_id,
+        game_database.game_history_manager.create_game_history(self.game_id, self.gamers[0].user_id,
+                                                               self.gamers[1].user_id,
                                                                str(self.game_type.value),
                                                                str(self.game_score_type.value))
         game_database.users_manager.update_user(self.gamers[0].user_id, open_game_id=self.game_id, )
@@ -180,3 +181,5 @@ class BaseGameSession:
 
     def finish_game(self, winner_gamer_id):
         self.score_manager.finish_game(winner_gamer_id)
+        from Entities.SocketIOClass.game import delete_game
+        delete_game(self.game_id)

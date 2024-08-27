@@ -298,14 +298,14 @@ def rpc_normal_data():
 
 
 def rpc_rank_data():
-    win_score = 1
-    lose_score = -1
+    win_score = 11
+    lose_score = -11
     draw_score = 0
-    win_xp = 1
-    lose_xp = -1
+    win_xp = 13
+    lose_xp = -13
     draw_xp = 0
-    win_coin = 1
-    lose_coin = -1
+    win_coin = 12
+    lose_coin = -12
     draw_coin = 0
     return win_score, lose_score, draw_score, win_xp, lose_xp, draw_xp, win_coin, lose_coin, draw_coin
 

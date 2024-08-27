@@ -11,8 +11,8 @@ from Controllers.GameSession import BaseGameSession
 
 
 class OthelloGameSession(BaseGameSession):
-    def __init__(self, game_id: str, game_score_type):
-        super().__init__(game_id, game_score_type)
+    def __init__(self, game_id: str, game_type, game_score_type):
+        super().__init__(game_id, game_type, game_score_type)
 
     async def send_command(self, command_id, command_data):
         if command_id == commands.Finish_Game:

@@ -1,19 +1,17 @@
 from datetime import datetime
-from Commons.static_functions import create_random_game_id
 
 
-def create_game_history_json(user1_id, user2_id, game_type, game_score_type) -> dict:
-    random_id = create_random_game_id()
-    return {'_id': random_id, 'user1_id': user1_id, 'user2_id': user2_id, "game_type": game_type,
-            "game_score_type": game_score_type, "is_finished": False, "start_date": datetime.now(),}
+def create_game_history_json(game_id, user1_id, user2_id, game_type, game_score_type) -> dict:
+    return {'_id': game_id, 'user1_id': user1_id, 'user2_id': user2_id, "game_type": game_type,
+            "game_score_type": game_score_type, "is_finished": False, "start_date": datetime.now(), }
 
 
 class GameHistoryCollectionManager:
     def __init__(self, collection):
         self.collection = collection
 
-    def create_game_history(self, user1_id, user2_id, game_type, game_score_type):
-        game_data = create_game_history_json(user1_id, user2_id, game_type, game_score_type)
+    def create_game_history(self, game_id, user1_id, user2_id, game_type, game_score_type):
+        game_data = create_game_history_json(game_id, user1_id, user2_id, game_type, game_score_type)
         self.collection.insert_one(game_data)
         return game_data
 

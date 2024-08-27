@@ -11,13 +11,12 @@ from Controllers.GameSession import BaseGameSession
 
 
 class RPCGameSession(BaseGameSession):
-    def __init__(self, game_id: str, game_score_type):
-        super().__init__(game_id, game_score_type)
+    def __init__(self, game_id: str, game_type, game_score_type):
+        super().__init__(game_id, game_type, game_score_type)
 
     def start_game_timer(self):
         self.game_controller = RPCGameClass(send_data_function=self.send_command)
         self.game_type = GameTypesEnum.RPC
-        self.score_manager.set_data(self.gamers[0].user_id, self.gamers[1].user_id, self.game_type)
 
         def entrypoint():
             self.check_start_game()

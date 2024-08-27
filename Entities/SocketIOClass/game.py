@@ -76,10 +76,14 @@ def add_new_game(game_id, queuers, game_type, game_score_type):
     game_idies.append(game_id)
 
 
+def delete_game(game_id):
+    del games[game_id]
+    game_idies.remove(game_id)
+
+
 class GameSocketNameSpace(socketio.AsyncNamespace):
     async def on_connect(self, socket_id, environ, auth):
         print('connect ', socket_id)
-        print(environ)
         if auth is not None:
             try:
                 user_id = auth['user_id']
@@ -105,7 +109,10 @@ class GameSocketNameSpace(socketio.AsyncNamespace):
         game_id = return_gameid_from_socketid(socket_id)
         if game_id is not None:
             await self.leave_room(socket_id, game_id, namespace="/game")
-            games[game_id].disconnect_user(socket_id)
+            try:
+                games[game_id].disconnect_user(socket_id)
+            except KeyError:
+                pass
             del socketid_gameid_pairs[socket_id]
         print('disconnect ', socket_id)
 

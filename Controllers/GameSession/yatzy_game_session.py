@@ -10,8 +10,8 @@ from Controllers.GameSession import BaseGameSession
 
 
 class YatzyGameSession(BaseGameSession):
-    def __init__(self, game_id: str, game_score_type):
-        super().__init__(game_id, game_score_type)
+    def __init__(self, game_id: str, game_type, game_score_type):
+        super().__init__(game_id, game_type, game_score_type)
 
     async def send_command(self, command_id, command_data):
         if command_id == commands.Finish_Game:
@@ -82,11 +82,11 @@ class YatzyGameSession(BaseGameSession):
         self.game_controller.change_turn()
         if self.game_controller.is_game_finished:
             winner_id = self.game_controller.get_game_winner()
-            self.finish_game(winner_id)
             if not self.game_controller.is_finish_message_delivered:
                 asyncio.new_event_loop().run_until_complete(send_command(
                     command=make_command_json(id=commands.Finish_Game, data={"Winner": winner_id}),
                     game_id=self.game_id, ))
+            self.finish_game(winner_id)
             return
         gamer1_data = self.find_gamer_from_gamer_id(1)
         gamer2_data = self.find_gamer_from_gamer_id(2)
