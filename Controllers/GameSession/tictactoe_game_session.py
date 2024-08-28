@@ -53,10 +53,12 @@ class TicTacToeGameSession(BaseGameSession):
         self.timer.start(TicTacToe_Turn_Time, self.send_current_turn)
 
     def change_round(self):
-        time.sleep(TicTacToe_Sleep_Round_Time)
-        self.game_controller.change_round()
-        from Entities.SocketIOManagerClass import send_command
-        asyncio.new_event_loop().run_until_complete(
-            send_command(command=make_command_json(id=commands.New_Round, data=self.game_controller.current_round),
-                         game_id=self.game_id))
-        self.send_current_turn()
+        def function():
+            self.game_controller.change_round()
+            from Entities.SocketIOManagerClass import send_command
+            asyncio.new_event_loop().run_until_complete(
+                send_command(command=make_command_json(id=commands.New_Round, data=self.game_controller.current_round),
+                             game_id=self.game_id))
+            self.send_current_turn()
+
+        self.timer.start(TicTacToe_Sleep_Round_Time, function)

@@ -1,3 +1,4 @@
+Start_Game_Time = 5
 TicTacToe_Turn_Time = 10
 TicTacToe_Sleep_Round_Time = 5
 RPC_Turn_Round_Time = 5

@@ -103,7 +103,8 @@ class GameSocketNameSpace(socketio.AsyncNamespace):
             else:
                 await self.disconnect(socket_id, namespace="/game")
         else:
-            await self.disconnect(socket_id, namespace="/game")
+            await self.emit('command', {'id': 'GameFinished'}, to=socket_id, namespace="/game")
+            # await self.disconnect(socket_id, namespace="/game")
 
     async def on_disconnect(self, socket_id):
         game_id = return_gameid_from_socketid(socket_id)

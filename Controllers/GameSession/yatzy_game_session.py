@@ -31,8 +31,7 @@ class YatzyGameSession(BaseGameSession):
             if self.check_all_players_joined():
                 self.is_game_running = True
                 self.prepare_gamers()
-                self.send_game_data()
-                self.send_current_turn()
+                self.send_game_data(self.send_current_turn)
                 break
             time.sleep(2)
 

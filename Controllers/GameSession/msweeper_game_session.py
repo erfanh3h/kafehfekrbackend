@@ -35,8 +35,7 @@ class MSweeperGameSession(BaseGameSession):
             if self.check_all_players_joined():
                 self.is_game_running = True
                 self.prepare_gamers()
-                self.send_game_data()
-                self.send_start_game()
+                self.send_game_data(self.send_start_game)
                 break
             time.sleep(2)
 

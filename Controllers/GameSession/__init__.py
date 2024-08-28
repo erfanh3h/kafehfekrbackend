@@ -5,7 +5,7 @@ import time
 from Commons import commands
 from Commons.static_functions import make_command_json
 from Entities.Games.base_game_class import BaseGameClass
-from Entities.Games.game_types import GameTypesEnum
+from Entities.Games.wait_times import Start_Game_Time
 from Entities.RewardManagerClass import RewardManagerClass
 from Entities.TimerClass import TimerClass
 from Models.Gamer import GamerModel
@@ -42,9 +42,7 @@ class BaseGameSession:
             if self.check_all_players_joined():
                 self.is_game_running = True
                 self.prepare_gamers()
-                self.send_game_data()
-                self.game_controller.change_turn()
-                self.send_current_turn()
+                self.send_game_data(self.send_current_turn)
                 break
             time.sleep(2)
 
@@ -88,13 +86,14 @@ class BaseGameSession:
             else:
                 self.gamers[gamer_index].join_game(socket_id)
 
-    def send_game_data(self):
+    def send_game_data(self , function):
         game_data = {'gamers': []}
         for gamer in self.gamers:
             game_data['gamers'].append(gamer.to_json())
         from Entities.SocketIOManagerClass import send_command
         asyncio.new_event_loop().run_until_complete(
             send_command(command=make_command_json(id=commands.Game_Data, data=game_data), game_id=self.game_id))
+        self.timer.start(Start_Game_Time, function)
 
     def send_reconnect_data(self, socket_id):
         reconnect_data = {'gamers': []}

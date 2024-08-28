@@ -29,8 +29,7 @@ class RPCGameSession(BaseGameSession):
             if self.check_all_players_joined():
                 self.is_game_running = True
                 self.prepare_gamers()
-                self.send_game_data()
-                self.start_new_turn_round()
+                self.send_game_data(self.start_new_turn_round)
                 break
             time.sleep(2)
 
