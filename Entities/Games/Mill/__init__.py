@@ -9,8 +9,8 @@ class MillGameClass(BaseGameClass):
         self.symbol_2 = 2
         self.board = [0 for i in range(24)]
         self.current_round = 1
-        self.player1_peaces = 4
-        self.player2_peaces = 4
+        self.player1_peaces = 10
+        self.player2_peaces = 10
         self.player1_played_peaces = 0
         self.player2_played_peaces = 0
         self.player1_removed_peaces = 0
