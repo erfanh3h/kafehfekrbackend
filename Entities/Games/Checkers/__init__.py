@@ -16,6 +16,12 @@ def get_peace_of_coordinate(x, y):
     return peace_number
 
 
+def is_valid_coordinate(col, row):
+    if 0 <= row < 8 and 0 <= col < 8:
+        return True
+    return False
+
+
 class CheckersGameClass(BaseGameClass):
     def __init__(self, send_data_function):
         super().__init__(send_data_function)
@@ -155,7 +161,8 @@ class CheckersGameClass(BaseGameClass):
             if self.is_target_peace_enemy(new_r_index, new_c_index, gamer_id):
                 new_r1_index = new_r_index - 1
                 new_c1_index = new_c_index + 1
-                if new_r1_index >= 0 and new_c1_index <= 7 and self.is_target_peace_empty(new_r1_index, new_c1_index):
+                if is_valid_coordinate(new_c1_index, new_r1_index) and self.is_target_peace_empty(new_r1_index,
+                                                                                                  new_c1_index):
                     self.check_move_list.append(
                         ((new_r1_index, new_c1_index), (new_r_index, new_c_index), (r_index, c_index), True))
                 return None, None, None, False
@@ -173,7 +180,8 @@ class CheckersGameClass(BaseGameClass):
             if self.is_target_peace_enemy(new_r_index, new_c_index, gamer_id):
                 new_r1_index = new_r_index + 1
                 new_c1_index = new_c_index + 1
-                if new_r1_index >= 0 and new_c1_index <= 7 and self.is_target_peace_empty(new_r1_index, new_c1_index):
+                if is_valid_coordinate(new_c1_index, new_r1_index) and self.is_target_peace_empty(new_r1_index,
+                                                                                                  new_c1_index):
                     self.check_move_list.append(
                         ((new_r1_index, new_c1_index), (new_r_index, new_c_index), (r_index, c_index), True))
                 return None, None, None, False
@@ -191,7 +199,8 @@ class CheckersGameClass(BaseGameClass):
             if self.is_target_peace_enemy(new_r_index, new_c_index, gamer_id):
                 new_r1_index = new_r_index + 1
                 new_c1_index = new_c_index - 1
-                if new_r1_index >= 0 and new_c1_index >= 0 and self.is_target_peace_empty(new_r1_index, new_c1_index):
+                if is_valid_coordinate(new_c1_index, new_r1_index) and self.is_target_peace_empty(new_r1_index,
+                                                                                                  new_c1_index):
                     self.check_move_list.append(
                         ((new_r1_index, new_c1_index), (new_r_index, new_c_index), (r_index, c_index), True))
                 return None, None, None, False
@@ -209,7 +218,8 @@ class CheckersGameClass(BaseGameClass):
             if self.is_target_peace_enemy(new_r_index, new_c_index, gamer_id):
                 new_r1_index = new_r_index - 1
                 new_c1_index = new_c_index - 1
-                if new_r1_index >= 0 and new_c1_index >= 0 and self.is_target_peace_empty(new_r1_index, new_c1_index):
+                if is_valid_coordinate(new_c1_index, new_r1_index) and self.is_target_peace_empty(new_r1_index,
+                                                                                                  new_c1_index):
                     self.check_move_list.append(
                         ((new_r1_index, new_c1_index), (new_r_index, new_c_index), (r_index, c_index), True))
                 return None, None, None, False
@@ -288,11 +298,11 @@ class CheckersGameClass(BaseGameClass):
         print(moves)
         for move_data in moves:
             if move_data[0] == (t_r_index, t_c_index):
-                self.board[s_c_index][s_r_index].remove_pawn_gamer()
-                if self.check_is_last_peace(t_c_index, gamer_id):
+                if self.check_is_last_peace(t_c_index, gamer_id) or self.board[s_c_index][s_r_index].is_super_pawn:
                     self.board[t_c_index][t_r_index].set_pawn_gamer_id(gamer_id, True)
                 else:
                     self.board[t_c_index][t_r_index].set_pawn_gamer_id(gamer_id, False)
+                self.board[s_c_index][s_r_index].remove_pawn_gamer()
                 if move_data[1] is not None:
                     remove_point = move_data[1]
                     source_peace_index = move_data[2]

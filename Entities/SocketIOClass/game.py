@@ -77,8 +77,11 @@ def add_new_game(game_id, queuers, game_type, game_score_type):
 
 
 def delete_game(game_id):
-    del games[game_id]
-    game_idies.remove(game_id)
+    try:
+        del games[game_id]
+        game_idies.remove(game_id)
+    except:
+        pass
 
 
 class GameSocketNameSpace(socketio.AsyncNamespace):
