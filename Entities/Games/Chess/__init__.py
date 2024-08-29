@@ -40,6 +40,8 @@ class ChessGameClass(BaseGameClass):
         self.player1_hitted_pawns = 0
         self.player2_hitted_pawns = 0
         self.init_board()
+        self.is_player1_kish = False
+        self.is_player2_kish = False
 
     def __str__(self):
         board = """"""
@@ -94,6 +96,11 @@ class ChessGameClass(BaseGameClass):
                 return True
             if (self.current_hits.keys().__contains__(source_position) and
                     self.current_hits[source_position].__contains__(target_position)):
+                # this checks used for when user is check and become dc
+                if gamer_id == 1 and target_position == self.king2_position:
+                    self.king2_position = (-1, -1)
+                if gamer_id == 2 and target_position == self.king1_position:
+                    self.king1_position = (-1, -1)
                 self.move_piece(source_position, target_position, gamer_id)
                 await self.send_data_function(commands.Peace_Selected, {
                     "select_data": {'s_c_index': source_column_index, 's_r_index': source_row_index,
@@ -108,6 +115,11 @@ class ChessGameClass(BaseGameClass):
             winner = self.get_opponent_id(self.leaver_id)
         elif self.player1_hitted_pawns == 15 and self.player2_hitted_pawns == 15:
             winner = 0
+        # this is status when user could kill enemy king ( while he is check not move)
+        elif self.king1_position == (-1, -1):
+            winner = 2
+        elif self.king2_position == (-1, -1):
+            winner = 1
         elif self.current_turn == 1:
             winner = self.symbol_2
         else:
@@ -118,6 +130,10 @@ class ChessGameClass(BaseGameClass):
         if len(self.current_moves.keys()) == 0 and len(self.current_hits.keys()) == 0:
             return True
         if self.player1_hitted_pawns == 15 and self.player2_hitted_pawns == 15:
+            return True
+        if self.king1_position == (-1, -1) or self.king2_position == (-1, -1):
+            return True
+        if self.leaver_id != 0 :
             return True
         return False
 
@@ -373,8 +389,8 @@ class ChessGameClass(BaseGameClass):
         if source_position == (7, 4) and target_position == (7, 6):
             self.move_piece((7, 7), (7, 5), gamer_id)
         if source_position == (0, 4) and target_position == (0, 6):
-            self.move_piece((0, 7), (5, 5), gamer_id)
-        if source_position == (4, 4) and target_position == (0, 2):
+            self.move_piece((0, 7), (0, 5), gamer_id)
+        if source_position == (0, 4) and target_position == (0, 2):
             self.move_piece((0, 0), (0, 3), gamer_id)
         ##########
         # change king position
@@ -384,20 +400,18 @@ class ChessGameClass(BaseGameClass):
             self.king2_position = target_position
         ##########
 
-    # def get_king_checks(self, gamer_id: int):
-    #     self.king1_checks.clear()
-    #     self.king2_checks.clear()
+    # def get_is_king_check(self, gamer_id: int):
+    #     # self.king1_checks.clear()
+    #     # self.king2_checks.clear()
     #     if gamer_id == 1:
-    #         target_king_position = self.king2_position
-    #     else:
     #         target_king_position = self.king1_position
+    #     else:
+    #         target_king_position = self.king2_position
     #     for i in range(8):
     #         for j in range(8):
     #             position = (i, j)
-    #             if self.is_target_piece_mine(position, gamer_id):
+    #             if self.is_target_piece_enemey(position[0], position[1], gamer_id):
     #                 result_list = self.get_hit_list(position, gamer_id)
     #                 if result_list.__contains__(target_king_position):
-    #                     if gamer_id == 1:
-    #                         self.king2_checks.append(position)
-    #                     else:
-    #                         self.king1_checks.append(position)
+    #                     return True
+    #     return False

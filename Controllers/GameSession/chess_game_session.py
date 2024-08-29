@@ -37,10 +37,6 @@ class ChessGameSession(BaseGameSession):
                     self.timer.stop()
 
     def send_current_turn(self):
-        if self.game_controller.is_game_finished:
-            winner_id = self.game_controller.get_game_winner()
-            self.finish_game(winner_id)
-            return
         self.game_controller.change_turn()
         from Entities.SocketIOManagerClass import send_command
         if self.game_controller.is_game_finished:
