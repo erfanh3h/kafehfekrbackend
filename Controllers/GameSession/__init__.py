@@ -5,7 +5,7 @@ import time
 from Commons import commands
 from Commons.static_functions import make_command_json
 from Entities.Games.base_game_class import BaseGameClass
-from Entities.Games.wait_times import Start_Game_Time
+from Entities.Games.wait_times import Start_Game_Time, Join_Game_Limit_Time
 from Entities.RewardManagerClass import RewardManagerClass
 from Entities.TimerClass import TimerClass
 from Models.Gamer import GamerModel
@@ -23,11 +23,19 @@ class BaseGameSession:
         self.game_type = game_type
         self.game_score_type = game_score_type
         self.score_manager = RewardManagerClass(game_score_type, game_id, game_type)
+        self.is_game_terminated = False
+
+    # this use to close game if didnt started in last 20 sec
+    def join_game_limit_time(self):
+        if not self.is_game_running:
+            self.is_game_terminated = True
+            self.finish_game(-1)
 
     def start_game_timer(self):
         def entrypoint():
             self.check_start_game()
 
+        self.timer.start(Join_Game_Limit_Time, self.join_game_limit_time)
         t = threading.Thread(target=entrypoint, daemon=True)
         t.start()
 
@@ -39,8 +47,11 @@ class BaseGameSession:
 
     def check_start_game(self):
         while True:
+            if self.is_game_terminated:
+                break
             if self.check_all_players_joined():
                 self.is_game_running = True
+                self.timer.stop()
                 self.prepare_gamers()
                 self.send_game_data(self.send_current_turn)
                 break
@@ -86,7 +97,7 @@ class BaseGameSession:
             else:
                 self.gamers[gamer_index].join_game(socket_id)
 
-    def send_game_data(self , function):
+    def send_game_data(self, function):
         game_data = {'gamers': []}
         for gamer in self.gamers:
             game_data['gamers'].append(gamer.to_json())

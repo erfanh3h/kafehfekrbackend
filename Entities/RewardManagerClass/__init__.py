@@ -17,6 +17,8 @@ class RewardManagerClass:
         self.player2_user_id = player2_user_id
 
     def finish_game(self, winner_gamer_id):
+        if winner_gamer_id == -1:
+            return
         from Entities.Database import game_database
         win_score, lose_score, draw_score, win_xp, lose_xp, draw_xp, win_coin, lose_coin, draw_coin = self.get_reward_data()
         user1_data = game_database.users_manager.read_user(self.player1_user_id)

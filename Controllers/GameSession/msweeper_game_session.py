@@ -3,7 +3,7 @@ import threading
 import time
 
 from Entities.Games.game_types import GameTypesEnum
-from Entities.Games.wait_times import MSweeper_game_Time
+from Entities.Games.wait_times import MSweeper_game_Time, Join_Game_Limit_Time
 from Commons.static_functions import make_command_json
 from Commons import commands
 from Entities.Games.MSweeper import MSweeperGameClass
@@ -27,13 +27,17 @@ class MSweeperGameSession(BaseGameSession):
         def entrypoint():
             self.check_start_game()
 
+        self.timer.start(Join_Game_Limit_Time, self.join_game_limit_time)
         t = threading.Thread(target=entrypoint, daemon=True)
         t.start()
 
     def check_start_game(self):
         while True:
+            if self.is_game_terminated:
+                break
             if self.check_all_players_joined():
                 self.is_game_running = True
+                self.timer.stop()
                 self.prepare_gamers()
                 self.send_game_data(self.send_start_game)
                 break

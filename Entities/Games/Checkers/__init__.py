@@ -118,7 +118,8 @@ class CheckersGameClass(BaseGameClass):
         return self.board[c_index][r_index].pawn_gamer_id == 0
 
     def is_target_peace_enemy(self, r_index, c_index, gamer_id):
-        return self.board[c_index][r_index].pawn_gamer_id != gamer_id
+        return self.board[c_index][r_index].pawn_gamer_id != 0 and self.board[c_index][
+            r_index].pawn_gamer_id != gamer_id
 
     def add_pawns_to_board(self):
         self.board[0][0].set_pawn_gamer_id(1)
