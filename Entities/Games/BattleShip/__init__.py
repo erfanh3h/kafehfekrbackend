@@ -29,6 +29,7 @@ class BattleShipGameClass(BaseGameClass):
         self.player2_board_rdy = False
         self.is_play_phase = False
         self.current_turn = 1
+        self.is_current_turn_played = False  # this field use for when user win a selection and wana to not layed next choice
         self.is_turn_win_happened = False
         self.init_boards()
 
@@ -72,6 +73,7 @@ class BattleShipGameClass(BaseGameClass):
 
     def select_piece(self, index, gamer_id):
         self.is_turn_win_happened = False
+        self.is_current_turn_played = True
         if gamer_id == 1:
             y, x = get_coordinate_of_peace(index)
             self.player2_board[y][x].select()
@@ -124,7 +126,8 @@ class BattleShipGameClass(BaseGameClass):
                                 'is_turn_win_happened': self.is_turn_win_happened}})
             is_game_finished = self.check_end_game()
             if is_game_finished:
-                self.finish_game()
+                self.is_turn_win_happened = False
+                self.is_game_finished = True
                 game_winner = self.get_game_winner()
                 await self.send_data_function(commands.Finish_Game, {"Winner": game_winner})
                 return True
@@ -133,6 +136,7 @@ class BattleShipGameClass(BaseGameClass):
     def change_turn(self):
         self.is_play_phase = True
         self.is_turn_win_happened = False
+        self.is_current_turn_played = False
         if self.current_turn == 1:
             self.current_turn = self.symbol_2
         else:

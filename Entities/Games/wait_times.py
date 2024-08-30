@@ -20,6 +20,6 @@ Four_In_Row_Turn_Time = 15
 Sudoku_game_Time = 600
 BattleShip_Board_Time = 60
 BattleShip_Wait_Time = 4
-BattleShip_Turn_Time = 15
+BattleShip_Turn_Time = 12
 BoxFour_Turn_Time = 15
 BackGammon_Turn_Time = 30

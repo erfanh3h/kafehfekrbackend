@@ -96,7 +96,8 @@ class BattleShipGameSession(BaseGameSession):
                     game_id=self.game_id))
             self.timer.start(BattleShip_Turn_Time, self.send_current_turn)
 
-        if self.game_controller.is_turn_win_happened:
+        if self.game_controller.is_turn_win_happened and self.game_controller.is_current_turn_played:
+            self.game_controller.is_current_turn_played = False
             self.timer.start(BattleShip_Turn_Time, self.send_current_turn)
         else:
             asyncio.new_event_loop().run_until_complete(
