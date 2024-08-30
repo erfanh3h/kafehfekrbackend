@@ -172,17 +172,17 @@ class MSweeperGameClass(BaseGameClass):
                     self.player2_board[x][y].mine = True
             is_game_finished = self.check_end_game()
             if is_game_finished:
-                self.finish_game()
-                game_winner = self.get_game_winner()
-                await self.send_data_function(commands.Finish_Game, {"Winner": game_winner})
+                self.is_game_finished = True
+                # game_winner = self.get_game_winner()
+                # await self.send_data_function(commands.Finish_Game, {"Winner": game_winner})
                 return True
         elif command_id == commands.Select_Mine:
             await self.select_mine(x, y, gamer_id)
             is_game_finished = self.check_end_game()
             if is_game_finished:
-                self.finish_game()
-                game_winner = self.get_game_winner()
-                await self.send_data_function(commands.Finish_Game, {"Winner": game_winner})
+                self.is_game_finished = True
+                # game_winner = self.get_game_winner()
+                # await self.send_data_function(commands.Finish_Game, {"Winner": game_winner})
                 return True
         return False
 

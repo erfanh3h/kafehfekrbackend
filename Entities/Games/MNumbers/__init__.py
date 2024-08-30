@@ -54,8 +54,8 @@ class MNumbersGameClass(BaseGameClass):
             is_game_finished = self.check_game_ended()
             if is_game_finished:
                 self.is_game_finished = True
-                winner = self.get_game_winner()
-                await self.send_data_function(commands.Finish_Game, {'Winner': winner})
+                # winner = self.get_game_winner()
+                # await self.send_data_function(commands.Finish_Game, {'Winner': winner})
 
     def check_authority(self, data, gamer_id: int):
         if (self.current_turn == 1 and gamer_id != 1) or (self.current_turn == 2 and gamer_id != 2):

@@ -43,12 +43,12 @@ class TicTacToeGameClass(BaseGameClass):
         winner = self.check_winner()
         if winner is not None or self.counter == 9:
             if self.check_game_ended():
-                game_winner = self.get_game_winner()
-                await self.send_data_function(commands.Finish_Game, {"Winner": game_winner})
+                # game_winner = self.get_game_winner()
+                # await self.send_data_function(commands.Finish_Game, {"Winner": game_winner})
                 self.is_game_finished = True
             else:
                 self.is_round_finished = True
-                await self.send_data_function(commands.Finish_Round, {"Winner": winner})
+                # await self.send_data_function(commands.Finish_Round, {"Winner": winner})
 
     def check_authority(self, data, gamer_id: int):
         if (self.current_turn == 1 and gamer_id != 1) or (self.current_turn == 2 and gamer_id != 2):

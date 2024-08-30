@@ -72,8 +72,8 @@ class MillGameClass(BaseGameClass):
             await self.send_data_function(commands.Peace_Removed, {'user': gamer_id, 'target_peace': peace_number})
             is_game_ended = self.check_game_ended()
             if is_game_ended:
-                winner = self.get_game_winner()
-                await self.send_data_function(commands.Finish_Game, {"Winner": winner})
+                # winner = self.get_game_winner()
+                # await self.send_data_function(commands.Finish_Game, {"Winner": winner})
                 self.is_game_finished = True
 
     def check_authority(self, data, gamer_id: int):

@@ -1,10 +1,8 @@
 import asyncio
-import time
 
-from Entities.Games.Checkers import CheckersGameClass
 from Entities.Games.Othello import OthelloGameClass
 from Entities.Games.game_types import GameTypesEnum
-from Entities.Games.wait_times import Checkers_Turn_Time
+from Entities.Games.wait_times import Othello_Turn_Time
 from Commons.static_functions import make_command_json
 from Commons import commands
 from Controllers.GameSession import BaseGameSession
@@ -13,13 +11,6 @@ from Controllers.GameSession import BaseGameSession
 class OthelloGameSession(BaseGameSession):
     def __init__(self, game_id: str, game_type, game_score_type):
         super().__init__(game_id, game_type, game_score_type)
-
-    async def send_command(self, command_id, command_data):
-        if command_id == commands.Finish_Game:
-            self.timer.stop()
-        elif command_id == commands.Finish_Round:
-            pass
-        await super().send_command(command_id, command_data)
 
     def start_game_timer(self):
         self.game_controller = OthelloGameClass(send_data_function=self.send_command)
@@ -38,13 +29,17 @@ class OthelloGameSession(BaseGameSession):
                 self.timer.stop()
 
     def send_current_turn(self):
-        if self.game_controller.is_game_finished:
-            winner_id = self.game_controller.get_game_winner()
-            self.finish_game(winner_id)
+        from Entities.SocketIOManagerClass import send_command
+        if self.game_controller.check_game_ended():
+            winner = self.game_controller.get_game_winner()
+            asyncio.new_event_loop().run_until_complete(
+                send_command(
+                    command=make_command_json(id=commands.Finish_Game, data={"Winner": winner}),
+                    game_id=self.game_id))
+            self.finish_game(winner)
             return
         self.game_controller.change_turn()
-        from Entities.SocketIOManagerClass import send_command
         asyncio.new_event_loop().run_until_complete(
             send_command(command=make_command_json(id=commands.Current_Turn, data=self.game_controller.current_turn),
                          game_id=self.game_id))
-        self.timer.start(Checkers_Turn_Time, self.send_current_turn)
+        self.timer.start(Othello_Turn_Time, self.send_current_turn)

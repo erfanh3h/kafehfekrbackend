@@ -12,13 +12,6 @@ class ChessGameSession(BaseGameSession):
     def __init__(self, game_id: str, game_type, game_score_type):
         super().__init__(game_id, game_type, game_score_type)
 
-    async def send_command(self, command_id, command_data):
-        if command_id == commands.Finish_Game:
-            self.timer.stop()
-        elif command_id == commands.Finish_Round:
-            pass
-        await super().send_command(command_id, command_data)
-
     def start_game_timer(self):
         self.game_controller = ChessGameClass(send_data_function=self.send_command)
         self.game_type = GameTypesEnum.CHESS

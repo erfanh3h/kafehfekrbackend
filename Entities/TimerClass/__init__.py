@@ -22,11 +22,11 @@ class TimerClass:
         self.timer = threading.Timer(1, self.start_timer)
         self.timer.start()
 
-    def stop(self):
+    def stop(self, must_play_function=True):
         self.timer.cancel()
         self.is_canceled = True
         self.is_user_turn = False
-        if self.return_function is not None:
+        if self.return_function is not None and must_play_function:
             self.return_function()
 
     # develop this like to keep track of time for reconnect data

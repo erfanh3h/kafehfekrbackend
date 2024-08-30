@@ -128,8 +128,8 @@ class BattleShipGameClass(BaseGameClass):
             if is_game_finished:
                 self.is_turn_win_happened = False
                 self.is_game_finished = True
-                game_winner = self.get_game_winner()
-                await self.send_data_function(commands.Finish_Game, {"Winner": game_winner})
+                # game_winner = self.get_game_winner()
+                # await self.send_data_function(commands.Finish_Game, {"Winner": game_winner})
                 return True
         return False
 

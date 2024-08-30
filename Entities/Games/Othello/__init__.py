@@ -59,10 +59,11 @@ class OthelloGameClass(BaseGameClass):
     def change_turn(self):
         if self.current_turn == 1:
             self.current_turn = self.symbol_2
+            self.player2_pawns -= 1
         else:
             self.current_turn = self.symbol_1
+            self.player1_pawns -= 1
         self.current_move_list = self.get_legal_moves(self.current_turn)
-        print(self.current_move_list)
 
     async def recieve_data(self, command_id, data, gamer_id):
         print(command_id, data, gamer_id)
@@ -70,20 +71,15 @@ class OthelloGameClass(BaseGameClass):
             column_index = data['c_index']
             row_index = data['r_index']
             move = (column_index, row_index)
-            if gamer_id == 1:
-                self.player1_pawns -= 1
-            else:
-                self.player2_pawns -= 1
             self.flip_tiles(gamer_id, move)
-            print(self)
             await self.send_data_function(commands.Peace_Selected, {
                 "select_data": {'c_index': column_index, 'r_index': row_index, 'gamer_id': gamer_id},
                 'scores': [self.player1_score, self.player2_score]})
-            is_game_finished = self.check_game_ended()
-            if is_game_finished:
-                winner = self.get_game_winner()
-                self.is_game_finished = True
-                await self.send_data_function(commands.Finish_Game, {"Winner": winner})
+            # is_game_finished = self.check_game_ended()
+            # if is_game_finished:
+            #     winner = self.get_game_winner()
+            #     self.is_game_finished = True
+            #     await self.send_data_function(commands.Finish_Game, {"Winner": winner})
 
     def get_game_winner(self):
         winner = 0
@@ -97,6 +93,7 @@ class OthelloGameClass(BaseGameClass):
 
     def check_game_ended(self):
         if self.player1_pawns == 0 and self.player2_pawns == 0:
+            self.is_game_finished = True
             return True
         return False
 
@@ -109,7 +106,7 @@ class OthelloGameClass(BaseGameClass):
             return False
         if self.is_game_finished:
             return False
-        move = (data['r_index'], data['c_index'])
+        move = (data['c_index'], data['r_index'])
         if not self.current_move_list.__contains__(move):
             return False
         return True

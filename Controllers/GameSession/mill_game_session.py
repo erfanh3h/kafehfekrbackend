@@ -14,11 +14,6 @@ class MillGameSession(BaseGameSession):
     def __init__(self, game_id: str, game_type, game_score_type):
         super().__init__(game_id, game_type, game_score_type)
 
-    async def send_command(self, command_id, command_data):
-        if command_id == commands.Finish_Game:
-            self.timer.stop()
-        await super().send_command(command_id, command_data)
-
     def start_game_timer(self):
         self.game_controller = MillGameClass(send_data_function=self.send_command)
         self.game_type = GameTypesEnum.MILL
@@ -50,6 +45,9 @@ class MillGameSession(BaseGameSession):
         from Entities.SocketIOManagerClass import send_command
         if self.game_controller.is_game_finished:
             winner_id = self.game_controller.get_game_winner()
+            asyncio.new_event_loop().run_until_complete(
+                send_command(command=make_command_json(id=commands.Finish_Game, data={"Winner": winner_id}),
+                             game_id=self.game_id))
             self.finish_game(winner_id)
             return
         if self.game_controller.current_remover == 0:

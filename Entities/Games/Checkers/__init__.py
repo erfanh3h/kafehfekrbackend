@@ -80,9 +80,9 @@ class CheckersGameClass(BaseGameClass):
                                     'gamer_id': gamer_id}, })
                 is_game_ended = self.check_game_ended()
                 if is_game_ended:
-                    winner = self.get_game_winner()
+                    # winner = self.get_game_winner()
                     self.is_game_finished = True
-                    await self.send_data_function(commands.Finish_Game, {"Winner": winner})
+                    # await self.send_data_function(commands.Finish_Game, {"Winner": winner})
                 return True
         return False
 
