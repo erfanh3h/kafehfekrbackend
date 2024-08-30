@@ -45,8 +45,8 @@ class BoardSpotClass:
 
 
 class BackGammonGameClass:
-    def __init__(self, send_data_function):
-        super().__init__(send_data_function)
+    def __init__(self, ):
+        super().__init__()
         self.board = [BoardSpotClass() for i in range(24)]
         self.player1_score = 0
         self.player2_score = 0
@@ -145,17 +145,25 @@ class BackGammonGameClass:
         else:
             self.board[target_index].add_piece(gamer_id)
 
+    def get_my_piece_indexes(self,gamer_id):
+        result = []
+        for index in range(0, len(self.board)):
+            if self.board[index].equipped_user == gamer_id:
+                result.append(index)
+        return result
+
     def play_game(self):
         self.print_game()
         self.print_equippes()
         dices = roll_dices()
-        self.move_piece(0, 6, self.symbol_1)
-        self.print_game()
-        self.print_equippes()
-        self.move_piece(5, 1, self.symbol_2)
-        self.print_game()
-        self.print_equippes()
-        print(self.player1_out_pieces, self.player2_out_pieces)
+        print(self.get_my_piece_indexes(2))
+        # self.move_piece(0, 6, self.symbol_1)
+        # self.print_game()
+        # self.print_equippes()
+        # self.move_piece(5, 1, self.symbol_2)
+        # self.print_game()
+        # self.print_equippes()
+        # print(self.player1_out_pieces, self.player2_out_pieces)
 
 
 backGommonClass = BackGammonGameClass()

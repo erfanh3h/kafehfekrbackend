@@ -189,6 +189,17 @@ class BaseGameSession:
         self.game_controller.finish_reconnect_time(gamer_id)
         self.timer.stop()
 
+    def check_finish_game(self):
+        from Entities.SocketIOManagerClass import send_command
+        if self.game_controller.is_game_finished:
+            winner = self.game_controller.get_game_winner()
+            asyncio.new_event_loop().run_until_complete(
+                send_command(command=make_command_json(id=commands.Finish_Game, data={"Winner": winner}),
+                             game_id=self.game_id))
+            self.finish_game(winner)
+            return True
+        return False
+
     def finish_game(self, winner_gamer_id):
         self.score_manager.finish_game(winner_gamer_id)
         from Entities.SocketIOClass.game import delete_game

@@ -46,6 +46,7 @@ class BackGammonGameClass(BaseGameClass):
         self.player2_out_pieces = 0
         self.player1_is_in_end_phase = False
         self.player2_is_in_end_phase = False
+        self.current_turn_player_rolled = False
 
     def init_board(self):
         self.board[0].add_piece(1, 2)
@@ -73,19 +74,22 @@ class BackGammonGameClass(BaseGameClass):
 
         data = {"board": board_data, "scores": [self.player1_score, self.player2_score],
                 "current_turn": self.current_turn, "out_pieces": [self.player1_out_pieces, self.player2_out_pieces],
-                "current_dices": self.current_dices,
+                "current_dices": self.current_dices, "current_turn_player_rolled": self.current_turn_player_rolled,
                 "end_phases": [self.player1_is_in_end_phase, self.player2_is_in_end_phase]}
         return data
 
     async def recieve_data(self, command_id, data, gamer_id):
-        async def check_game_finish():
+        def check_game_finish():
             is_game_finished = self.check_game_ended()
             if is_game_finished:
                 self.is_game_finished = True
-                winner = self.get_game_winner()
-                await self.send_data_function(commands.Finish_Game, {'Winner': winner})
 
         print(command_id, data, gamer_id)
+        if command_id == commands.Roll_Dice:
+            self.current_dices = roll_dices()
+            self.current_turn_player_rolled = True
+            return self.have_available_move(gamer_id)
+
         if command_id == commands.Select_Peace:
             index = data['index']
             dice_index = data['dice_index']
@@ -104,14 +108,14 @@ class BackGammonGameClass(BaseGameClass):
                     await self.send_data_function(commands.Peace_Selected,
                                                   {'gamer_id': gamer_id, 'index': index, 'dice_index': dice_index})
                     self.current_dices.remove(self.current_dices[dice_index])
-                    await check_game_finish()
+                    check_game_finish()
             else:
                 is_correct = self.move_piece(index, self.current_dices[dice_index], gamer_id)
                 if is_correct:
                     await self.send_data_function(commands.Peace_Selected,
                                                   {'gamer_id': gamer_id, 'index': index, 'dice_index': dice_index})
                     self.current_dices.remove(self.current_dices[dice_index])
-                    await check_game_finish()
+                    check_game_finish()
 
             return len(self.current_dices) == 0
 
@@ -173,7 +177,8 @@ class BackGammonGameClass(BaseGameClass):
         return winner
 
     def change_turn(self):
-        self.current_dices = roll_dices()
+        self.current_dices.clear()
+        self.current_turn_player_rolled = False
         if self.current_turn == 1:
             self.current_turn = self.symbol_2
         else:
@@ -186,14 +191,38 @@ class BackGammonGameClass(BaseGameClass):
 
     def check_gamer_is_in_end_phase(self, gamer_id):
         if gamer_id == 1:
-            if (self.board[18].count + self.board[19].count + self.board[20].count + self.board[21].count +
-                    self.board[22].count + self.board[23].count + self.player1_score == 15):
+            result = self.player1_score
+            if self.board[18].equipped_user == gamer_id:
+                result += self.board[18].count
+            if self.board[19].equipped_user == gamer_id:
+                result += self.board[19].count
+            if self.board[20].equipped_user == gamer_id:
+                result += self.board[20].count
+            if self.board[21].equipped_user == gamer_id:
+                result += self.board[21].count
+            if self.board[22].equipped_user == gamer_id:
+                result += self.board[22].count
+            if self.board[23].equipped_user == gamer_id:
+                result += self.board[23].count
+            if result == 15:
                 self.player1_is_in_end_phase = True
             else:
                 self.player1_is_in_end_phase = False
         else:
-            if (self.board[0].count + self.board[1].count + self.board[2].count + self.board[3].count +
-                    self.board[4].count + self.board[5].count + self.player2_score == 15):
+            result = self.player2_score
+            if self.board[0].equipped_user == gamer_id:
+                result += self.board[0].count
+            if self.board[1].equipped_user == gamer_id:
+                result += self.board[1].count
+            if self.board[2].equipped_user == gamer_id:
+                result += self.board[2].count
+            if self.board[3].equipped_user == gamer_id:
+                result += self.board[3].count
+            if self.board[4].equipped_user == gamer_id:
+                result += self.board[4].count
+            if self.board[5].equipped_user == gamer_id:
+                result += self.board[5].count
+            if result == 15:
                 self.player2_is_in_end_phase = True
             else:
                 self.player2_is_in_end_phase = False
@@ -237,3 +266,28 @@ class BackGammonGameClass(BaseGameClass):
         if result:
             self.check_gamer_is_in_end_phase(gamer_id)
         return result
+
+    def get_my_piece_indexes(self, gamer_id):
+        result = []
+        for index in range(0, len(self.board)):
+            if self.board[index].equipped_user == gamer_id:
+                result.append(index)
+        return result
+
+    def have_available_move(self, gamer_id):
+        pieces = self.get_my_piece_indexes(gamer_id)
+        is_piece_out = self.check_gamer_piece_is_out(gamer_id)
+        if is_piece_out:
+            if gamer_id == 1:
+                piece_index = -1
+            else:
+                piece_index = 24
+            for dice in self.current_dices:
+                if self.check_source_can_move_n_count(piece_index, dice, gamer_id):
+                    return True
+        else:
+            for piece_index in pieces:
+                for dice in self.current_dices:
+                    if self.check_source_can_move_n_count(piece_index, dice, gamer_id):
+                        return True
+        return False
