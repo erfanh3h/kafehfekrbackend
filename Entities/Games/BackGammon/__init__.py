@@ -164,13 +164,12 @@ class BackGammonGameClass(BaseGameClass):
         return True
 
     def get_game_winner(self):
-        winner = 0
-        if self.leaver_id != 0:
-            winner = self.get_opponent_id(self.leaver_id)
-        elif self.player1_score == 15:
-            winner = self.symbol_1
-        elif self.player2_score == 15:
-            winner = self.symbol_2
+        winner = super().get_game_winner()
+        if winner == 0:
+            if self.player1_score == 15:
+                winner = self.symbol_1
+            elif self.player2_score == 15:
+                winner = self.symbol_2
         return winner
 
     def change_turn(self):

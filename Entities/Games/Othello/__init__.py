@@ -82,13 +82,12 @@ class OthelloGameClass(BaseGameClass):
             #     await self.send_data_function(commands.Finish_Game, {"Winner": winner})
 
     def get_game_winner(self):
-        winner = 0
-        if self.leaver_id != 0:
-            winner = self.get_opponent_id(self.leaver_id)
-        elif self.player1_score > self.player2_score:
-            winner = self.symbol_1
-        elif self.player2_score > self.player1_score:
-            winner = self.symbol_2
+        winner = super().get_game_winner()
+        if winner == 0:
+            if self.player1_score > self.player2_score:
+                winner = self.symbol_1
+            elif self.player2_score > self.player1_score:
+                winner = self.symbol_2
         return winner
 
     def check_game_ended(self):

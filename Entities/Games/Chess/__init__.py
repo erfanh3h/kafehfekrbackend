@@ -110,20 +110,19 @@ class ChessGameClass(BaseGameClass):
         return False
 
     def get_game_winner(self):
-        winner = 0
-        if self.leaver_id != 0:
-            winner = self.get_opponent_id(self.leaver_id)
-        elif self.player1_hitted_pawns == 15 and self.player2_hitted_pawns == 15:
-            winner = 0
-        # this is status when user could kill enemy king ( while he is check not move)
-        elif self.king1_position == (-1, -1):
-            winner = 2
-        elif self.king2_position == (-1, -1):
-            winner = 1
-        elif self.current_turn == 1:
-            winner = self.symbol_2
-        else:
-            winner = self.symbol_1
+        winner = super().get_game_winner()
+        if winner == 0:
+            if self.player1_hitted_pawns == 15 and self.player2_hitted_pawns == 15:
+                winner = 0
+            # this is status when user could kill enemy king ( while he is check not move)
+            elif self.king1_position == (-1, -1):
+                winner = 2
+            elif self.king2_position == (-1, -1):
+                winner = 1
+            elif self.current_turn == 1:
+                winner = self.symbol_2
+            else:
+                winner = self.symbol_1
         return winner
 
     def check_game_ended(self):
@@ -133,7 +132,7 @@ class ChessGameClass(BaseGameClass):
             return True
         if self.king1_position == (-1, -1) or self.king2_position == (-1, -1):
             return True
-        if self.leaver_id != 0 :
+        if self.leaver_id != 0:
             return True
         return False
 

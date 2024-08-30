@@ -103,9 +103,9 @@ class SudokuGameClass(BaseGameClass):
         return False
 
     def get_game_winner(self):
-        winner = self.winner_id
-        if self.leaver_id != 0:
-            winner = self.get_opponent_id(self.leaver_id)
+        winner = super().get_game_winner()
+        if winner == 0:
+            winner = self.winner_id
         return winner
 
     def finish_game(self):

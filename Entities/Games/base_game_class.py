@@ -39,7 +39,10 @@ class BaseGameClass:
         pass
 
     def get_game_winner(self):
-        pass
+        winner = 0
+        if self.leaver_id != 0:
+            winner = self.get_opponent_id(self.leaver_id)
+        return winner
 
     def check_game_ended(self):
         pass
@@ -50,7 +53,8 @@ class BaseGameClass:
     async def surrender(self, gamer_id):
         self.is_game_finished = True
         self.is_finish_message_delivered = True
-        await self.send_data_function(commands.Surrender, {"gamer_id": gamer_id})
+        self.leaver_id = gamer_id
+        # await self.send_data_function(commands.Surrender, {"gamer_id": gamer_id})
 
     def finish_reconnect_time(self, gamer_id):
         self.leaver_id = gamer_id

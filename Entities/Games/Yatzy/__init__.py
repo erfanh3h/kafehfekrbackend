@@ -112,13 +112,12 @@ class YatzyGameClass(BaseGameClass):
         return True
 
     def get_game_winner(self):
-        winner = 0
-        if self.leaver_id != 0:
-            winner = self.get_opponent_id(self.leaver_id)
-        elif self.player1_score > self.player2_score:
-            winner = self.symbol_1
-        elif self.player2_score > self.player1_score:
-            winner = self.symbol_2
+        winner = super().get_game_winner()
+        if winner == 0:
+            if self.player1_score > self.player2_score:
+                winner = self.symbol_1
+            elif self.player2_score > self.player1_score:
+                winner = self.symbol_2
         return winner
 
     def change_turn(self):
@@ -297,4 +296,3 @@ class YatzyGameClass(BaseGameClass):
                 self.player2_board[self.player2_selected_dice_type].select(0)
                 return self.player2_selected_dice_type
         return -1
-

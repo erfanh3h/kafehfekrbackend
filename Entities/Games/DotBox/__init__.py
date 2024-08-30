@@ -72,13 +72,12 @@ class DotBoxGameClass(BaseGameClass):
         return True
 
     def get_game_winner(self):
-        winner = 0
-        if self.leaver_id != 0:
-            winner = self.get_opponent_id(self.leaver_id)
-        elif self.gamer1_score > self.gamer2_score:
-            winner = self.gamer1_score
-        elif self.gamer2_score > self.gamer1_score:
-            winner = self.gamer2_score
+        winner = super().get_game_winner()
+        if winner == 0:
+            if self.gamer1_score > self.gamer2_score:
+                winner = self.gamer1_score
+            elif self.gamer2_score > self.gamer1_score:
+                winner = self.gamer2_score
         return winner
 
     def check_game_ended(self):

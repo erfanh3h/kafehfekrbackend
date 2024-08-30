@@ -87,13 +87,12 @@ class CheckersGameClass(BaseGameClass):
         return False
 
     def get_game_winner(self):
-        winner = 0
-        if self.leaver_id != 0:
-            winner = self.get_opponent_id(self.leaver_id)
-        elif self.player1_pawns <= 0:
-            winner = self.symbol_2
-        elif self.player2_pawns <= 0:
-            winner = self.symbol_1
+        winner = super().get_game_winner()
+        if winner == 0:
+            if self.player1_pawns <= 0:
+                winner = self.symbol_2
+            elif self.player2_pawns <= 0:
+                winner = self.symbol_1
         return winner
 
     def check_game_ended(self):

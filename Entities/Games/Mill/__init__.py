@@ -85,15 +85,12 @@ class MillGameClass(BaseGameClass):
         return True
 
     def get_game_winner(self):
-        winner = 0
-        if self.leaver_id != 0:
-            winner = self.get_opponent_id(self.leaver_id)
-        elif self.player1_peaces - self.player1_removed_peaces < 3:
-            print(f"Player{self.symbol_2} win game.")
-            winner = self.symbol_2
-        elif self.player2_peaces - self.player2_removed_peaces < 3:
-            print(f"Player{self.symbol_1} win game.")
-            winner = self.symbol_1
+        winner = super().get_game_winner()
+        if winner == 0:
+            if self.player1_peaces - self.player1_removed_peaces < 3:
+                winner = self.symbol_2
+            elif self.player2_peaces - self.player2_removed_peaces < 3:
+                winner = self.symbol_1
         return winner
 
     def check_game_ended(self):

@@ -86,13 +86,12 @@ class TicTacToeGameClass(BaseGameClass):
         return False
 
     def get_game_winner(self):
-        winner = 0
-        if self.leaver_id != 0:
-            winner = self.get_opponent_id(self.leaver_id)
-        elif self.gamer1_score > self.gamer2_score:
-            winner = self.symbol_1
-        elif self.gamer2_score > self.gamer1_score:
-            winner = self.symbol_2
+        winner = super().get_game_winner()
+        if winner == 0:
+            if self.gamer1_score > self.gamer2_score:
+                winner = self.symbol_1
+            elif self.gamer2_score > self.gamer1_score:
+                winner = self.symbol_2
         return winner
 
     def is_game_finished(self):

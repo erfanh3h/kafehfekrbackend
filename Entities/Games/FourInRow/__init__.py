@@ -92,9 +92,9 @@ class FourInRowGameClass(BaseGameClass):
                     await self.send_data_function(commands.Finish_Game, {"Winner": self.game_winner})
 
     def get_game_winner(self):
-        winner = self.game_winner
-        if self.leaver_id != 0:
-            winner = self.get_opponent_id(self.leaver_id)
+        winner = super().get_game_winner()
+        if winner == 0:
+            winner = self.game_winner
         return winner
 
     def check_game_ended(self):
