@@ -64,7 +64,7 @@ class SudokuGameClass(BaseGameClass):
         base = 3
         side = base * base
         squares = side * side
-        empties = 45
+        empties = 41
         for p in random.sample(range(squares), empties):
             self.player1_board[p // side][p % side].clear_number()
             self.player2_board[p // side][p % side].clear_number()
@@ -93,7 +93,6 @@ class SudokuGameClass(BaseGameClass):
             if not self.is_game_finished and is_win_happened:
                 self.finish_game()
                 self.winner_id = gamer_id
-                await self.send_data_function(commands.Finish_Game, {"Winner": gamer_id})
                 return True
             else:
                 await self.send_private_data_function(commands.Wrong_Solve, None, gamer_id)

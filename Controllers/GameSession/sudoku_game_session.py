@@ -14,15 +14,11 @@ class SudokuGameSession(BaseGameSession):
     def __init__(self, game_id: str, game_type, game_score_type):
         super().__init__(game_id, game_type, game_score_type)
 
-    async def send_command(self, command_id, command_data):
-        if command_id == commands.Finish_Game:
-            self.timer.stop()
-        await super().send_command(command_id, command_data)
-
     def start_game_timer(self):
         self.game_controller = SudokuGameClass(send_data_function=self.send_command,
                                                send_private_data_function=self.send_private_command)
         self.game_type = GameTypesEnum.SUDOKU
+
         def entrypoint():
             self.check_start_game()
 
@@ -85,17 +81,9 @@ class SudokuGameSession(BaseGameSession):
         self.timer.start(Sudoku_game_Time, self.check_winner)
 
     def check_winner(self):
-        if self.game_controller.is_game_finished:
-            winner_id = self.game_controller.get_game_winner()
-            self.finish_game(winner_id)
-            return
-        time.sleep(2)
-        self.game_controller.finish_game()
+        from Entities.SocketIOManagerClass import send_command
         winner = self.game_controller.get_game_winner()
-        if not self.game_controller.is_finish_message_delivered:
-            from Entities.SocketIOManagerClass import send_command
-            asyncio.new_event_loop().run_until_complete(
-                send_command(command=make_command_json(id=commands.Finish_Game, data={"Winner": winner}),
-                             game_id=self.game_id))
-        winner_id = self.game_controller.get_game_winner()
-        self.finish_game(winner_id)
+        asyncio.new_event_loop().run_until_complete(
+            send_command(command=make_command_json(id=commands.Finish_Game, data={"Winner": winner}),
+                         game_id=self.game_id))
+        self.finish_game(winner)
