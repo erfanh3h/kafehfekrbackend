@@ -2,7 +2,7 @@ import socketio
 
 from Commons import static_functions
 # from Entities.SocketIOClass import Socket_Server, return_random_idies
-from Controllers.GameSession.BoxFour_game_session import BoxFourGameSession
+from Controllers.GameSession.box_four_game_session import BoxFourGameSession
 from Controllers.GameSession.backgammon_game_session import BackGammonGameSession
 from Controllers.GameSession.battleship_game_session import BattleShipGameSession
 from Controllers.GameSession.checkers_game_session import CheckersGameSession

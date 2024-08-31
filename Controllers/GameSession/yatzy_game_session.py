@@ -105,4 +105,4 @@ class YatzyGameSession(BaseGameSession):
                     command=make_command_json(id=commands.Wait_Time, data=Yatzy_Turn_Wait_Time), game_id=self.game_id))
             self.timer.start(Yatzy_Turn_Wait_Time, function)
         else:
-            self.timer.start(Yatzy_Turn_Time, self.send_current_turn)
+            function()
