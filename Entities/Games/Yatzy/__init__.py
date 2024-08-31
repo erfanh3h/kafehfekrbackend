@@ -102,6 +102,9 @@ class YatzyGameClass(BaseGameClass):
                                               {'gamer_id': gamer_id, 'selected_index': user_selected_index,
                                                'score': score, 'player1_score': self.player1_score,
                                                'player2_score': self.player2_score}, )
+            if self.is_player1_round_done and self.is_player2_round_done:
+                return True
+        return False
 
     def check_authority(self, data, gamer_id: int):
         if (gamer_id == 1 and self.is_player1_round_done) or (gamer_id == 2 and self.is_player2_round_done):
