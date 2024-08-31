@@ -44,8 +44,6 @@ class DotBoxGameClass(BaseGameClass):
         await self.send_data_function(commands.Peace_Selected, {'user': gamer_id, 'target_peace': peace_number})
         if self.check_game_ended():
             self.is_game_finished = True
-            game_winner = self.get_game_winner()
-            await self.send_data_function(commands.Finish_Game, {"Winner": game_winner})
             return False
         else:
             is_win_happen, win_list = self.check_box_win_happen(peace_number)
@@ -82,7 +80,7 @@ class DotBoxGameClass(BaseGameClass):
 
     def check_game_ended(self):
         for peace in self.lines_board:
-            if peace != 0:
+            if peace == 0:
                 return False
         return True
 
