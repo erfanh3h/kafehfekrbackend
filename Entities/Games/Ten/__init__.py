@@ -19,6 +19,7 @@ class TenGameClass(BaseGameClass):
         self.gamer1_score = 0
         self.gamer2_score = 0
         self.init_games()
+        self.round_winner = 0
 
     def init_games(self):
         indexes = []
@@ -36,6 +37,7 @@ class TenGameClass(BaseGameClass):
         return data
 
     def change_round(self):
+        self.round_winner = 0
         self.is_round_finished = False
         self.current_round_numbers = self.rounds_list[self.current_round]
         self.current_round += 1
@@ -46,14 +48,10 @@ class TenGameClass(BaseGameClass):
             self.gamer1_score += 1
         else:
             self.gamer2_score += 1
-        winner = gamer_id
+        self.round_winner = gamer_id
+        self.is_round_finished = True
         if self.check_game_ended():
-            game_winner = self.get_game_winner()
-            await self.send_data_function(commands.Finish_Game, {"Winner": game_winner})
             self.is_game_finished = True
-        else:
-            self.is_round_finished = True
-            await self.send_data_function(commands.Finish_Round, {"Winner": winner})
 
     def round_time_finished(self):
         if self.current_round == self.round_count:
@@ -64,7 +62,8 @@ class TenGameClass(BaseGameClass):
     def check_game_ended(self):
         if self.current_round == self.round_count:
             return True
-        # if self.gamer1_score.__float__() >= self.round_count / 2
+        if self.gamer1_score == 2 or self.gamer2_score == 2:
+            return True
         return False
 
     def check_authority(self, data, gamer_id: int):

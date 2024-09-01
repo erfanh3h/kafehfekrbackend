@@ -21,6 +21,7 @@ class RPCGameClass(BaseGameClass):
         self.gamer2_total_score = 0
         self.gamer1_round_selection = RPCModel.Rock
         self.gamer2_round_selection = RPCModel.Rock
+        self.turn_round_winner = 0
 
     def get_game_data(self):
         data = {"round_scores": [self.gamer1_round_score, self.gamer2_round_score],
@@ -37,12 +38,14 @@ class RPCGameClass(BaseGameClass):
         self.gamer2_round_score = 0
         self.current_round += 1
         self.current_turn_round = 1
+        self.turn_round_winner = 0
 
     def change_turn_round(self):
         self.is_turn_round_finished = False
         self.current_turn_round += 1
         self.gamer1_round_selection = RPCModel.Rock
         self.gamer2_round_selection = RPCModel.Rock
+        self.turn_round_winner = 0
 
     async def recieve_data(self, command_id, data, gamer_id):
         print(command_id, data, gamer_id)
@@ -53,7 +56,8 @@ class RPCGameClass(BaseGameClass):
 
     def check_turn_round_winner(self):
         winner = self.check_winner()
-        if self.current_turn_round == self.turn_round_count:
+        if (self.current_turn_round == self.turn_round_count or self.gamer1_round_score == 3 or
+                self.gamer2_round_score == 3):
             if self.gamer1_round_score > self.gamer2_round_score:
                 self.gamer1_total_score += 1
             elif self.gamer2_round_score > self.gamer1_round_score:
@@ -77,15 +81,19 @@ class RPCGameClass(BaseGameClass):
             if self.gamer1_round_selection == condition[0] and self.gamer2_round_selection == condition[1]:
                 winner = self.symbol_1
                 self.gamer1_round_score += 1
+                self.turn_round_winner = winner
                 break
             if self.gamer2_round_selection == condition[0] and self.gamer1_round_selection == condition[1]:
                 winner = self.symbol_2
                 self.gamer2_round_score += 1
+                self.turn_round_winner = winner
                 break
         return winner
 
     def check_game_ended(self):
         if self.current_round == self.round_count:
+            return True
+        if self.gamer1_total_score == 2 or self.gamer2_total_score == 2:
             return True
         # if self.gamer1_score.__float__() >= self.round_count / 2
         return False

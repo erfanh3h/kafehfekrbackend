@@ -15,21 +15,12 @@ class TicTacToeGameClass(BaseGameClass):
         self.current_round = 1
         self.gamer1_score = 0
         self.gamer2_score = 0
+        self.round_winner = 0
 
     def get_game_data(self):
         data = {"board": self.board, "scores": [self.gamer1_score, self.gamer2_score],
                 "current_round": self.current_round, "current_turn": self.current_turn}
         return data
-
-    def change_round(self):
-        self.board = [0 for i in range(9)]
-        self.counter = 0
-        self.is_round_finished = False
-        self.current_round += 1
-        if self.current_round % 2 == 0:
-            self.current_turn = 1
-        else:
-            self.current_turn = 2
 
     async def recieve_data(self, command_id, data, gamer_id):
         print(command_id, data, gamer_id)
@@ -52,7 +43,6 @@ class TicTacToeGameClass(BaseGameClass):
 
     def check_authority(self, data, gamer_id: int):
         if (self.current_turn == 1 and gamer_id != 1) or (self.current_turn == 2 and gamer_id != 2):
-            print("not turn of : ", gamer_id)
             return False
         peace_number = data
         # Check if players' selection is out of range
@@ -72,17 +62,20 @@ class TicTacToeGameClass(BaseGameClass):
             if self.board[condition[0]] == self.board[condition[1]] == self.board[condition[2]] == self.symbol_1:
                 winner = self.symbol_1
                 self.gamer1_score += 1
+                self.round_winner = winner
                 break
             if self.board[condition[0]] == self.board[condition[1]] == self.board[condition[2]] == self.symbol_2:
                 winner = self.symbol_2
                 self.gamer2_score += 1
+                self.round_winner = winner
                 break
         return winner
 
     def check_game_ended(self):
         if self.current_round == self.round_count:
             return True
-        # if self.gamer1_score.__float__() >= self.round_count / 2
+        if self.gamer1_score == 3 or self.gamer2_score == 3:
+            return True
         return False
 
     def get_game_winner(self):
@@ -102,3 +95,10 @@ class TicTacToeGameClass(BaseGameClass):
             self.current_turn = 2
         else:
             self.current_turn = 1
+
+    def change_round(self):
+        self.current_round += 1
+        self.is_round_finished = False
+        self.round_winner = 0
+        self.board = [0 for i in range(9)]
+        self.counter = 0

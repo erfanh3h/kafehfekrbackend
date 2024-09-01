@@ -94,7 +94,7 @@ class RPCGameSession(BaseGameSession):
 
     def check_and_send_turn_round_winner(self):
         from Entities.SocketIOManagerClass import send_command
-        turn_round_winner = self.game_controller.check_winner()
+        turn_round_winner = self.game_controller.turn_round_winner
         asyncio.new_event_loop().run_until_complete(
             send_command(command=make_command_json(id=commands.Finish_Turn_Round, data={
                 "Winner": turn_round_winner,

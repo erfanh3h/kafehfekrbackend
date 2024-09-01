@@ -28,19 +28,13 @@ class TicTacToeGameSession(BaseGameSession):
             if is_selection_correct:
                 await self.game_controller.recieve_data(data['id'], peace_id, gamer_id)
                 self.timer.stop()
-                if self.game_controller.is_round_finished:
-                    self.change_round()
 
     def send_current_turn(self):
         from Entities.SocketIOManagerClass import send_command
-        if self.game_controller.is_game_finished:
-            winner = self.game_controller.get_game_winner()
-            asyncio.new_event_loop().run_until_complete(
-                send_command(command=make_command_json(id=commands.Finish_Game, data={"Winner": winner}),
-                             game_id=self.game_id))
-            self.finish_game(winner)
+        if self.check_finish_game():
             return
         if self.game_controller.is_round_finished:
+            self.change_round()
             return
         self.game_controller.change_turn()
         asyncio.new_event_loop().run_until_complete(
@@ -50,7 +44,7 @@ class TicTacToeGameSession(BaseGameSession):
 
     def change_round(self):
         from Entities.SocketIOManagerClass import send_command
-        winner = self.game_controller.check_winner()
+        winner = self.game_controller.round_winner
         asyncio.new_event_loop().run_until_complete(
             send_command(command=make_command_json(id=commands.Finish_Round, data={"Winner": winner}),
                          game_id=self.game_id))
