@@ -29,6 +29,7 @@ game_database = DataBaseManager()
 # # game_database.game_history_manager.create_game_history(0, 1, "tictactoe", "Rank")
 # print(game_database.game_history_manager.read_game_history("Y6pl1xm"))
 # game_database.game_history_manager.update_game_history("Y6pl1xm", 1)
+# game_database.game_history_manager.delete_unfinished_games()
 
 # game_database.config_manager.create_config()
 # print(game_database.config_manager.read_config())

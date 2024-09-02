@@ -28,3 +28,7 @@ class GameHistoryCollectionManager:
     def delete_game_history(self, game_id):
         query = {'_id': game_id}
         self.collection.delete_one(query)
+
+    def delete_unfinished_games(self):
+        query = {'is_finished': False}
+        self.collection.delete_many(query)
