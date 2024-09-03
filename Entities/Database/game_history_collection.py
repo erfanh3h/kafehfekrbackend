@@ -16,18 +16,45 @@ class GameHistoryCollectionManager:
         return game_data
 
     def read_game_history(self, game_id):
-        query = {'_id': game_id}
-        game_Data = self.collection.find_one(query)
-        return game_Data
+        try:
+            query = {'_id': game_id}
+            game_Data = self.collection.find_one(query)
+            return game_Data
+        except:
+            return None
+
+    def read_user_games_histories(self, user_id):
+        result = []
+        try:
+            query = {'user1_id': user_id}
+            user_Data = self.collection.find(query)
+            for user in user_Data:
+                result.append(user)
+        except:
+            pass
+        try:
+            query = {'user2_id': user_id}
+            user_Data = self.collection.find(query)
+            for user in user_Data:
+                result.append(user)
+        except:
+            pass
+        return result
 
     def update_game_history(self, game_id, winner_id):
-        query = {'_id': game_id}
-        update_data = {"finish_data": datetime.now(), "is_finished": True, "winner_id": winner_id}
-        self.collection.find_one_and_update(query, {'$set': update_data})
+        try:
+            query = {'_id': game_id}
+            update_data = {"finish_data": datetime.now(), "is_finished": True, "winner_id": winner_id}
+            self.collection.find_one_and_update(query, {'$set': update_data})
+        except:
+            pass
 
     def delete_game_history(self, game_id):
-        query = {'_id': game_id}
-        self.collection.delete_one(query)
+        try:
+            query = {'_id': game_id}
+            self.collection.delete_one(query)
+        except:
+            pass
 
     def delete_unfinished_games(self):
         query = {'is_finished': False}

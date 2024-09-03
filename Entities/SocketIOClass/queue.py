@@ -1,3 +1,5 @@
+import random
+
 import socketio
 
 from Commons import static_functions
@@ -36,7 +38,7 @@ class QueueSocketNameSpace(socketio.AsyncNamespace):
         if game_type is None:
             await self.disconnect(socket_id, namespace="/queue")
         else:
-            queuer_data = QueuerModel(user_id, "test", socket_id=socket_id)
+            queuer_data = QueuerModel(user_id, "test", socket_id=socket_id, user_image=random.randint(1, 100))
             normal_queue_session.join_queuer(queuer_data, game_type)
             socketid_game_type_pairs[socket_id] = game_type
 
