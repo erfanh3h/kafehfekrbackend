@@ -42,6 +42,10 @@ class MillGameSession(BaseGameSession):
                 self.timer.stop()
 
     def send_current_turn(self):
+        # checking player not played his turn
+        if (self.game_controller.current_round != 0 and not self.game_controller.is_current_turn_played and
+                self.check_finish_game_by_not_play_turn(self.game_controller.current_turn)):
+            return
         from Entities.SocketIOManagerClass import send_command
         if self.game_controller.is_game_finished:
             winner_id = self.game_controller.get_game_winner()

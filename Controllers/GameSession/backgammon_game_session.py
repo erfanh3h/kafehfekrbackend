@@ -36,6 +36,10 @@ class BackGammonGameSession(BaseGameSession):
                     self.timer.stop()
 
     def send_current_turn(self):
+        # checking player not played his turn
+        if (self.game_controller.current_round != 0 and not self.game_controller.is_current_turn_played and
+                self.check_finish_game_by_not_play_turn(self.game_controller.current_turn)):
+            return
         if self.check_finish_game():
             return
         self.game_controller.change_turn()
@@ -61,4 +65,5 @@ class BackGammonGameSession(BaseGameSession):
                 command=make_command_json(id=commands.Out_Of_Move, data={'turn': self.game_controller.current_turn,
                                                                          'dices': self.game_controller.current_dices}),
                 game_id=self.game_id))
+        self.game_controller.is_current_turn_played = True
         self.timer.start(BackGammon_Out_Of_Move_time, self.send_current_turn)

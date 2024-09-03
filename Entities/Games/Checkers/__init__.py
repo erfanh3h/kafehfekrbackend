@@ -32,6 +32,7 @@ class CheckersGameClass(BaseGameClass):
         self.player2_pawns = 12
         self.check_move_list = []
         self.add_pawns_to_board()
+        self.current_round = 0
 
     def __str__(self):
         board = """"""
@@ -59,6 +60,8 @@ class CheckersGameClass(BaseGameClass):
         return data
 
     def change_turn(self):
+        self.is_current_turn_played = False
+        self.current_round += 1
         if self.current_turn == 1:
             self.current_turn = self.symbol_2
         else:
@@ -74,6 +77,7 @@ class CheckersGameClass(BaseGameClass):
             is_move_correct = self.move_pawn(source_column_index, source_row_index, target_column_index,
                                              target_row_index, gamer_id)
             if is_move_correct:
+                self.is_current_turn_played = True
                 await self.send_data_function(commands.Peace_Selected, {
                     "select_data": {'s_c_index': source_column_index, 's_r_index': source_row_index,
                                     't_c_index': target_column_index, 't_r_index': target_row_index,

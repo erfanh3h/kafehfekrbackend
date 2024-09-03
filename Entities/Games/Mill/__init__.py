@@ -8,9 +8,9 @@ class MillGameClass(BaseGameClass):
         self.symbol_1 = 1
         self.symbol_2 = 2
         self.board = [0 for i in range(24)]
-        self.current_round = 1
-        self.player1_peaces = 10
-        self.player2_peaces = 10
+        self.current_round = 0
+        self.player1_peaces = 9
+        self.player2_peaces = 9
         self.player1_played_peaces = 0
         self.player2_played_peaces = 0
         self.player1_removed_peaces = 0
@@ -47,6 +47,7 @@ class MillGameClass(BaseGameClass):
             else:
                 self.board[peace_number] = self.symbol_2
                 self.player2_played_peaces += 1
+            self.is_current_turn_played = True
             await self.send_data_function(commands.Peace_Selected, {'user': gamer_id, 'target_peace': peace_number})
             result = self.check_all_match_three_conditions(peace_number, gamer_id)
             if result:
@@ -56,6 +57,7 @@ class MillGameClass(BaseGameClass):
             target_peace_number = data["data"]["target"]
             self.board[source_peace_number] = 0
             self.board[target_peace_number] = gamer_id
+            self.is_current_turn_played = True
             await self.send_data_function(commands.Peace_Swaped, {'user': gamer_id, 'source_peace': source_peace_number,
                                                                   'target_peace': target_peace_number})
             result = self.check_all_match_three_conditions(target_peace_number, gamer_id)
@@ -69,6 +71,7 @@ class MillGameClass(BaseGameClass):
             else:
                 self.player1_removed_peaces += 1
             self.current_remover = 0
+            self.is_current_turn_played = True
             await self.send_data_function(commands.Peace_Removed, {'user': gamer_id, 'target_peace': peace_number})
             is_game_ended = self.check_game_ended()
             if is_game_ended:
@@ -101,6 +104,8 @@ class MillGameClass(BaseGameClass):
         return False
 
     def change_turn(self):
+        self.is_current_turn_played = False
+        self.current_round += 1
         self.current_remover = 0
         if self.current_turn == 1:
             self.current_turn = self.symbol_2

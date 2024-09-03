@@ -47,6 +47,8 @@ class BackGammonGameClass(BaseGameClass):
         self.player1_is_in_end_phase = False
         self.player2_is_in_end_phase = False
         self.current_turn_player_rolled = False
+        self.current_round = 0
+
 
     def init_board(self):
         self.board[0].add_piece(1, 2)
@@ -101,6 +103,7 @@ class BackGammonGameClass(BaseGameClass):
                     index = 24
                 is_correct = self.move_piece(index, self.current_dices[dice_index], gamer_id)
                 if is_correct:
+                    self.is_current_turn_played = True
                     if gamer_id == 1:
                         self.player1_out_pieces -= 1
                     else:
@@ -112,6 +115,7 @@ class BackGammonGameClass(BaseGameClass):
             else:
                 is_correct = self.move_piece(index, self.current_dices[dice_index], gamer_id)
                 if is_correct:
+                    self.is_current_turn_played = True
                     await self.send_data_function(commands.Peace_Selected,
                                                   {'gamer_id': gamer_id, 'index': index, 'dice_index': dice_index})
                     self.current_dices.remove(self.current_dices[dice_index])
@@ -177,6 +181,8 @@ class BackGammonGameClass(BaseGameClass):
         return winner
 
     def change_turn(self):
+        self.current_round += 1
+        self.is_current_turn_played = False
         self.current_dices.clear()
         self.current_turn_player_rolled = False
         if self.current_turn == 1:
