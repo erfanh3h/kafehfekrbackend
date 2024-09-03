@@ -189,6 +189,41 @@ class BaseGameSession:
         self.game_controller.finish_reconnect_time(gamer_id)
         self.timer.stop()
 
+    def check_finish_game_by_not_play_turn(self, current_turn):
+        from Entities.SocketIOManagerClass import send_command
+        if current_turn == 1:
+            self.gamers[0].not_played_turn()
+            if self.gamers[0].not_played_turns == 4:
+                winner = 2
+                asyncio.new_event_loop().run_until_complete(
+                    send_command(command=make_command_json(id=commands.Finish_Game, data={"Winner": winner}),
+                                 game_id=self.game_id))
+                self.finish_game(winner)
+                return True
+            else:
+                asyncio.new_event_loop().run_until_complete(
+                    send_command(command=make_command_json(id=commands.Not_played_Turns,
+                                                           data={"gamer_id": self.gamers[0].gamer_id,
+                                                                 "count": self.gamers[0].not_played_turns}),
+                                 game_id=self.game_id))
+                return False
+        else:
+            self.gamers[1].not_played_turn()
+            if self.gamers[1].not_played_turns == 4:
+                winner = 1
+                asyncio.new_event_loop().run_until_complete(
+                    send_command(command=make_command_json(id=commands.Finish_Game, data={"Winner": winner}),
+                                 game_id=self.game_id))
+                self.finish_game(winner)
+                return True
+            else:
+                asyncio.new_event_loop().run_until_complete(
+                    send_command(command=make_command_json(id=commands.Not_played_Turns,
+                                                           data={"gamer_id": self.gamers[1].gamer_id,
+                                                                 "count": self.gamers[1].not_played_turns}),
+                                 game_id=self.game_id))
+                return False
+
     def check_finish_game(self):
         from Entities.SocketIOManagerClass import send_command
         if self.game_controller.is_game_finished:

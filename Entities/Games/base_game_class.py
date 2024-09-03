@@ -10,6 +10,7 @@ class BaseGameClass:
         self.is_turn_round_finished = False
         self.leaver_id = 0
         self.is_finish_message_delivered = False
+        self.is_current_turn_played = False
 
     def get_game_data(self):
         pass

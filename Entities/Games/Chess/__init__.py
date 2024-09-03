@@ -42,6 +42,7 @@ class ChessGameClass(BaseGameClass):
         self.init_board()
         self.is_player1_kish = False
         self.is_player2_kish = False
+        self.current_round = 0
 
     def __str__(self):
         board = """"""
@@ -68,6 +69,8 @@ class ChessGameClass(BaseGameClass):
         return data
 
     def change_turn(self):
+        self.is_current_turn_played = False
+        self.current_round += 1
         self.current_hits.clear()
         self.current_moves.clear()
         if self.current_turn == 1:
@@ -88,6 +91,7 @@ class ChessGameClass(BaseGameClass):
             target_position = (target_column_index, target_row_index)
             if (self.current_moves.keys().__contains__(source_position) and
                     self.current_moves[source_position].__contains__(target_position)):
+                self.is_current_turn_played = True
                 self.move_piece(source_position, target_position, gamer_id)
                 await self.send_data_function(commands.Peace_Selected, {
                     "select_data": {'s_c_index': source_column_index, 's_r_index': source_row_index,
@@ -96,6 +100,7 @@ class ChessGameClass(BaseGameClass):
                 return True
             if (self.current_hits.keys().__contains__(source_position) and
                     self.current_hits[source_position].__contains__(target_position)):
+                self.is_current_turn_played = True
                 # this checks used for when user is check and become dc
                 if gamer_id == 1 and target_position == self.king2_position:
                     self.king2_position = (-1, -1)

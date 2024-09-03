@@ -20,7 +20,7 @@ class GamerModel(UserModel):
         self.team_id: int = team_id
 
     def not_played_turn(self):
-        if self.is_disconnected:
+        if not self.is_disconnected:
             self.not_played_turns += 1
 
     def set_finish_reconnect_time_function(self, finish_reconnect_time_function):
