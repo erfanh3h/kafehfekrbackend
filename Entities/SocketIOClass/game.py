@@ -91,12 +91,21 @@ class GameSocketNameSpace(socketio.AsyncNamespace):
         print('connect ', socket_id)
         if auth is not None:
             try:
-                user_id = auth['user_id']
+                # user_id = auth['user_id']
                 user_game_id = auth['game_id']
+                from Entities.Security import extract_token
+                token_data = await extract_token(auth['token'])
+                if token_data is not None:
+                    user_id = token_data['id']
+                else:
+                    await self.disconnect(socket_id, namespace="/game")
+                    return
             except:
-                user_id, user_game_id = return_random_idies()
+                await self.disconnect(socket_id, namespace="/game")
+                return
         else:
-            user_id, user_game_id = return_random_idies()
+            await self.disconnect(socket_id, namespace="/game")
+            return
         # print(Socket_Server.namespaces)
         #     await my_message(socket_id, {'Test': f'{socket_id}'})
 
@@ -107,6 +116,7 @@ class GameSocketNameSpace(socketio.AsyncNamespace):
                 socketid_gameid_pairs[socket_id] = user_game_id
             else:
                 await self.disconnect(socket_id, namespace="/game")
+                return
         else:
             await self.emit('command', {'id': 'GameFinished'}, to=socket_id, namespace="/game")
             # await self.disconnect(socket_id, namespace="/game")
