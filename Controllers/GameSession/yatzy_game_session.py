@@ -19,16 +19,17 @@ class YatzyGameSession(BaseGameSession):
         self.game_type = GameTypesEnum.YATZY
         super().start_game_timer()
 
-    def check_start_game(self):
-        while True:
-            if self.is_game_terminated:
-                break
-            if self.check_all_players_joined():
-                self.is_game_running = True
-                self.prepare_gamers()
-                self.send_game_data(self.send_current_turn)
-                break
-            time.sleep(2)
+    # def check_start_game(self):
+    #     while True:
+    #         if self.is_game_terminated:
+    #             break
+    #         if self.check_all_players_joined():
+    #             self.is_game_running = True
+    #             self.timer.stop()
+    #             self.prepare_gamers()
+    #             self.send_game_data(self.send_current_turn)
+    #             break
+    #         time.sleep(2)
 
     def send_reconnect_data(self, socket_id):
         reconnect_data = {'gamers': []}

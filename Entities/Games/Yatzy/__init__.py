@@ -24,8 +24,8 @@ class YatzyGameClass(BaseGameClass):
         self.symbol_2 = 2
         self.player1_current_dices = []
         self.player2_current_dices = []
-        self.player1_rolled_dice_time = 0
-        self.player2_rolled_dice_time = 0
+        self.player1_rolled_dice_time = 1
+        self.player2_rolled_dice_time = 1
         self.is_player1_round_done = False
         self.is_player2_round_done = False
         self.current_round = 0
@@ -130,8 +130,8 @@ class YatzyGameClass(BaseGameClass):
         else:
             self.player1_current_dices = roll_dices(5)
             self.player2_current_dices = roll_dices(5)
-            self.player1_rolled_dice_time = 0
-            self.player2_rolled_dice_time = 0
+            self.player1_rolled_dice_time = 1
+            self.player2_rolled_dice_time = 1
             self.is_player1_round_done = False
             self.is_player2_round_done = False
             self.player1_selected_dice_type = self.get_first_empty_index(1)
