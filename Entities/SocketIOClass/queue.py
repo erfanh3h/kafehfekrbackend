@@ -20,7 +20,7 @@ normal_socketid_game_type_pairs: dict[str, str] = {}
 
 class QueueSocketNameSpace(socketio.AsyncNamespace):
     async def on_connect(self, socket_id, environ, auth):
-        print('connect ', socket_id)
+        # print('connect ', socket_id)
         if auth is not None:
             try:
                 from Entities.Security import extract_token

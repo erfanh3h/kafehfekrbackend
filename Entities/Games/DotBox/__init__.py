@@ -73,12 +73,14 @@ class DotBoxGameClass(BaseGameClass):
         winner = super().get_game_winner()
         if winner == 0:
             if self.gamer1_score > self.gamer2_score:
-                winner = self.gamer1_score
+                winner = self.symbol_1
             elif self.gamer2_score > self.gamer1_score:
-                winner = self.gamer2_score
+                winner = self.symbol_2
         return winner
 
     def check_game_ended(self):
+        if self.is_game_finished:
+            return True
         for peace in self.lines_board:
             if peace == 0:
                 return False

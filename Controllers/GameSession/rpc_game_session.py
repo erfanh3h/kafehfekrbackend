@@ -54,10 +54,9 @@ class RPCGameSession(BaseGameSession):
         if self.game_controller.is_game_finished:
             def function2():
                 winner_id = self.game_controller.get_game_winner()
-                if not self.game_controller.is_finish_message_delivered:
-                    asyncio.new_event_loop().run_until_complete(
-                        send_command(command=make_command_json(id=commands.Finish_Game, data={"Winner": winner_id}),
-                                     game_id=self.game_id))
+                asyncio.new_event_loop().run_until_complete(
+                    send_command(command=make_command_json(id=commands.Finish_Game, data={"Winner": winner_id}),
+                                 game_id=self.game_id))
                 self.finish_game(winner_id)
 
             def function1():
@@ -103,8 +102,9 @@ class RPCGameSession(BaseGameSession):
                                                    ), game_id=self.game_id))
 
     def check_and_send_round_winner(self):
-        from Entities.SocketIOManagerClass import send_command
-        round_winner = self.game_controller.get_round_winner()
-        asyncio.new_event_loop().run_until_complete(
-            send_command(command=make_command_json(id=commands.Finish_Round, data={"Winner": round_winner}),
-                         game_id=self.game_id))
+        if self.game_controller.is_round_finished:
+            from Entities.SocketIOManagerClass import send_command
+            round_winner = self.game_controller.get_round_winner()
+            asyncio.new_event_loop().run_until_complete(
+                send_command(command=make_command_json(id=commands.Finish_Round, data={"Winner": round_winner}),
+                             game_id=self.game_id))

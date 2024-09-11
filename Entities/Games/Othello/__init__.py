@@ -91,6 +91,8 @@ class OthelloGameClass(BaseGameClass):
         return winner
 
     def check_game_ended(self):
+        if self.is_game_finished:
+            return True
         if self.player1_pawns == 0 and self.player2_pawns == 0:
             self.is_game_finished = True
             return True

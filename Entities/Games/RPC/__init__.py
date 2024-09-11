@@ -99,21 +99,23 @@ class RPCGameClass(BaseGameClass):
         return False
 
     def get_round_winner(self):
-        winner = super().get_game_winner()
-        if winner == 0:
-            if self.gamer1_round_score > self.gamer2_round_score:
-                winner = self.symbol_1
-            elif self.gamer2_round_score > self.gamer1_round_score:
-                winner = self.symbol_2
-        return winner
-
-    def get_game_winner(self):
-        if self.gamer1_total_score > self.gamer2_total_score:
+        if self.gamer1_round_score > self.gamer2_round_score:
             return self.symbol_1
-        elif self.gamer2_total_score > self.gamer1_total_score:
+        elif self.gamer2_round_score > self.gamer1_round_score:
             return self.symbol_2
         else:
             return 0
+
+    def get_game_winner(self):
+        winner = super().get_game_winner()
+        if winner == 0:
+            if self.gamer1_total_score > self.gamer2_total_score:
+                return self.symbol_1
+            elif self.gamer2_total_score > self.gamer1_total_score:
+                return self.symbol_2
+            else:
+                return 0
+        return winner
 
     def change_turn(self):
         pass

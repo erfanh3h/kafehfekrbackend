@@ -390,17 +390,17 @@ class ChessGameClass(BaseGameClass):
         # chech king rook special move
         if source_position == (7, 4) and target_position == (7, 2):
             self.move_piece((7, 0), (7, 3), gamer_id)
-        if source_position == (7, 4) and target_position == (7, 6):
+        elif source_position == (7, 4) and target_position == (7, 6):
             self.move_piece((7, 7), (7, 5), gamer_id)
-        if source_position == (0, 4) and target_position == (0, 6):
+        elif source_position == (0, 4) and target_position == (0, 6):
             self.move_piece((0, 7), (0, 5), gamer_id)
-        if source_position == (0, 4) and target_position == (0, 2):
+        elif source_position == (0, 4) and target_position == (0, 2):
             self.move_piece((0, 0), (0, 3), gamer_id)
         ##########
         # change king position
         if gamer_id == 1 and source_position == self.king1_position:
             self.king1_position = target_position
-        if gamer_id == 2 and target_position == self.king2_position:
+        elif gamer_id == 2 and source_position == self.king2_position:
             self.king2_position = target_position
         ##########
 

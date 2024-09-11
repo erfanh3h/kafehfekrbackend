@@ -17,7 +17,7 @@ class MillGameClass(BaseGameClass):
         self.player2_removed_peaces = 0
         self.current_remover = 0  # if user successfully removed a peace , he can remove peace now
         self.win_conditions = [[0, 1, 2], [0, 9, 21], [21, 22, 23], [23, 14, 2], [1, 4, 7], [9, 10, 11], [22, 19, 16],
-                               [14, 13, 12], [3, 4, 5], [3, 10, 18], [18, 19, 20], [20, 13, 5], [6, 7, 8], [6, 1, 15],
+                               [14, 13, 12], [3, 4, 5], [3, 10, 18], [18, 19, 20], [20, 13, 5], [6, 7, 8], [6, 11, 15],
                                [15, 16, 17],
                                [17, 12, 8], ]
         self.pieces_neighbors = {0: [1, 9], 1: [0, 2, 4], 2: [1, 14], 3: [4, 10], 4: [1, 3, 5, 7], 5: [4, 13],

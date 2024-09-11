@@ -32,7 +32,7 @@ class BaseQueueSession:
                         # self.queues[key].start_game()
                     if len(self.queues[key].queuers) > 0:
                         print(f"{self.queues[key].game_type.value} queuer len : ", len(self.queues[key].queuers))
-                print("---------------------")
+                # print("---------------------")
                 time.sleep(5)
 
         t = threading.Thread(target=check_start_new_game, daemon=True)
