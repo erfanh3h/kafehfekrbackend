@@ -21,7 +21,7 @@ class BaseQueueSession:
     def init_session(self):
         games_values = [game.value for game in GameTypesEnum]
         games_enums = [game for game in GameTypesEnum]
-        for index,item in enumerate(games_values):
+        for index, item in enumerate(games_values):
             self.queues[games_values[index]] = GameQueueSessionDetails(games_enums[index], self.game_score_type)
 
         def check_start_new_game():
@@ -31,7 +31,8 @@ class BaseQueueSession:
                         threading.Thread(target=self.queues[key].start_game, daemon=True).start()
                         # self.queues[key].start_game()
                     if len(self.queues[key].queuers) > 0:
-                        print(f"{self.queues[key].game_type.value} queuer len : ", len(self.queues[key].queuers))
+                        print(f"{self.game_score_type} {self.queues[key].game_type.value} queuer len : ",
+                              len(self.queues[key].queuers))
                 # print("---------------------")
                 time.sleep(5)
 

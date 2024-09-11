@@ -1,5 +1,8 @@
 import string, random
 
+from Entities.Games.game_difficulty import GameDifficultyEnum
+from Entities.Games.game_types import GameTypesEnum
+
 
 def make_command_json(id, data=None):
     return {'id': id, 'data': data}
@@ -32,3 +35,41 @@ async def get_current_user(token: str):
         return user
     else:
         return None
+
+
+def gametype_to_difficulty(game_type):
+    if game_type == GameTypesEnum.TIC_TAC_TOE.value:
+        return GameDifficultyEnum.Easy
+    if game_type == GameTypesEnum.RPC.value:
+        return GameDifficultyEnum.Easy
+    if game_type == GameTypesEnum.TEN.value:
+        return GameDifficultyEnum.Easy
+    if game_type == GameTypesEnum.DOTBOX.value:
+        return GameDifficultyEnum.Easy
+    if game_type == GameTypesEnum.MSweeper.value:
+        return GameDifficultyEnum.Normal
+    if game_type == GameTypesEnum.MNUMBERS.value:
+        return GameDifficultyEnum.Normal
+    if game_type == GameTypesEnum.BATTLESHIP.value:
+        return GameDifficultyEnum.Normal
+    if game_type == GameTypesEnum.FOURINROW.value:
+        return GameDifficultyEnum.Normal
+    if game_type == GameTypesEnum.BOXFOUR.value:
+        return GameDifficultyEnum.Normal
+    if game_type == GameTypesEnum.SUDOKU.value:
+        return GameDifficultyEnum.Normal
+    if game_type == GameTypesEnum.YATZY.value:
+        return GameDifficultyEnum.Normal
+    if game_type == GameTypesEnum.CHESS.value:
+        return GameDifficultyEnum.Hard
+    if game_type == GameTypesEnum.CHECKERS.value:
+        return GameDifficultyEnum.Hard
+    if game_type == GameTypesEnum.OTHELLO.value:
+        return GameDifficultyEnum.Hard
+    if game_type == GameTypesEnum.BACKGAMMON.value:
+        return GameDifficultyEnum.Hard
+    if game_type == GameTypesEnum.MILL.value:
+        return GameDifficultyEnum.Hard
+
+
+
