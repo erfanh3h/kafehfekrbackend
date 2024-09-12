@@ -52,7 +52,8 @@ class QueueSocketNameSpace(socketio.AsyncNamespace):
             from Entities.Database import game_database
             user_data = game_database.users_manager.read_user(user_id)
             queuer_data = QueuerModel(user_id, user_data["username"], socket_id=socket_id,
-                                      user_image=user_data['image'])
+                                      user_image=user_data['image'], user_coin=user_data['coin'],
+                                      user_score=user_data['score'])
             if game_score_type == "Normal":
                 normal_queue_session.join_queuer(queuer_data, game_type)
                 normal_socketid_game_type_pairs[socket_id] = game_type
@@ -60,7 +61,7 @@ class QueueSocketNameSpace(socketio.AsyncNamespace):
                 reward_data = gametype_to_rewards(game_type)
                 if reward_data[0] > user_data['coin']:  # check user score
                     await self.emit('command', {'id': commands.Not_Enough_Coin}, to=socket_id, namespace="/queue")
-                    print(reward_data , user_data['score'])
+                    print(reward_data, user_data['score'])
                 else:
                     rank_queue_session.join_queuer(queuer_data, game_type)
                     rank_socketid_game_type_pairs[socket_id] = game_type

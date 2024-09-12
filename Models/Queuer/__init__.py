@@ -2,8 +2,8 @@ from Models.User import UserModel
 
 
 class QueuerModel(UserModel):
-    def __init__(self, user_id: str, username: str, user_image: int, user_score: int = 0, socket_id='', ):
-        super().__init__(user_id, username, user_image)
+    def __init__(self, user_id: str, username: str, user_image: int, user_coin: int, user_score: int, socket_id='', ):
+        super().__init__(user_id, username, user_image, user_coin, user_score)
         self.socket_id = socket_id
         self.user_id: str = user_id
         self.nominate_for_game = False

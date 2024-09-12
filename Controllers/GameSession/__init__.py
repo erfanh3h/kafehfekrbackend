@@ -6,7 +6,7 @@ from Commons import commands
 from Commons.static_functions import make_command_json
 from Entities.Games.base_game_class import BaseGameClass
 from Entities.Games.wait_times import Start_Game_Time, Join_Game_Limit_Time
-from Entities.RewardManagerClass import RewardManagerClass
+from Entities.RewardManagerClass import RewardManagerClass, GameScoreTypesEnum
 from Entities.TimerClass import TimerClass
 from Models.Gamer import GamerModel
 
@@ -130,8 +130,16 @@ class BaseGameSession:
                                                                self.gamers[1].user_id,
                                                                str(self.game_type.value),
                                                                str(self.game_score_type.value))
-        game_database.users_manager.update_user(self.gamers[0].user_id, open_game_id=self.game_id, )
-        game_database.users_manager.update_user(self.gamers[1].user_id, open_game_id=self.game_id, )
+        if self.game_type == GameScoreTypesEnum.NORMAL:
+            game_database.users_manager.update_user(self.gamers[0].user_id, open_game_id=self.game_id, )
+            game_database.users_manager.update_user(self.gamers[1].user_id, open_game_id=self.game_id, )
+        else:
+            from Entities.RewardManagerClass.reward_data import gametype_to_rewards
+            reward_data = gametype_to_rewards(self.game_type.value)
+            game_database.users_manager.update_user(self.gamers[0].user_id, open_game_id=self.game_id,
+                                                    coin=self.gamers[0].user_coin - reward_data[0])
+            game_database.users_manager.update_user(self.gamers[1].user_id, open_game_id=self.game_id,
+                                                    coin=self.gamers[1].user_coin - reward_data[0])
 
     async def send_command(self, command_id, command_data):
         from Entities.SocketIOManagerClass import send_command

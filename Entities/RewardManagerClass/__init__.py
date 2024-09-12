@@ -1,6 +1,5 @@
-from Entities.Games.game_types import GameTypesEnum
 from Entities.RewardManagerClass.game_score_types import GameScoreTypesEnum
-from Entities.RewardManagerClass import reward_data
+from Entities.RewardManagerClass.reward_data import gametype_to_rewards
 from datetime import datetime
 
 
@@ -21,7 +20,12 @@ class RewardManagerClass:
         if winner_gamer_id == -1:
             return
         from Entities.Database import game_database
-        win_score, lose_score, draw_score, win_xp, lose_xp, draw_xp, win_coin, lose_coin, draw_coin = self.get_reward_data()
+        if self.game_score_type == GameScoreTypesEnum.RANK:
+            win_coin, lose_coin, draw_coin, win_score, lose_score, draw_score, win_xp, lose_xp, draw_xp = (
+                self.get_rank_reward_data())
+        else:
+            win_coin, lose_coin, draw_coin, win_score, lose_score, draw_score, win_xp, lose_xp, draw_xp = (
+                0, 0, 0, 0, 0, 0, 2, 0, 0)
         user1_data = game_database.users_manager.read_user(self.player1_user_id)
         user2_data = game_database.users_manager.read_user(self.player2_user_id)
         if winner_gamer_id == 0:
@@ -83,87 +87,6 @@ class RewardManagerClass:
                     user1_history = {"lose_normal": 1}
         return user1_history, user2_history
 
-    def get_reward_data(self):
-        # is_rank = True
-        is_rank = self.game_score_type == GameScoreTypesEnum.RANK
-        is_lobby = self.game_score_type == GameScoreTypesEnum.LOBBY
-        if self.game_type == GameTypesEnum.BACKGAMMON:
-            if is_rank:
-                return reward_data.backgammon_rank_data()
-            else:
-                return reward_data.backgammon_normal_data()
-        elif self.game_type == GameTypesEnum.BATTLESHIP:
-            if is_rank:
-                return reward_data.battleship_rank_data()
-            else:
-                return reward_data.battleship_normal_data()
-        elif self.game_type == GameTypesEnum.BOXFOUR:
-            if is_rank:
-                return reward_data.boxfour_rank_data()
-            else:
-                return reward_data.boxfour_normal_data()
-        elif self.game_type == GameTypesEnum.CHECKERS:
-            if is_rank:
-                return reward_data.checkers_rank_data()
-            else:
-                return reward_data.checkers_normal_data()
-        elif self.game_type == GameTypesEnum.CHESS:
-            if is_rank:
-                return reward_data.chess_rank_data()
-            else:
-                return reward_data.chess_normal_data()
-        elif self.game_type == GameTypesEnum.DOTBOX:
-            if is_rank:
-                return reward_data.dotbox_rank_data()
-            else:
-                return reward_data.dotbox_normal_data()
-        elif self.game_type == GameTypesEnum.FOURINROW:
-            if is_rank:
-                return reward_data.fourinrow_rank_data()
-            else:
-                return reward_data.fourinrow_normal_data()
-        elif self.game_type == GameTypesEnum.MILL:
-            if is_rank:
-                return reward_data.mill_rank_data()
-            else:
-                return reward_data.mill_normal_data()
-        elif self.game_type == GameTypesEnum.MNUMBERS:
-            if is_rank:
-                return reward_data.mnumbers_rank_data()
-            else:
-                return reward_data.mnumbers_normal_data()
-        elif self.game_type == GameTypesEnum.MSweeper:
-            if is_rank:
-                return reward_data.msweeper_rank_data()
-            else:
-                return reward_data.msweeper_normal_data()
-        elif self.game_type == GameTypesEnum.OTHELLO:
-            if is_rank:
-                return reward_data.othello_rank_data()
-            else:
-                return reward_data.othello_normal_data()
-        elif self.game_type == GameTypesEnum.RPC:
-            if is_rank:
-                return reward_data.rpc_rank_data()
-            else:
-                return reward_data.rpc_normal_data()
-        elif self.game_type == GameTypesEnum.SUDOKU:
-            if is_rank:
-                return reward_data.sudoku_rank_data()
-            else:
-                return reward_data.sudoku_normal_data()
-        elif self.game_type == GameTypesEnum.TEN:
-            if is_rank:
-                return reward_data.ten_rank_data()
-            else:
-                return reward_data.ten_normal_data()
-        elif self.game_type == GameTypesEnum.TIC_TAC_TOE:
-            if is_rank:
-                return reward_data.tictactoe_rank_data()
-            else:
-                return reward_data.tictactoe_normal_data()
-        else:
-            if is_rank:
-                return reward_data.yatzy_rank_data()
-            else:
-                return reward_data.yatzy_normal_data()
+    def get_rank_reward_data(self):
+        data = gametype_to_rewards(self.game_type.value)
+        return data[0], 0, (data[0] / 3).__ceil__(), data[1], -1 * data[1], (data[1] / 4), data[2], data[4], data[3]

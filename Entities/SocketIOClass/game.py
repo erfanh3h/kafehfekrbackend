@@ -70,9 +70,11 @@ def add_new_game(game_id, queuers, game_type, game_score_type):
     gameSession = game_type_class_pairs[game_type.value](game_id=game_id, game_type=game_type,
                                                          game_score_type=game_score_type)
     gameSession.add_gamer(
-        GamerModel(user_id=queuers[0].user_id, username=queuers[0].username, user_image=queuers[0].user_image))
+        GamerModel(user_id=queuers[0].user_id, username=queuers[0].username, user_image=queuers[0].user_image,
+                   user_score=queuers[0].user_score, user_coin=queuers[0].user_coin))
     gameSession.add_gamer(
-        GamerModel(user_id=queuers[1].user_id, username=queuers[1].username, user_image=queuers[1].user_image))
+        GamerModel(user_id=queuers[1].user_id, username=queuers[1].username, user_image=queuers[1].user_image,
+                   user_score=queuers[1].user_score, user_coin=queuers[1].user_coin))
     gameSession.start_game_timer()
     games[game_id] = gameSession
     game_idies.append(game_id)

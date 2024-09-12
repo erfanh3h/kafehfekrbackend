@@ -5,4 +5,3 @@ class GameScoreTypesEnum(Enum):
     RANK = "Rank"
     NORMAL = "Normal"
     LOBBY = "Lobby"
-    C = "C"

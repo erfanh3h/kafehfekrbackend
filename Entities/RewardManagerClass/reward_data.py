@@ -8,5 +8,5 @@ def gametype_to_rewards(game_type):
         return 10, 8, 4, 2, 1
     if difficulty == GameDifficultyEnum.Normal:
         return 15, 16, 8, 3, 2
-    if difficulty == GameDifficultyEnum.Normal:
-        return 20, 25, 12, 4, 3
+    if difficulty == GameDifficultyEnum.Hard:
+        return 20, 24, 12, 4, 3
