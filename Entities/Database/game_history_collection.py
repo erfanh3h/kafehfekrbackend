@@ -59,3 +59,9 @@ class GameHistoryCollectionManager:
     def delete_unfinished_games(self):
         query = {'is_finished': False}
         self.collection.delete_many(query)
+
+    def get_count_of_unfinished_games(self):
+        return self.collection.count_documents({'is_finished': False})
+
+    def get_count_of_finished_games(self):
+        return self.collection.count_documents({'is_finished': True})

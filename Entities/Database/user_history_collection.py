@@ -1,3 +1,5 @@
+import pymongo
+
 from Entities.Games.game_types import GameTypesEnum
 
 
@@ -28,6 +30,22 @@ class UserHistoryCollectionManager:
             return user_Data
         except:
             return None
+
+    def read_user_global_history(self, user_id):
+        try:
+            query = {'_id': user_id}
+            selection_items = {"win_normal": 1, "draw_normal": 1, "lose_normal": 1, "win_rank": 1, "draw_rank": 1,
+                               "lose_rank": 1}
+            user_Data = self.collection.find_one(query, selection_items)
+            return user_Data
+        except:
+            return None
+
+    def read_ranking_users_by_win(self):
+        query = {'win_rank': {'$gt': 0}}
+        selection_items = {"win_rank": 1}
+        data = self.collection.find(query, selection_items).sort([('win_rank', pymongo.DESCENDING)]).limit(5)
+        return data
 
     def update_user_history(self, user_id, incoming_data: dict):
         try:
