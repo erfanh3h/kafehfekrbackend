@@ -23,7 +23,6 @@ rank_socketid_game_type_pairs: dict[str, str] = {}
 
 class QueueSocketNameSpace(socketio.AsyncNamespace):
     async def on_connect(self, socket_id, environ, auth):
-        # print('connect ', socket_id)
         if auth is not None:
             try:
                 from Entities.Security import extract_token
@@ -61,13 +60,11 @@ class QueueSocketNameSpace(socketio.AsyncNamespace):
                 reward_data = gametype_to_rewards(game_type)
                 if reward_data[0] > user_data['coin']:  # check user score
                     await self.emit('command', {'id': commands.Not_Enough_Coin}, to=socket_id, namespace="/queue")
-                    print(reward_data, user_data['score'])
                 else:
                     rank_queue_session.join_queuer(queuer_data, game_type)
                     rank_socketid_game_type_pairs[socket_id] = game_type
 
     async def on_disconnect(self, socket_id):
-        print('disconnect ', socket_id)
         game_type = return_game_type_from_normal_socketid(socket_id)
         if game_type is not None:
             normal_queue_session.disconnect_user(socket_id, game_type)

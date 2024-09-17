@@ -130,7 +130,7 @@ class BaseGameSession:
                                                                self.gamers[1].user_id,
                                                                str(self.game_type.value),
                                                                str(self.game_score_type.value))
-        if self.game_type == GameScoreTypesEnum.NORMAL:
+        if self.game_score_type == GameScoreTypesEnum.NORMAL:
             game_database.users_manager.update_user(self.gamers[0].user_id, open_game_id=self.game_id, )
             game_database.users_manager.update_user(self.gamers[1].user_id, open_game_id=self.game_id, )
         else:
@@ -156,7 +156,7 @@ class BaseGameSession:
 
     async def command_received(self, data, socket_id):
         if not self.is_game_running:
-            print("game not started yet")
+            #print("game not started yet")
             return None
         gamer_data = self.find_gamer_from_socket(socket_id)
         if gamer_data is None:

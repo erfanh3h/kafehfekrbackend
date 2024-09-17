@@ -86,7 +86,7 @@ class BackGammonGameClass(BaseGameClass):
             if is_game_finished:
                 self.is_game_finished = True
 
-        print(command_id, data, gamer_id)
+        #print(command_id, data, gamer_id)
         if command_id == commands.Roll_Dice:
             self.current_dices = roll_dices()
             self.current_turn_player_rolled = True

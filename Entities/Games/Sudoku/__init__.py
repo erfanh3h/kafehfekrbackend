@@ -78,7 +78,7 @@ class SudokuGameClass(BaseGameClass):
                 self.player2_board[position[1]][position[0]].set_number(number)
 
     async def recieve_data(self, command_id, data, gamer_id):
-        print(command_id, data, gamer_id)
+        #print(command_id, data, gamer_id)
         if command_id == commands.Select_Peace:
             piece_id = data['piece_id']
             row_index, column_index = get_coordinate_of_peace(piece_id)
@@ -170,4 +170,4 @@ class SudokuGameClass(BaseGameClass):
             if i != 8:
                 board += '_______________________________________\n'
         board += '______________________________________\n'
-        print(board)
+        #print(board)

@@ -43,7 +43,7 @@ class TenGameClass(BaseGameClass):
         self.current_round += 1
 
     async def recieve_data(self, command_id, data, gamer_id):
-        print(command_id, data, gamer_id)
+        #print(command_id, data, gamer_id)
         if gamer_id == 1:
             self.gamer1_score += 1
         else:

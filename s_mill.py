@@ -71,7 +71,7 @@ class MillGameClass:
     def get_user_input(self, user_label) -> int:
         x1 = input(f"player{user_label} , enter your move : ")
         while not self.is_peace_available(int(x1)):
-            print('invalid move . please enter again : ')
+            #print('invalid move . please enter again : ')
             x1 = input(f"player{user_label} , enter your move : ")
         return int(x1)
 
@@ -80,24 +80,24 @@ class MillGameClass:
 
         input_value = input(f"player{user_label} , enter your piece : ")
         while not self.is_peace_have_selection(int(input_value)):
-            print('Invalid piece . please enter again : ')
+            #print('Invalid piece . please enter again : ')
             input_value = input(f"player{user_label} , enter your piece : ")
         location_label = self.get_value_of_location(int(input_value))
         if location_label == user_label:
             return self.swap_peaces_input_action(int(input_value), user_label)
         else:
-            print('invalid piece . please enter again. ')
+            #print('invalid piece . please enter again. ')
             return self.move_user_input(user_label)
 
     def swap_peaces_input_action(self, input_value, user_label):
         target_location = input("Enter target location : ")
         while int(target_location) not in self.pieces_neighbors[input_value]:
-            print('Invalid location . please enter again : ')
+            #print('Invalid location . please enter again : ')
             target_location = input("Enter target location : ")
         if self.is_peace_available(int(target_location)):
             self.swap_pieces_values(input_value, target_location, user_label)
         else:
-            print('Invalid empty location . please enter again : ')
+            #print('Invalid empty location . please enter again : ')
             return self.swap_peaces_input_action(input_value, user_label)
         return int(target_location)
 
@@ -144,7 +144,7 @@ class MillGameClass:
     def remove_piece_from_board(self, possible_pieces_label):
         target_location = input("Remove one of opponent pieces from self.board:")
         while not self.is_peace_have_selection(int(target_location)):
-            print('Invalid piece .')
+            #print('Invalid piece .')
             target_location = input("Please remove one of opponent pieces from board:")
 
         if self.board[int(target_location)] == possible_pieces_label:

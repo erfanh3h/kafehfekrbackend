@@ -195,7 +195,7 @@ class ChessGameClass:
                     x = position[1] + move[1]
                     if is_valid_coord(y, x) and self.is_target_piece_empty(y, x):
                         result.append((y, x))
-        print(result)
+        #print(result)
         return result
 
     def get_hit_list(self, position, gamer_id):
@@ -227,7 +227,7 @@ class ChessGameClass:
                     if is_valid_coord(x, y):
                         if self.is_target_piece_enemey(y, x, gamer_id):
                             result.append((y, x))
-        print(result)
+        #print(result)
         return result
 
     def get_king_checks(self, gamer_id: int):
@@ -268,11 +268,11 @@ class ChessGameClass:
 
     def play(self):
         self.init_board()
-        print(self)
+        #print(self)
         move_result = self.get_moves_list((0, 0), 1)
         self.get_hit_list((0, 7), 1)
         self.move_piece((1, 7), (2, 7), 1)
-        print(self)
+        #print(self)
 
 
 chess_game = ChessGameClass()

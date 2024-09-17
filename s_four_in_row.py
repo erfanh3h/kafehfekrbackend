@@ -75,7 +75,7 @@ class OthelloGameClass:
         self.board[col][row] = gamer_id
 
     def play(self):
-        print(checkers_game)
+        #print(checkers_game)
         col = self.get_possible_piece_column(6)
         if col != -1:
             self.submit_piece(col, 6, 1)
@@ -88,8 +88,8 @@ class OthelloGameClass:
         col = self.get_possible_piece_column(6)
         if col != -1:
             self.submit_piece(col, 6, 1)
-        print(checkers_game)
-        print(self.is_win_happen(1, (4, 6)))
+        #print(checkers_game)
+        #print(self.is_win_happen(1, (4, 6)))
 
         # self.flip_tiles(1, (3, 5))
         # print(checkers_game)

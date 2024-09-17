@@ -48,7 +48,7 @@ class RPCGameClass(BaseGameClass):
         self.turn_round_winner = 0
 
     async def recieve_data(self, command_id, data, gamer_id):
-        print(command_id, data, gamer_id)
+        #print(command_id, data, gamer_id)
         if gamer_id == 1:
             self.gamer1_round_selection = string_to_rpc_enum(string=data)
         else:

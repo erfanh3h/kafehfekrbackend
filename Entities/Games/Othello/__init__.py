@@ -29,7 +29,7 @@ class OthelloGameClass(BaseGameClass):
         self.player1_score = 2
         self.player2_score = 2
         self.add_pawns_to_board()
-        print(self)
+        #print(self)
 
     def __str__(self):
         board = """"""
@@ -66,7 +66,7 @@ class OthelloGameClass(BaseGameClass):
         self.current_move_list = self.get_legal_moves(self.current_turn)
 
     async def recieve_data(self, command_id, data, gamer_id):
-        print(command_id, data, gamer_id)
+        #print(command_id, data, gamer_id)
         if command_id == commands.Select_Peace:
             column_index = data['c_index']
             row_index = data['r_index']
@@ -103,7 +103,7 @@ class OthelloGameClass(BaseGameClass):
 
     def check_authority(self, data, gamer_id: int):
         if (self.current_turn == 1 and gamer_id != 1) or (self.current_turn == 2 and gamer_id != 2):
-            print("not turn of : ", gamer_id)
+            #print("not turn of : ", gamer_id)
             return False
         if self.is_game_finished:
             return False

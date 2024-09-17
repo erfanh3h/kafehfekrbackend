@@ -34,7 +34,7 @@ class DotBoxGameClass(BaseGameClass):
             self.current_turn = 1
 
     async def recieve_data(self, command_id, data, gamer_id):
-        print(command_id, data, gamer_id)
+        #print(command_id, data, gamer_id)
         peace_number = data
         self.counter += 1
         if gamer_id == 1:
@@ -58,7 +58,7 @@ class DotBoxGameClass(BaseGameClass):
 
     def check_authority(self, data, gamer_id: int):
         if (self.current_turn == 1 and gamer_id != 1) or (self.current_turn == 2 and gamer_id != 2):
-            print("not turn of : ", gamer_id)
+            #print("not turn of : ", gamer_id)
             return False
         peace_number = data
         if peace_number < 0 or peace_number > 63:

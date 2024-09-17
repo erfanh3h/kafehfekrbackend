@@ -15,15 +15,17 @@ class TicTacToeGameClass:
             self.play_round()
             self.printPretty()
             if count == 8:
-                print("The board is full. Game over.")
+                #print("The board is full. Game over.")
                 if winner:
-                    print("There is a tie. ")
+                    pass
+                    #print("There is a tie. ")
 
             # Check if here is a winner
             winner = self.check_winner()
             count += 1
         if not winner:
-            print("Game over.")
+            pass
+            #print("Game over.")
         self.report(winner)
 
     def play_round(self):
@@ -34,17 +36,17 @@ class TicTacToeGameClass:
             player = self.symbol_1
         elif self.current_turn % 2 == 1:
             player = self.symbol_2
-        print("Player " + player + ", it is your turn. ")
+        #print("Player " + player + ", it is your turn. ")
         peace_number = int(input("Pick a peace number : "))
 
         # Check if players' selection is out of range
         while peace_number < 0 or peace_number > 8:
-            print("Out of boarder. Pick another one. ")
+            #print("Out of boarder. Pick another one. ")
             peace_number = int(input("Pick a peace number : "))
 
             # Check if the square is already filled
         while (self.board[peace_number] == self.symbol_1) or (self.board[peace_number] == self.symbol_2):
-            print("The square you picked is already filled. Pick another one.")
+            #print("The square you picked is already filled. Pick another one.")
             peace_number = int(input("Pick a peace number : "))
 
             # Locates player's symbol on the board
@@ -65,7 +67,7 @@ class TicTacToeGameClass:
         for condition in self.win_conditions:
             if self.board[condition[0]] == self.board[condition[1]] == self.board[condition[2]] == self.symbol_1:
                 winner = self.symbol_1
-                print("Player " + self.symbol_1 + ", you won!")
+                #print("Player " + self.symbol_1 + ", you won!")
                 break
             if self.board[condition[0]] == self.board[condition[1]] == self.board[condition[2]] == self.symbol_2:
                 winner = self.symbol_2

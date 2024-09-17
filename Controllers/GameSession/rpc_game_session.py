@@ -74,10 +74,10 @@ class RPCGameSession(BaseGameSession):
 
             self.check_and_send_turn_round_winner()
             self.timer.start(RPC_Sleep_Round_Time, function)
-            print("end round ", self.game_controller.current_round)
+            #print("end round ", self.game_controller.current_round)
 
         elif self.game_controller.is_turn_round_finished:
-            print("end turn round ", self.game_controller.current_turn_round)
+            #print("end turn round ", self.game_controller.current_turn_round)
             self.check_and_send_turn_round_winner()
             self.timer.start(RPC_Sleep_Turn_Round_Time, self.start_new_turn_round)
             self.game_controller.change_turn_round()
@@ -85,7 +85,7 @@ class RPCGameSession(BaseGameSession):
             self.start_new_turn_round()
 
     def start_new_turn_round(self):
-        print("start turn round ", self.game_controller.current_turn_round)
+        #print("start turn round ", self.game_controller.current_turn_round)
         from Entities.SocketIOManagerClass import send_command
         self.timer.start(RPC_Turn_Round_Time, self.send_current_turn)
         asyncio.new_event_loop().run_until_complete(

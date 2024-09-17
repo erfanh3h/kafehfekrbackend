@@ -8,7 +8,7 @@ def roll_dices():
     if result[0] == result[1]:
         result.append(result[0])
         result.append(result[0])
-    print(result)
+    #print(result)
     return result
 
 

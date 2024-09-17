@@ -136,7 +136,7 @@ class BoxFourGameClass:
         return board
 
     def play_game(self):
-        print(self.print_game())
+        #print(self.print_game())
         # print(self.print_equippes())
         self.submit_piece_for_user((2, 1))
         print(self.print_game())

@@ -14,7 +14,7 @@ class Game:
         self.message = "this is where prompts will go"
         self.gameboard = {}
         self.placePieces()
-        print("chess program. enter moves in algebraic notation separated by space")
+        #print("chess program. enter moves in algebraic notation separated by space")
         self.main()
 
     def placePieces(self):
@@ -34,7 +34,7 @@ class Game:
 
         while True:
             self.printBoard()
-            print(self.message)
+            #print(self.message)
             self.message = ""
             startpos, endpos = self.parseInput()
             try:
@@ -44,7 +44,7 @@ class Game:
                 target = None
 
             if target:
-                print("found " + str(target))
+                #print("found " + str(target))
                 if target.Color != self.playersturn:
                     self.message = "you aren't allowed to move that piece this turn"
                     continue
@@ -59,7 +59,7 @@ class Game:
                         self.playersturn = BLACK
                 else:
                     self.message = "invalid move" + str(target.availableMoves(startpos[0], startpos[1], self.gameboard))
-                    print(target.availableMoves(startpos[0], startpos[1], self.gameboard))
+                    #print(target.availableMoves(startpos[0], startpos[1], self.gameboard))
             else:
                 self.message = "there is no piece in that space"
 
@@ -71,7 +71,7 @@ class Game:
         for position, piece in self.gameboard.items():
             if type(piece) == King:
                 kingDict[piece.Color] = position
-            print(piece)
+            #print(piece)
             pieceDict[piece.Color].append((piece, position))
         # white
         if self.canSeeKing(kingDict[WHITE], pieceDict[BLACK]):
@@ -90,10 +90,10 @@ class Game:
             a, b = input().split()
             a = ((ord(a[0]) - 97), int(a[1]) - 1)
             b = (ord(b[0]) - 97, int(b[1]) - 1)
-            print(a, b)
+            #print(a, b)
             return (a, b)
         except:
-            print("error decoding input. please try again")
+            #print("error decoding input. please try again")
             return ((-1, -1), (-1, -1))
 
     """def validateInput(self, *kargs):

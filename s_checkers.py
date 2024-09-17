@@ -219,7 +219,7 @@ class CheckersGameClass:
             temp_move_list = get_direction1_moves(r_index, c_index, gamer_id)
         else:
             temp_move_list = get_direction2_movees(r_index, c_index, gamer_id)
-        print(temp_move_list)
+        #print(temp_move_list)
         for move in temp_move_list:
             if move[0] is not None:
                 moves.append(move)
@@ -244,7 +244,7 @@ class CheckersGameClass:
 
     def move_pawn(self, s_c_index, s_r_index, t_c_index, t_r_index, gamer_id):
         moves = self.get_possible_moves_of_peace(s_r_index, s_c_index, gamer_id)
-        print(moves)
+        #print(moves)
         self.board[s_c_index][s_r_index].remove_pawn_gamer()
         if self.check_is_last_peace(t_c_index, gamer_id):
             self.board[t_c_index][t_r_index].set_pawn_gamer_id(gamer_id, True)
@@ -275,9 +275,9 @@ class CheckersGameClass:
 
     def play(self):
         self.add_pawns_to_board()
-        print(checkers_game)
+        #print(checkers_game)
         self.move_pawn(6, 0, 7, 5, 2)
-        print(checkers_game)
+        #print(checkers_game)
         # print(self.check_win())
         # print(self.get_possible_moves_of_peace(4, 2, 1))
 

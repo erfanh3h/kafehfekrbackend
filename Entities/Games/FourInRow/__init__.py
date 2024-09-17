@@ -66,11 +66,11 @@ class FourInRowGameClass(BaseGameClass):
             self.current_turn = self.symbol_1
 
     async def recieve_data(self, command_id, data, gamer_id):
-        print(command_id, data, gamer_id)
+        #print(command_id, data, gamer_id)
         if command_id == commands.Select_Peace:
             row_index = data['r_index']
             column_index = self.get_possible_piece_column(row_index)
-            print(column_index)
+            #print(column_index)
             if column_index != -1:
                 self.submit_piece(column_index, row_index, gamer_id)
                 await self.send_data_function(commands.Peace_Selected, {
@@ -105,7 +105,7 @@ class FourInRowGameClass(BaseGameClass):
 
     def check_authority(self, data, gamer_id: int):
         if (self.current_turn == 1 and gamer_id != 1) or (self.current_turn == 2 and gamer_id != 2):
-            print("not turn of : ", gamer_id)
+            #print("not turn of : ", gamer_id)
             return False
         if self.is_game_finished:
             return False

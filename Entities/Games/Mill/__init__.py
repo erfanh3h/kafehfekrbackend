@@ -38,7 +38,7 @@ class MillGameClass(BaseGameClass):
         pass
 
     async def recieve_data(self, command_id, data, gamer_id):
-        print(command_id, data, gamer_id)
+        #print(command_id, data, gamer_id)
         if command_id == commands.Select_Peace:
             peace_number = data
             if gamer_id == 1:
@@ -81,7 +81,7 @@ class MillGameClass(BaseGameClass):
 
     def check_authority(self, data, gamer_id: int):
         if (self.current_turn == 1 and gamer_id != 1) or (self.current_turn == 2 and gamer_id != 2):
-            print("not turn of : ", gamer_id)
+            #print("not turn of : ", gamer_id)
             return False
         if self.is_game_finished:
             return False

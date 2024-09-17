@@ -45,7 +45,6 @@ class GameQueueSessionDetails:
         for queuer_id in queuers_idis:
             queuer_data = self.find_gamer_from_user_id(queuer_id)
             if queuer_data is None:
-                print("Invalid user")
                 return False
             queuers.append(queuer_data)
         game_id = static_functions.create_random_game_id()
@@ -57,7 +56,6 @@ class GameQueueSessionDetails:
                     send_queue_command(command=make_command_json(id=commands.Start_Game, data=game_data),
                                        socket_id=queuer_data.socket_id))
                 self.queuers.remove(queuer_data)
-        print(game_id, queuers_idis)
         from Entities.SocketIOClass.game import add_new_game
         add_new_game(game_id, queuers, self.game_type, self.game_score_type)
 

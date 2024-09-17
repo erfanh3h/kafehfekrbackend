@@ -81,9 +81,8 @@ class MSweeperGameSession(BaseGameSession):
     def check_winner(self):
         self.game_controller.finish_game()
         winner = self.game_controller.get_game_winner()
-        if not self.game_controller.is_finish_message_delivered:
-            from Entities.SocketIOManagerClass import send_command
-            asyncio.new_event_loop().run_until_complete(
-                send_command(command=make_command_json(id=commands.Finish_Game, data={"Winner": winner}),
-                             game_id=self.game_id))
+        from Entities.SocketIOManagerClass import send_command
+        asyncio.new_event_loop().run_until_complete(
+            send_command(command=make_command_json(id=commands.Finish_Game, data={"Winner": winner}),
+                         game_id=self.game_id))
         self.finish_game(winner)

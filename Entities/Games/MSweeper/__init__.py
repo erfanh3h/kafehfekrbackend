@@ -44,7 +44,7 @@ class MSweeperGameClass(BaseGameClass):
                 i += 1
             else:
                 i -= 1
-        print(self.show_board())
+        #print(self.show_board())
 
     def get_game_data_msweeper(self, gamer_id):
         board_peaces_data = []
@@ -151,7 +151,7 @@ class MSweeperGameClass(BaseGameClass):
         return self.board[x][y].value == -1
 
     async def recieve_data(self, command_id, data, gamer_id):
-        print(command_id, data, gamer_id)
+        #print(command_id, data, gamer_id)
         peace_number = data
         x, y = get_coordinate_of_peace(peace_number)
         if command_id == commands.Select_Peace:

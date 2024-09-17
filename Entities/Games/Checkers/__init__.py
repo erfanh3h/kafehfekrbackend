@@ -68,7 +68,7 @@ class CheckersGameClass(BaseGameClass):
             self.current_turn = self.symbol_1
 
     async def recieve_data(self, command_id, data, gamer_id):
-        print(command_id, data, gamer_id)
+        #print(command_id, data, gamer_id)
         if command_id == commands.Select_Peace:
             source_column_index = data['s_c_index']
             source_row_index = data['s_r_index']
@@ -111,7 +111,7 @@ class CheckersGameClass(BaseGameClass):
 
     def check_authority(self, data, gamer_id: int):
         if (self.current_turn == 1 and gamer_id != 1) or (self.current_turn == 2 and gamer_id != 2):
-            print("not turn of : ", gamer_id)
+            #print("not turn of : ", gamer_id)
             return False
         if self.is_game_finished:
             return False
@@ -274,7 +274,7 @@ class CheckersGameClass(BaseGameClass):
             temp_move_list = get_direction1_moves(r_index, c_index, gamer_id)
         else:
             temp_move_list = get_direction2_moves(r_index, c_index, gamer_id)
-        print(temp_move_list)
+        #print(temp_move_list)
         for move in temp_move_list:
             if move[0] is not None:
                 moves.append(move)
@@ -299,7 +299,7 @@ class CheckersGameClass(BaseGameClass):
 
     def move_pawn(self, s_c_index, s_r_index, t_c_index, t_r_index, gamer_id):
         moves = self.get_possible_moves_of_peace(s_r_index, s_c_index, gamer_id)
-        print(moves)
+        #print(moves)
         for move_data in moves:
             if move_data[0] == (t_r_index, t_c_index):
                 if self.check_is_last_peace(t_c_index, gamer_id) or self.board[s_c_index][s_r_index].is_super_pawn:

@@ -54,7 +54,7 @@ class YatzyGameClass(BaseGameClass):
         return data
 
     async def recieve_data(self, command_id, data, gamer_id):
-        print(command_id, data, gamer_id)
+        #print(command_id, data, gamer_id)
         if command_id == commands.Roll_Dice:
             selected_indexes = data['selected_indexes']
             if gamer_id == 1:
@@ -108,7 +108,7 @@ class YatzyGameClass(BaseGameClass):
 
     def check_authority(self, data, gamer_id: int):
         if (gamer_id == 1 and self.is_player1_round_done) or (gamer_id == 2 and self.is_player2_round_done):
-            print("round done : ", gamer_id)
+            #print("round done : ", gamer_id)
             return False
         if self.is_game_finished:
             return False

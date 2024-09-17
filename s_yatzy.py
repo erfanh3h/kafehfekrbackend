@@ -29,7 +29,7 @@ class YatzyGameClass:
         self.player2_board = [boardSpot(index, 2) for index in range(12)]
 
     def play_game(self):
-        print(roll_dices(5))
+        #print(roll_dices(5))
 
     def __str__(self):
         return ""

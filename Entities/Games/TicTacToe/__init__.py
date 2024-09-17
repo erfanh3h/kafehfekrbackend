@@ -23,7 +23,7 @@ class TicTacToeGameClass(BaseGameClass):
         return data
 
     async def recieve_data(self, command_id, data, gamer_id):
-        print(command_id, data, gamer_id)
+        #print(command_id, data, gamer_id)
         peace_number = data
         self.counter += 1
         if gamer_id == 1:
