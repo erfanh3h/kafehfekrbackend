@@ -1,13 +1,13 @@
 import socketio
 
 from Commons import static_functions
-# from Entities.SocketIOClass import Socket_Server, return_random_idies
 from Controllers.GameSession.box_four_game_session import BoxFourGameSession
 from Controllers.GameSession.backgammon_game_session import BackGammonGameSession
 from Controllers.GameSession.battleship_game_session import BattleShipGameSession
 from Controllers.GameSession.checkers_game_session import CheckersGameSession
 from Controllers.GameSession.chess_game_session import ChessGameSession
 from Controllers.GameSession.dotbox_game_session import DotBoxGameSession
+from Controllers.GameSession.fekrbekr_game_session import FekrBekrGameSession
 from Controllers.GameSession.four_in_row_game_session import FourInRowGameSession
 from Controllers.GameSession.mill_game_session import MillGameSession
 from Controllers.GameSession.mnumbers_game_session import MNumbersGameSession
@@ -22,35 +22,25 @@ from Entities.Games.game_types import GameTypesEnum
 from Entities.RewardManagerClass import GameScoreTypesEnum
 from Models.Gamer import GamerModel
 
-# current_game_id = "gameId"
-# gameSession = MillGameSession(game_id=current_game_id, game_score_type=GameScoreTypesEnum.NORMAL)
-# gameSession = MNumbersGameSession(game_id=current_game_id, game_score_type=GameScoreTypesEnum.NORMAL)
-# gameSession = CheckersGameSession(game_id=current_game_id, game_score_type=GameScoreTypesEnum.NORMAL)
-# gameSession = TenGameSession(game_id=current_game_id, game_score_type=GameScoreTypesEnum.NORMAL)
-# gameSession = ChessGameSession(game_id=current_game_id, game_score_type=GameScoreTypesEnum.NORMAL)
-# gameSession = YatzyGameSession(game_id=current_game_id, game_score_type=GameScoreTypesEnum.NORMAL)
-# gameSession = FourInRowGameSession(game_id=current_game_id, game_score_type=GameScoreTypesEnum.NORMAL)
-# gameSession = SudokuGameSession(game_id=current_game_id, game_score_type=GameScoreTypesEnum.NORMAL)
-# gameSession = BattleShipGameSession(game_id=current_game_id, game_score_type=GameScoreTypesEnum.NORMAL)
-# gameSession = BoxFourGameSession(game_id=current_game_id, game_score_type=GameScoreTypesEnum.NORMAL)
-# gameSession = BackGammonGameSession(game_id=current_game_id, game_score_type=GameScoreTypesEnum.NORMAL)
-# gameSession = TicTacToeGameSession(game_id=current_game_id, game_score_type=GameScoreTypesEnum.NORMAL)
-# gameSession = RPCGameSession(game_id=current_game_id, game_score_type=GameScoreTypesEnum.NORMAL)
-# gameSession = OthelloGameSession(game_id=current_game_id, game_score_type=GameScoreTypesEnum.NORMAL)
-# gameSession = DotBoxGameSession(game_id=current_game_id, game_score_type=GameScoreTypesEnum.NORMAL)
-# gameSession = MSweeperGameSession(game_id=current_game_id, game_score_type=GameScoreTypesEnum.NORMAL)
+current_game_id = "gameId"
+gameSession = FekrBekrGameSession(game_id=current_game_id, game_score_type=GameScoreTypesEnum.NORMAL,
+                                  game_type=GameTypesEnum.FEKRBEKR)
 
-# gameSession.add_gamer(GamerModel(user_id="0", username='test'))
-# gameSession.add_gamer(GamerModel(user_id="1", username='mobile'))
-# gameSession.start_game_timer()
+gameSession.add_gamer(
+    GamerModel("kC8GgJ", username="test", user_image=60,
+               user_score=1000, user_coin=1000))
+gameSession.add_gamer(
+    GamerModel("NHD6bL", username="test", user_image=60,
+               user_score=1000, user_coin=1000))
+gameSession.start_game_timer()
 
-# games = {current_game_id: gameSession}
-# game_idies = [current_game_id]
-# socketid_gameid_pairs = {}
-
-games = {}
-game_idies = []
+games = {current_game_id: gameSession}
+game_idies = [current_game_id]
 socketid_gameid_pairs = {}
+
+# games = {}
+# game_idies = []
+# socketid_gameid_pairs = {}
 
 game_type_class_pairs = {GameTypesEnum.TIC_TAC_TOE.value: TicTacToeGameSession,
                          GameTypesEnum.CHECKERS.value: CheckersGameSession, GameTypesEnum.CHESS.value: ChessGameSession,
@@ -63,6 +53,7 @@ game_type_class_pairs = {GameTypesEnum.TIC_TAC_TOE.value: TicTacToeGameSession,
                          GameTypesEnum.SUDOKU.value: SudokuGameSession,
                          GameTypesEnum.BATTLESHIP.value: BattleShipGameSession,
                          GameTypesEnum.BOXFOUR.value: BoxFourGameSession,
+                         GameTypesEnum.FEKRBEKR.value: FekrBekrGameSession,
                          GameTypesEnum.BACKGAMMON.value: BackGammonGameSession}
 
 

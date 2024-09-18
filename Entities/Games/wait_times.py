@@ -1,4 +1,4 @@
-Join_Game_Limit_Time = 20
+Join_Game_Limit_Time = 2000
 Start_Game_Time = 5
 TicTacToe_Turn_Time = 10
 TicTacToe_Sleep_Round_Time = 5
@@ -24,5 +24,7 @@ BattleShip_Board_Time = 60
 BattleShip_Wait_Time = 4
 BattleShip_Turn_Time = 12
 BoxFour_Turn_Time = 12
+FekrBekr_Board_Time = 60
+FekrBekr_Round_Time = 50
 BackGammon_Turn_Time = 30
 BackGammon_Out_Of_Move_time = 5

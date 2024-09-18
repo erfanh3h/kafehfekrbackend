@@ -17,4 +17,5 @@ class GameTypesEnum(Enum):
     SUDOKU = "Sudoku"
     BATTLESHIP = "BattleShip"
     BOXFOUR = "BoxFour"
+    FEKRBEKR = "FekrBekr"
     BACKGAMMON = "BackGammon"

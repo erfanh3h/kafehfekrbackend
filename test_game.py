@@ -28,7 +28,9 @@ async def disconnect():
 
 
 async def start():
-    await sio.connect('http://localhost:5000', wait_timeout=1, auth={'user_id': "0", 'game_id': 'testgame'},
+    token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJwaG9uZSI6IjkzMTEyMzQ1NjciLCJpZCI6ImtDOEdnSiIsImRldmljZV9pZCI6Ins1MkEyNzNBMi0yNDBELTQ1OUMtQkNGNC01MkIwNzlFODhDREJ9IiwiZXhwIjoxNzU3OTQ2ODMxfQ._QGMzgC0mL30BNZiFeUiXqUhNlzvKnr4EU8WB6_LiAk"
+    await sio.connect('http://localhost:5000', wait_timeout=1,
+                      auth={'user_id': "kC8GgJ", 'game_id': 'gameId', 'token': token},
                       namespaces="/game")
     await asyncio.sleep(1)
     while True:
