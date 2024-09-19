@@ -26,11 +26,14 @@ current_game_id = "gameId"
 gameSession = FekrBekrGameSession(game_id=current_game_id, game_score_type=GameScoreTypesEnum.NORMAL,
                                   game_type=GameTypesEnum.FEKRBEKR)
 
+# gameSession.add_gamer(
+#     GamerModel("kC8GgJ", username="test", user_image=60,
+#                user_score=1000, user_coin=1000))
 gameSession.add_gamer(
-    GamerModel("kC8GgJ", username="test", user_image=60,
+    GamerModel("NHD6bL", username="windows", user_image=60,
                user_score=1000, user_coin=1000))
 gameSession.add_gamer(
-    GamerModel("NHD6bL", username="test", user_image=60,
+    GamerModel("kFIrrF", username="mobile", user_image=60,
                user_score=1000, user_coin=1000))
 gameSession.start_game_timer()
 

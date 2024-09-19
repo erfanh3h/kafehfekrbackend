@@ -3,7 +3,7 @@ import time
 
 from Entities.Games.FekrBekr import FekrBekrGameClass
 from Entities.Games.game_types import GameTypesEnum
-from Entities.Games.wait_times import FekrBekr_Round_Time, FekrBekr_Board_Time
+from Entities.Games.wait_times import FekrBekr_Round_Time, FekrBekr_Board_Time, FekrBekr_Round_Wait_Time
 from Commons.static_functions import make_command_json
 from Commons import commands
 from Controllers.GameSession import BaseGameSession
@@ -73,21 +73,34 @@ class FekrBekrGameSession(BaseGameSession):
         from Entities.SocketIOManagerClass import send_command
 
         def auto_select_round():
-            empty_data = [0, 0, 0, 0, 0]
+            empty_data = [0, 0, 0, 0]
             if not self.game_controller.player1_played_turn:
-                self.game_controller.submit_data(empty_data, 1)
+                self.game_controller.player1_choices.append(empty_data)
+                self.game_controller.player1_results.append(empty_data)
                 asyncio.new_event_loop().run_until_complete(send_command(
-                    command=make_command_json(id=commands.Peace_Selected, data={'gamer_id': 1, 'data': empty_data}),
+                    command=make_command_json(id=commands.Peace_Selected,
+                                              data={'gamer_id': 1, 'data': empty_data, "result": empty_data}),
                     game_id=self.game_id, ))
             if not self.game_controller.player2_played_turn:
-                self.game_controller.submit_data(empty_data, 2)
+                self.game_controller.player2_choices.append(empty_data)
+                self.game_controller.player2_results.append(empty_data)
                 asyncio.new_event_loop().run_until_complete(send_command(
-                    command=make_command_json(id=commands.Peace_Selected, data={'gamer_id': 2, 'data': empty_data}),
+                    command=make_command_json(id=commands.Peace_Selected,
+                                              data={'gamer_id': 2, 'data': empty_data, "result": empty_data}),
                     game_id=self.game_id, ))
+
+        def auto_select_board():
+            default_board = [1, 2, 3, 4]
+            if not self.game_controller.player1_board_rdy:
+                self.game_controller.save_board(default_board, 1)
+            if not self.game_controller.player2_board_rdy:
+                self.game_controller.save_board(default_board, 2)
 
         # check to if user didn't select this turn , automattically select first piece of him
         if self.game_controller.current_round != 0 and not self.game_controller.is_game_finished:
             auto_select_round()
+        elif self.game_controller.current_round == 0:
+            auto_select_board()
         self.game_controller.change_round()
         if self.game_controller.check_game_ended():
             winner = self.game_controller.get_game_winner()
@@ -97,8 +110,15 @@ class FekrBekrGameSession(BaseGameSession):
             self.finish_game(winner)
             return
 
+        def function():
+            asyncio.new_event_loop().run_until_complete(
+                send_command(command=make_command_json(id=commands.Current_Turn,
+                                                       data={"current_round": self.game_controller.current_round}),
+                             game_id=self.game_id))
+            self.timer.start(FekrBekr_Round_Time, self.send_current_turn)
+
         asyncio.new_event_loop().run_until_complete(
-            send_command(command=make_command_json(id=commands.Current_Turn,
-                                                   data={"current_turn": self.game_controller.current_round}),
-                         game_id=self.game_id))
-        self.timer.start(FekrBekr_Round_Time, self.send_current_turn)
+            send_command(
+                command=make_command_json(id=commands.Wait_Time, data=FekrBekr_Round_Wait_Time),
+                game_id=self.game_id))
+        self.timer.start(FekrBekr_Round_Wait_Time, function)
