@@ -18,4 +18,5 @@ class GameTypesEnum(Enum):
     BATTLESHIP = "BattleShip"
     BOXFOUR = "BoxFour"
     FEKRBEKR = "FekrBekr"
+    PENTAGO = "Pentago"
     BACKGAMMON = "BackGammon"

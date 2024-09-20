@@ -13,6 +13,7 @@ from Controllers.GameSession.mill_game_session import MillGameSession
 from Controllers.GameSession.mnumbers_game_session import MNumbersGameSession
 from Controllers.GameSession.msweeper_game_session import MSweeperGameSession
 from Controllers.GameSession.othello_game_session import OthelloGameSession
+from Controllers.GameSession.pentago_game_session import PentagoGameSession
 from Controllers.GameSession.rpc_game_session import RPCGameSession
 from Controllers.GameSession.sudoku_game_session import SudokuGameSession
 from Controllers.GameSession.ten_game_session import TenGameSession
@@ -23,18 +24,20 @@ from Entities.RewardManagerClass import GameScoreTypesEnum
 from Models.Gamer import GamerModel
 
 current_game_id = "gameId"
-gameSession = FekrBekrGameSession(game_id=current_game_id, game_score_type=GameScoreTypesEnum.NORMAL,
+# gameSession = FekrBekrGameSession(game_id=current_game_id, game_score_type=GameScoreTypesEnum.NORMAL,
+#                                   game_type=GameTypesEnum.FEKRBEKR)
+gameSession = PentagoGameSession(game_id=current_game_id, game_score_type=GameScoreTypesEnum.NORMAL,
                                   game_type=GameTypesEnum.FEKRBEKR)
 
-# gameSession.add_gamer(
-#     GamerModel("kC8GgJ", username="test", user_image=60,
-#                user_score=1000, user_coin=1000))
+gameSession.add_gamer(
+    GamerModel("kC8GgJ", username="test", user_image=60,
+               user_score=1000, user_coin=1000))
 gameSession.add_gamer(
     GamerModel("NHD6bL", username="windows", user_image=60,
                user_score=1000, user_coin=1000))
-gameSession.add_gamer(
-    GamerModel("kFIrrF", username="mobile", user_image=60,
-               user_score=1000, user_coin=1000))
+# gameSession.add_gamer(
+#     GamerModel("kFIrrF", username="mobile", user_image=60,
+#                user_score=1000, user_coin=1000))
 gameSession.start_game_timer()
 
 games = {current_game_id: gameSession}
@@ -57,6 +60,7 @@ game_type_class_pairs = {GameTypesEnum.TIC_TAC_TOE.value: TicTacToeGameSession,
                          GameTypesEnum.BATTLESHIP.value: BattleShipGameSession,
                          GameTypesEnum.BOXFOUR.value: BoxFourGameSession,
                          GameTypesEnum.FEKRBEKR.value: FekrBekrGameSession,
+                         GameTypesEnum.PENTAGO.value: PentagoGameSession,
                          GameTypesEnum.BACKGAMMON.value: BackGammonGameSession}
 
 
