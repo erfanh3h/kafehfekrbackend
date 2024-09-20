@@ -40,9 +40,11 @@ class PentagoGameSession(BaseGameSession):
         if self.game_controller.current_round != 0 and not self.game_controller.rotation_played:
             random_index = random.randint(1, 8)
             self.game_controller.rotate_piece(random_index)
+            self.game_controller.rotation_played = True
             asyncio.new_event_loop().run_until_complete(send_command(
                 command=make_command_json(id=commands.Peace_Rotated, data={'user': self.game_controller.current_turn,
-                                                                           'rotation_id': random_index}),
+                                                                           'rotation_id': random_index,
+                                                                           'board': self.game_controller.board}),
                 game_id=self.game_id))
         if self.game_controller.check_game_ended():
             winner = self.game_controller.get_game_winner()
@@ -53,7 +55,15 @@ class PentagoGameSession(BaseGameSession):
             self.finish_game(winner)
             return
         self.game_controller.change_turn()
-        asyncio.new_event_loop().run_until_complete(
-            send_command(command=make_command_json(id=commands.Current_Turn, data=self.game_controller.current_turn),
-                         game_id=self.game_id))
-        self.timer.start(Pentago_Turn_Time, self.send_current_turn)
+
+        def function():
+            asyncio.new_event_loop().run_until_complete(
+                send_command(
+                    command=make_command_json(id=commands.Current_Turn, data=self.game_controller.current_turn),
+                    game_id=self.game_id))
+            self.timer.start(Pentago_Turn_Time, self.send_current_turn)
+
+        if self.game_controller.current_round == 1:
+            function()
+        else:
+            self.timer.start(2, function)

@@ -6,7 +6,9 @@ win_conditions = [[0, 1, 2, 9, 10], [1, 2, 9, 10, 11], [3, 4, 5, 12, 13], [4, 5,
                   [22, 23, 30, 31, 32], [24, 25, 26, 33, 34], [25, 26, 33, 34, 35], [0, 3, 6, 18, 21],
                   [3, 6, 18, 21, 24], [1, 4, 7, 19, 22], [4, 7, 19, 22, 25], [2, 5, 8, 20, 23], [5, 8, 20, 23, 26],
                   [9, 12, 15, 27, 30], [12, 15, 27, 30, 33], [10, 13, 16, 28, 31], [13, 16, 28, 31, 34],
-                  [11, 14, 17, 29, 32], [14, 17, 29, 32, 35]]
+                  [11, 14, 17, 29, 32], [14, 17, 29, 32, 35], [21, 19, 8, 12, 10], [25, 23, 27, 16, 14],
+                  [1, 5, 15, 28, 32], [3, 7, 20, 30, 34], [24, 22, 20, 15, 13], [11, 13, 15, 20, 22], [0, 4, 8, 27, 31],
+                  [35, 31, 27, 8, 4]]
 
 
 class PentagoGameClass(BaseGameClass):
@@ -42,7 +44,8 @@ class PentagoGameClass(BaseGameClass):
             self.rotate_piece(data)
             self.rotation_played = True
             self.is_game_finished = self.check_win_happened()
-            await self.send_data_function(commands.Peace_Rotated, {'user': gamer_id, 'rotation_id': data})
+            await self.send_data_function(commands.Peace_Rotated,
+                                          {'user': gamer_id, 'rotation_id': data, 'board': self.board})
             return True
         return False
 
@@ -71,6 +74,30 @@ class PentagoGameClass(BaseGameClass):
             self.board[15], self.board[12], self.board[9] = self.board[17], self.board[16], self.board[15]
             self.board[17], self.board[16], self.board[15] = self.board[11], self.board[14], self.board[17]
             self.board[11], self.board[14], self.board[17] = temp1, temp2, temp3
+        elif rotation_id == 5:
+            temp1, temp2, temp3 = self.board[18], self.board[19], self.board[20]
+            self.board[18], self.board[19], self.board[20] = self.board[20], self.board[23], self.board[26]
+            self.board[20], self.board[23], self.board[26] = self.board[26], self.board[25], self.board[24]
+            self.board[26], self.board[25], self.board[24] = self.board[24], self.board[21], self.board[18]
+            self.board[24], self.board[21], self.board[18] = temp1, temp2, temp3
+        elif rotation_id == 6:
+            temp1, temp2, temp3 = self.board[18], self.board[19], self.board[20]
+            self.board[18], self.board[19], self.board[20] = self.board[24], self.board[21], self.board[18]
+            self.board[24], self.board[21], self.board[18] = self.board[26], self.board[25], self.board[24]
+            self.board[26], self.board[25], self.board[24] = self.board[20], self.board[23], self.board[26]
+            self.board[20], self.board[23], self.board[26] = temp1, temp2, temp3
+        elif rotation_id == 7:
+            temp1, temp2, temp3 = self.board[27], self.board[28], self.board[29]
+            self.board[27], self.board[28], self.board[29] = self.board[29], self.board[32], self.board[35]
+            self.board[29], self.board[32], self.board[35] = self.board[35], self.board[34], self.board[33]
+            self.board[35], self.board[34], self.board[33] = self.board[33], self.board[30], self.board[27]
+            self.board[33], self.board[30], self.board[27] = temp1, temp2, temp3
+        elif rotation_id == 8:
+            temp1, temp2, temp3 = self.board[27], self.board[28], self.board[29]
+            self.board[27], self.board[28], self.board[29] = self.board[33], self.board[30], self.board[27]
+            self.board[33], self.board[30], self.board[27] = self.board[35], self.board[34], self.board[33]
+            self.board[35], self.board[34], self.board[33] = self.board[29], self.board[32], self.board[35]
+            self.board[29], self.board[32], self.board[35] = temp1, temp2, temp3
 
     def check_win_happened(self):
         def check_win(gamer_id, indexes) -> bool:
@@ -103,6 +130,8 @@ class PentagoGameClass(BaseGameClass):
             return False
         if self.is_game_finished:
             return False
+        if self.selection_played:
+            return False
         return True
 
     def check_rotate_authority(self, data, gamer_id: int):
@@ -112,6 +141,8 @@ class PentagoGameClass(BaseGameClass):
         if rotate_id < 1 or rotate_id > 8:
             return False
         if self.is_game_finished:
+            return False
+        if self.rotation_played:
             return False
         return True
 
