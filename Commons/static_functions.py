@@ -53,7 +53,7 @@ def gametype_to_difficulty(game_type):
     if game_type == GameTypesEnum.MSweeper.value:
         return GameDifficultyEnum.Normal
     if game_type == GameTypesEnum.MNUMBERS.value:
-        return GameDifficultyEnum.Normal
+        return GameDifficultyEnum.Easy
     if game_type == GameTypesEnum.BATTLESHIP.value:
         return GameDifficultyEnum.Normal
     if game_type == GameTypesEnum.FOURINROW.value:
