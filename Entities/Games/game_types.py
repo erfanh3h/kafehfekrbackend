@@ -19,4 +19,5 @@ class GameTypesEnum(Enum):
     BOXFOUR = "BoxFour"
     FEKRBEKR = "FekrBekr"
     PENTAGO = "Pentago"
+    YINSH = "Yinsh"
     BACKGAMMON = "BackGammon"

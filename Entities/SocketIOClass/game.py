@@ -19,6 +19,7 @@ from Controllers.GameSession.sudoku_game_session import SudokuGameSession
 from Controllers.GameSession.ten_game_session import TenGameSession
 from Controllers.GameSession.tictactoe_game_session import TicTacToeGameSession
 from Controllers.GameSession.yatzy_game_session import YatzyGameSession
+from Controllers.GameSession.yinsh_game_session import YinshGameSession
 from Entities.Games.game_types import GameTypesEnum
 from Entities.RewardManagerClass import GameScoreTypesEnum
 from Models.Gamer import GamerModel
@@ -61,6 +62,7 @@ game_type_class_pairs = {GameTypesEnum.TIC_TAC_TOE.value: TicTacToeGameSession,
                          GameTypesEnum.BOXFOUR.value: BoxFourGameSession,
                          GameTypesEnum.FEKRBEKR.value: FekrBekrGameSession,
                          GameTypesEnum.PENTAGO.value: PentagoGameSession,
+                         GameTypesEnum.YINSH.value: YinshGameSession,
                          GameTypesEnum.BACKGAMMON.value: BackGammonGameSession}
 
 

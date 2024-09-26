@@ -24,6 +24,7 @@ Sudoku_game_Time = 1200
 BattleShip_Board_Time = 60
 BattleShip_Wait_Time = 4
 BattleShip_Turn_Time = 12
+Yinsh_Turn_Time = 30
 BoxFour_Turn_Time = 12
 FekrBekr_Board_Time = 60
 FekrBekr_Round_Time = 60

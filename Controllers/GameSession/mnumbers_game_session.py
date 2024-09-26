@@ -39,7 +39,10 @@ class MNumbersGameSession(BaseGameSession):
                 send_command(
                     command=make_command_json(id=commands.Current_Turn, data=self.game_controller.current_turn),
                     game_id=self.game_id))
-            self.timer.start(MNumbers_Turn_Time, self.send_current_turn)
+            if self.game_controller.is_game_finished:
+                self.send_current_turn()
+            else:
+                self.timer.start(MNumbers_Turn_Time, self.send_current_turn)
 
         if self.game_controller.is_game_finished:
             winner_id = self.game_controller.get_game_winner()

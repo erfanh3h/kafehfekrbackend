@@ -72,8 +72,7 @@ def gametype_to_difficulty(game_type):
         return GameDifficultyEnum.Hard
     if game_type == GameTypesEnum.BACKGAMMON.value:
         return GameDifficultyEnum.Hard
+    if game_type == GameTypesEnum.YINSH.value:
+        return GameDifficultyEnum.Hard
     if game_type == GameTypesEnum.MILL.value:
         return GameDifficultyEnum.Hard
-
-
-

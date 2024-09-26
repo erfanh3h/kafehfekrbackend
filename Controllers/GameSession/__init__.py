@@ -1,4 +1,5 @@
 import asyncio
+import random
 import threading
 import time
 
@@ -121,6 +122,8 @@ class BaseGameSession:
                                  socket_id=socket_id, game_id=self.game_id))
 
     def prepare_gamers(self):
+        random.shuffle(self.gamers)
+        random.shuffle(self.gamers)
         for gamer_id in range(0, len(self.gamers)):
             self.gamers[gamer_id].gamer_id = gamer_id + 1
             self.gamers[gamer_id].team_id = gamer_id + 1
