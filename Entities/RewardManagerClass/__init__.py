@@ -16,6 +16,7 @@ class RewardManagerClass:
         self.player2_user_id = player2_user_id
 
     def finish_game(self, winner_gamer_id):
+        return
         # -1 is when game terminated by not joining users
         if winner_gamer_id == -1:
             return

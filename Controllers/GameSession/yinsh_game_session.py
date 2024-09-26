@@ -2,7 +2,7 @@ import asyncio
 
 from Entities.Games.Yinsh import YinshGameClass
 from Entities.Games.game_types import GameTypesEnum
-from Entities.Games.wait_times import Yinsh_Turn_Time
+from Entities.Games.wait_times import Yinsh_Turn_Time, Yinsh_Ring_Time
 from Commons.static_functions import make_command_json
 from Commons import commands
 from Controllers.GameSession import BaseGameSession
@@ -21,15 +21,47 @@ class YinshGameSession(BaseGameSession):
         gamer_id = await super().command_received(data, socket_id)
         if gamer_id is None:
             return
-        if data['id'] == commands.Select_Peace:
+        if data['id'] == commands.Submit_Ring:
             peace_id = data['data']
-            is_selection_authorized = self.game_controller.check_authority(peace_id, gamer_id)
+            is_selection_authorized = self.game_controller.check_setup_ring_authority(peace_id, gamer_id)
             if is_selection_authorized:
                 await self.game_controller.recieve_data(data['id'], peace_id, gamer_id)
+                self.timer.stop()
+        elif data['id'] == commands.Select_Peace:
+            peace_id = data['data']
+            is_selection_authorized = self.game_controller.check_select_piece_authority(peace_id, gamer_id)
+            if is_selection_authorized:
+                await self.game_controller.recieve_data(data['id'], peace_id, gamer_id)
+        elif data['id'] == commands.Move_Ring:
+            peace_id = data['data']['target_id']
+            is_selection_authorized = self.game_controller.check_move_ring_authority(peace_id, gamer_id)
+            if is_selection_authorized:
+                await self.game_controller.recieve_data(data['id'], data['data'], gamer_id)
                 self.timer.stop()
 
     def send_current_turn(self):
         from Entities.SocketIOManagerClass import send_command
+        # auto select ring if user didnt select on his turn
+        if (self.game_controller.is_setup_ring_phase and not self.game_controller.is_ring_setuped and
+                self.game_controller.current_round != 0):
+            gamer_id = self.game_controller.current_turn
+            random_id = self.game_controller.extract_random_piece_for_auto_ring()
+            self.game_controller.submit_ring(gamer_id, random_id)
+            asyncio.new_event_loop().run_until_complete(
+                send_command(command=make_command_json(id=commands.Ring_Submited,
+                                                       data={'gamer_id': gamer_id, 'piece_id': random_id}),
+                             game_id=self.game_id))
+            self.game_controller.is_ring_setuped = True
+        # auto remove selected peace if user didnt move ring
+        if not self.game_controller.is_setup_ring_phase and self.game_controller.last_selected_piece_id != -1:
+            piece_id = self.game_controller.last_selected_piece_id
+            self.game_controller.remove_disk(piece_id)
+            self.game_controller.last_selected_piece_id = -1
+            asyncio.new_event_loop().run_until_complete(
+                send_command(command=make_command_json(id=commands.Remove_Peace,
+                                                       data={'piece_id': piece_id}),
+                             game_id=self.game_id))
+            self.game_controller.is_ring_setuped = True
         if self.game_controller.check_game_ended():
             winner = self.game_controller.get_game_winner()
             asyncio.new_event_loop().run_until_complete(
@@ -40,6 +72,11 @@ class YinshGameSession(BaseGameSession):
             return
         self.game_controller.change_turn()
         asyncio.new_event_loop().run_until_complete(
-            send_command(command=make_command_json(id=commands.Current_Turn, data=self.game_controller.current_turn),
+            send_command(command=make_command_json(id=commands.Current_Turn,
+                                                   data={'turn': self.game_controller.current_turn,
+                                                         "is_setup_ring_phase": self.game_controller.is_setup_ring_phase}),
                          game_id=self.game_id))
-        self.timer.start(Yinsh_Turn_Time, self.send_current_turn)
+        if self.game_controller.is_setup_ring_phase:
+            self.timer.start(Yinsh_Ring_Time, self.send_current_turn)
+        else:
+            self.timer.start(Yinsh_Turn_Time, self.send_current_turn)

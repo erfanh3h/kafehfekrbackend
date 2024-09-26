@@ -24,30 +24,28 @@ from Entities.Games.game_types import GameTypesEnum
 from Entities.RewardManagerClass import GameScoreTypesEnum
 from Models.Gamer import GamerModel
 
-# current_game_id = "gameId"
-# gameSession = FekrBekrGameSession(game_id=current_game_id, game_score_type=GameScoreTypesEnum.NORMAL,
-#                                   game_type=GameTypesEnum.FEKRBEKR)
-# gameSession = PentagoGameSession(game_id=current_game_id, game_score_type=GameScoreTypesEnum.NORMAL,
-#                                   game_type=GameTypesEnum.FEKRBEKR)
+current_game_id = "gameId"
+gameSession = YinshGameSession(game_id=current_game_id, game_score_type=GameScoreTypesEnum.NORMAL,
+                               game_type=GameTypesEnum.YINSH)
 
-# gameSession.add_gamer(
-#     GamerModel("kC8GgJ", username="test", user_image=60,
-#                user_score=1000, user_coin=1000))
-# gameSession.add_gamer(
-#     GamerModel("NHD6bL", username="windows", user_image=60,
-#                user_score=1000, user_coin=1000))
+gameSession.add_gamer(
+    GamerModel("kC8GgJ", username="test", user_image=60,
+               user_score=1000, user_coin=1000))
+gameSession.add_gamer(
+    GamerModel("NHD6bL", username="windows", user_image=60,
+               user_score=1000, user_coin=1000))
 # gameSession.add_gamer(
 #     GamerModel("kFIrrF", username="mobile", user_image=60,
 #                user_score=1000, user_coin=1000))
-# gameSession.start_game_timer()
+gameSession.start_game_timer()
 
-# games = {current_game_id: gameSession}
-# game_idies = [current_game_id]
-# socketid_gameid_pairs = {}
-
-games = {}
-game_idies = []
+games = {current_game_id: gameSession}
+game_idies = [current_game_id]
 socketid_gameid_pairs = {}
+
+# games = {}
+# game_idies = []
+# socketid_gameid_pairs = {}
 
 game_type_class_pairs = {GameTypesEnum.TIC_TAC_TOE.value: TicTacToeGameSession,
                          GameTypesEnum.CHECKERS.value: CheckersGameSession, GameTypesEnum.CHESS.value: ChessGameSession,
