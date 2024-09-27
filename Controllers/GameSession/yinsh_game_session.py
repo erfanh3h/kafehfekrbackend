@@ -41,6 +41,25 @@ class YinshGameSession(BaseGameSession):
 
     def send_current_turn(self):
         from Entities.SocketIOManagerClass import send_command
+
+        def send_win_data():
+            asyncio.new_event_loop().run_until_complete(
+                send_command(command=make_command_json(id=commands.Win_Happened,
+                                                       data={'win_data': self.game_controller.win_happens_data,
+                                                             'removed_rings': self.game_controller.removed_rings}),
+                             game_id=self.game_id))
+            self.game_controller.win_happens_data.clear()
+            self.game_controller.removed_rings.clear()
+            self.send_current_turn()
+
+        if len(self.game_controller.win_happens_data) > 0:
+            asyncio.new_event_loop().run_until_complete(
+                send_command(
+                    command=make_command_json(id=commands.Wait_Time, data=5),
+                    game_id=self.game_id))
+            self.timer.start(5, send_win_data)
+            return
+
         # auto select ring if user didnt select on his turn
         if (self.game_controller.is_setup_ring_phase and not self.game_controller.is_ring_setuped and
                 self.game_controller.current_round != 0):
