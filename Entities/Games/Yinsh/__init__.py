@@ -76,9 +76,11 @@ class YinshGameClass(BaseGameClass):
             self.is_setup_ring_phase = False
 
     def check_game_ended(self):
+        if self.is_game_finished:
+            return True
         if self.player1_score >= 3 or self.player2_score >= 3:
             return True
-        if self.disk_count == 50:
+        if self.disk_count == 0:
             return True
         return False
 

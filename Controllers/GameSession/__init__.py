@@ -127,7 +127,6 @@ class BaseGameSession:
         for gamer_id in range(0, len(self.gamers)):
             self.gamers[gamer_id].gamer_id = gamer_id + 1
             self.gamers[gamer_id].team_id = gamer_id + 1
-        return
         self.score_manager.set_user_data(self.gamers[0].user_id, self.gamers[1].user_id)
         from Entities.Database import game_database
         game_database.game_history_manager.create_game_history(self.game_id, self.gamers[0].user_id,

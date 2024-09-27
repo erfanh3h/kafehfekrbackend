@@ -2,7 +2,7 @@ import threading
 
 
 class UserDisconnectTimerClass:
-    def __init__(self, user_id: str, max_time: int = 12000, ):
+    def __init__(self, user_id: str, max_time: int = 120, ):
         self.timerCounting = True
         self.max_time = max_time
         self.finish_timer_function = None
