@@ -1,3 +1,4 @@
+Game_Play_Data = "GamePlayData"
 Game_Data = "GameData"
 Reconnect_Data = "ReconnectData"
 Reaction = "Reaction"

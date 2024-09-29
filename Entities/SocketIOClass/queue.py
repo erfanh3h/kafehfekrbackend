@@ -1,21 +1,15 @@
 import socketio
 
 from Commons import static_functions
-from Controllers.QueueSession import BaseQueueSession
-from Entities.RewardManagerClass import GameScoreTypesEnum
+from Controllers.QueueSession.normal import NormalQueueSession
+from Controllers.QueueSession.rank import RankQueueSession
 from Models.Queuer import QueuerModel
-from Entities.RewardManagerClass.reward_data import gametype_to_rewards
 from Commons import commands
 
-normal_queue_session = BaseQueueSession(GameScoreTypesEnum.NORMAL)
+normal_queue_session = NormalQueueSession()
 normal_queue_session.init_session()
-rank_queue_session = BaseQueueSession(GameScoreTypesEnum.RANK)
+rank_queue_session = RankQueueSession()
 rank_queue_session.init_session()
-
-
-# game_types = [game.value for game in GameTypesEnum]
-# normal_socketid_game_type_pairs: dict[str, str] = {}
-# rank_socketid_game_type_pairs: dict[str, str] = {}
 
 
 class QueueSocketNameSpace(socketio.AsyncNamespace):
@@ -45,18 +39,18 @@ class QueueSocketNameSpace(socketio.AsyncNamespace):
             user_data = game_database.users_manager.read_user(user_id)
             queuer_data = QueuerModel(user_id, user_data["username"], socket_id=socket_id,
                                       user_image=user_data['image'], user_coin=user_data['coin'],
-                                      user_score=user_data['score'])
+                                      user_score=user_data['score'], game_types=game_types)
             if game_score_type == "Normal":
-                normal_queue_session.join_queuer(queuer_data, game_types)
+                normal_queue_session.join_queuer(queuer_data)
             else:
-                if user_data['coin'] < 15:  # check user score
+                if user_data['coin'] < 15:  # check user coin
                     await self.emit('command', {'id': commands.Not_Enough_Coin}, to=socket_id, namespace="/queue")
                 else:
-                    rank_queue_session.join_queuer(queuer_data, game_types)
+                    rank_queue_session.join_queuer(queuer_data)
 
     async def on_disconnect(self, socket_id):
-        normal_queue_session.disconnect_user(socket_id, game_type)
-        rank_queue_session.disconnect_user(socket_id, game_type)
+        normal_queue_session.disconnect_user(socket_id)
+        rank_queue_session.disconnect_user(socket_id)
 
 
 async def on_user_command(self, socket_id, data):

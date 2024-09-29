@@ -1,16 +1,12 @@
 import asyncio
-import threading
-import time
 
 from Commons import commands
 from Commons.static_functions import make_command_json
-from Entities.Games.game_types import GameTypesEnum
-from Entities.TimerClass import TimerClass
 from Models.Queuer import QueuerModel
 from Commons import static_functions
 
 
-class GameQueueSessionDetails:
+class NormalQueueSessionDetails:
     def __init__(self, game_type, game_score_type):
         self.queuers: list[QueuerModel] = []
         self.game_type = game_type

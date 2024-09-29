@@ -29,7 +29,7 @@ socketid_gameid_pairs = {}
 
 def add_new_game(game_id, queuers, game_types, game_score_type):
     game_play = BaseGamePlayClass(game_id, queuers, game_types, game_score_type)
-    # game_play.start_current_game()
+    game_play.start_game_timer()
     games[game_id] = game_play
     game_idies.append(game_id)
 
