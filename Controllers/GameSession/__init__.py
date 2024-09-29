@@ -3,7 +3,7 @@ import random
 import threading
 import time
 
-from Commons import commands
+from Commons import commands, static_functions
 from Commons.static_functions import make_command_json
 from Entities.Games.base_game_class import BaseGameClass
 from Entities.Games.wait_times import Start_Game_Time, Join_Game_Limit_Time
@@ -19,12 +19,17 @@ class BaseGameSession:
         self.timer = TimerClass()
         self.game_controller: BaseGameClass = BaseGameClass(None)
         self.game_id = game_id
+        self.game_history_id = ""
         self.is_game_running = False
         self.gamer_idies = []
         self.game_type = game_type
         self.game_score_type = game_score_type
         self.score_manager = RewardManagerClass(game_score_type, game_id, game_type)
         self.is_game_terminated = False
+        self.add_history_id()
+
+    def add_history_id(self):
+        self.game_history_id = static_functions.create_random_game_id()
 
     # this use to close game if didnt started in last 20 sec
     def join_game_limit_time(self):
@@ -159,7 +164,7 @@ class BaseGameSession:
 
     async def command_received(self, data, socket_id):
         if not self.is_game_running:
-            #print("game not started yet")
+            # print("game not started yet")
             return None
         gamer_data = self.find_gamer_from_socket(socket_id)
         if gamer_data is None:

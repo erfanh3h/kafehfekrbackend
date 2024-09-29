@@ -2,7 +2,6 @@ import socketio
 
 from Commons import static_functions
 from Controllers.QueueSession import BaseQueueSession
-from Entities.Games.game_types import GameTypesEnum
 from Entities.RewardManagerClass import GameScoreTypesEnum
 from Models.Queuer import QueuerModel
 from Entities.RewardManagerClass.reward_data import gametype_to_rewards
@@ -13,11 +12,9 @@ normal_queue_session.init_session()
 rank_queue_session = BaseQueueSession(GameScoreTypesEnum.RANK)
 rank_queue_session.init_session()
 
-game_types = [game.value for game in GameTypesEnum]
-normal_socketid_game_type_pairs: dict[str, str] = {}
-rank_socketid_game_type_pairs: dict[str, str] = {}
 
-
+# game_types = [game.value for game in GameTypesEnum]
+# normal_socketid_game_type_pairs: dict[str, str] = {}
 # rank_socketid_game_type_pairs: dict[str, str] = {}
 
 
@@ -30,12 +27,8 @@ class QueueSocketNameSpace(socketio.AsyncNamespace):
                 token_data = await extract_token(auth['token'])
                 if token_data is not None:
                     user_id = token_data['id']
-                    if auth['game_type'] in game_types:
-                        game_type = auth['game_type']
-                        game_score_type = auth['game_score_type']
-                    else:
-                        game_type = None
-                        game_score_type = ""
+                    game_types = auth['game_types']
+                    game_score_type = auth['game_score_type']
                 else:
                     await self.disconnect(socket_id, namespace="/queue")
                     return
@@ -45,7 +38,7 @@ class QueueSocketNameSpace(socketio.AsyncNamespace):
         else:
             await self.disconnect(socket_id, namespace="/queue")
             return
-        if game_type is None:
+        if game_types is None:
             await self.disconnect(socket_id, namespace="/queue")
         else:
             from Entities.Database import game_database
@@ -54,27 +47,16 @@ class QueueSocketNameSpace(socketio.AsyncNamespace):
                                       user_image=user_data['image'], user_coin=user_data['coin'],
                                       user_score=user_data['score'])
             if game_score_type == "Normal":
-                normal_queue_session.join_queuer(queuer_data, game_type)
-                normal_socketid_game_type_pairs[socket_id] = game_type
+                normal_queue_session.join_queuer(queuer_data, game_types)
             else:
-                reward_data = gametype_to_rewards(game_type)
-                if reward_data[0] > user_data['coin']:  # check user score
+                if user_data['coin'] < 15:  # check user score
                     await self.emit('command', {'id': commands.Not_Enough_Coin}, to=socket_id, namespace="/queue")
                 else:
-                    rank_queue_session.join_queuer(queuer_data, game_type)
-                    rank_socketid_game_type_pairs[socket_id] = game_type
+                    rank_queue_session.join_queuer(queuer_data, game_types)
 
     async def on_disconnect(self, socket_id):
-        game_type = return_game_type_from_normal_socketid(socket_id)
-        if game_type is not None:
-            normal_queue_session.disconnect_user(socket_id, game_type)
-            del normal_socketid_game_type_pairs[socket_id]
-            return
-        game_type = return_game_type_from_rank_socketid(socket_id)
-        if game_type is not None:
-            rank_queue_session.disconnect_user(socket_id, game_type)
-            del rank_socketid_game_type_pairs[socket_id]
-            return
+        normal_queue_session.disconnect_user(socket_id, game_type)
+        rank_queue_session.disconnect_user(socket_id, game_type)
 
 
 async def on_user_command(self, socket_id, data):
@@ -88,17 +70,3 @@ async def on_user_command(self, socket_id, data):
 def return_random_id():
     user_id = static_functions.create_random_name()
     return user_id
-
-
-def return_game_type_from_normal_socketid(socket_id):
-    for raw_socket_id in normal_socketid_game_type_pairs.keys():
-        if raw_socket_id == socket_id:
-            return normal_socketid_game_type_pairs[raw_socket_id]
-    return None
-
-
-def return_game_type_from_rank_socketid(socket_id):
-    for raw_socket_id in rank_socketid_game_type_pairs.keys():
-        if raw_socket_id == socket_id:
-            return rank_socketid_game_type_pairs[raw_socket_id]
-    return None
