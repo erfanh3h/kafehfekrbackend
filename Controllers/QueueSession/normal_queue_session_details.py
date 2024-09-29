@@ -53,7 +53,7 @@ class NormalQueueSessionDetails:
                                        socket_id=queuer_data.socket_id))
                 self.queuers.remove(queuer_data)
         from Entities.SocketIOClass.game import add_new_game
-        add_new_game(game_id, queuers, self.game_type, self.game_score_type)
+        add_new_game(game_id, queuers, [self.game_type.value], self.game_score_type)
 
     def command_received(self, data, socket_id):
         queuer_data = self.find_gamer_from_socket(socket_id)

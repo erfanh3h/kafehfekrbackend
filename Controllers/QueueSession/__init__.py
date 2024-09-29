@@ -1,5 +1,4 @@
 import threading
-from Controllers.QueueSession.game_queue_session_details import GameQueueSessionDetails
 from Entities.TimerClass import TimerClass
 from Models.Queuer import QueuerModel
 

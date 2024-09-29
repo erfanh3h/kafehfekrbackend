@@ -1,4 +1,5 @@
 import asyncio
+import random
 import threading
 import time
 
@@ -6,7 +7,7 @@ from Commons import commands
 from Commons.static_functions import make_command_json
 from Controllers.GamePlay.game_type_class_pairs import game_type_class_pairs
 from Entities.Games.wait_times import Join_Game_Limit_Time, Start_Game_Time
-from Entities.RewardManagerClass import RewardManagerClass
+from Entities.RewardManagerClass import RewardManagerClass, GameScoreTypesEnum
 from Entities.TimerClass import TimerClass
 from Models.Gamer import GamerModel
 
@@ -31,7 +32,16 @@ class BaseGamePlayClass:
         self.score_manager = RewardManagerClass(game_score_type, 'game_id', 'game_type')
 
     def select_random_games(self):
-        pass
+        if self.game_score_type == GameScoreTypesEnum.NORMAL :
+            games_length = 1
+        else:
+            games_length = 3
+        games_types = []
+        for i in range(games_length):
+            random_type = random.choice(self.game_types)
+            games_types.append(random_type)
+            self.game_types.remove(random_type)
+        self.game_types = games_types
 
     def join_game_limit_time(self):
         if not self.is_game_started:
@@ -55,7 +65,7 @@ class BaseGamePlayClass:
         return True
 
     def send_game_play_data(self):
-        game_data = {'gamers': [], 'games': self.game_types, 'game_score_type': self.game_score_type,
+        game_data = {'gamers': [], 'games': self.game_types, 'game_score_type': self.game_score_type.value,
                      'current_game_index': self.current_game_index, 'winners': self.game_winners,
                      'gamer1_score': self.gamer1_score, 'gamer2_score': self.gamer2_score}
         for gamer in self.gamers:
@@ -73,6 +83,7 @@ class BaseGamePlayClass:
                 self.is_game_started = True
                 self.timer.stop()
                 self.select_random_games()
+                time.sleep(3)
                 self.send_game_play_data()
                 print(self.game_types[self.current_game_index])
                 # self.timer.start(Start_Game_Time, self.start_current_game)
@@ -110,6 +121,12 @@ class BaseGamePlayClass:
                        user_image=self.gamers[1].user_image,
                        user_score=self.gamers[1].user_score, user_coin=self.gamers[1].user_coin))
         self.game_session.start_game_timer()
+
+    def is_user_id_valid(self, user_id):
+        for user_data in self.gamers:
+            if user_data.user_id == user_id:
+                return True
+        return False
 
     def finish_current_game(self, winner_id):
         self.current_game_index += 1

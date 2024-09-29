@@ -66,7 +66,7 @@ class GameSocketNameSpace(socketio.AsyncNamespace):
         #     await my_message(socket_id, {'Test': f'{socket_id}'})
 
         if is_game_id_valid(user_game_id):
-            if games[user_game_id].gamer_idies.__contains__(user_id):
+            if games[user_game_id].is_user_id_valid(user_id):
                 await self.enter_room(socket_id, user_game_id, namespace="/game")
                 games[user_game_id].join_gamer(user_id, socket_id)
                 socketid_gameid_pairs[socket_id] = user_game_id
