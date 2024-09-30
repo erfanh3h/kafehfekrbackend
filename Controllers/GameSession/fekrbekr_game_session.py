@@ -20,9 +20,8 @@ class FekrBekrGameSession(BaseGameSession):
 
     def check_start_game(self):
         while True:
-            if self.is_game_terminated:
-                break
             if self.check_all_players_joined():
+                time.sleep(3)
                 self.is_game_running = True
                 self.timer.stop()
                 self.prepare_gamers()

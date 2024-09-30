@@ -25,39 +25,30 @@ class BaseGameSession:
         self.game_type = game_type
         self.game_score_type = game_score_type
         self.score_manager = RewardManagerClass(game_score_type, game_id, game_type)
-        self.is_game_terminated = False
         self.add_history_id()
 
     def add_history_id(self):
         self.game_history_id = static_functions.create_random_game_id()
 
-    # this use to close game if didnt started in last 20 sec
-    def join_game_limit_time(self):
-        if not self.is_game_running:
-            self.is_game_terminated = True
-            self.finish_game(-1)
-
     def start_game_timer(self):
+
         def entrypoint():
             self.check_start_game()
 
-        self.timer.start(Join_Game_Limit_Time, self.join_game_limit_time)
         t = threading.Thread(target=entrypoint, daemon=True)
         t.start()
 
     def check_all_players_joined(self):
-        for gamer in self.gamers:
-            if not gamer.is_joined_game:
-                return False
+        # for gamer in self.gamers:
+        #     if not gamer.is_joined_game:
+        #         return False
         return True
 
     def check_start_game(self):
         while True:
-            if self.is_game_terminated:
-                break
             if self.check_all_players_joined():
+                time.sleep(3)
                 self.is_game_running = True
-                self.timer.stop()
                 self.prepare_gamers()
                 self.send_game_data(self.send_current_turn)
                 break
@@ -92,14 +83,19 @@ class BaseGameSession:
         self.gamer_idies.append(gamer.user_id)
 
     def join_gamer(self, user_id: int, socket_id):
+        def send_reconnect_data():  # used this ilke to give device change socket handler functions
+            time.sleep(2)
+            self.send_reconnect_data(socket_id)
+
         gamer_index = self.find_gamer_index_from_id(user_id)
         if gamer_index is not None:
             self.gamers[gamer_index].set_finish_reconnect_time_function(self.finish_reconnect_time)
             if self.gamers[gamer_index].is_joined_game:
                 self.gamers[gamer_index].reconnect(socket_id)
-                self.send_reconnect_data(socket_id)
                 asyncio.new_event_loop().run_until_complete(
                     self.send_command(commands.User_Reconnected, {"user_id": user_id}))
+                t = threading.Thread(target=send_reconnect_data, daemon=True)
+                t.start()
             else:
                 self.gamers[gamer_index].join_game(socket_id)
 
@@ -132,22 +128,22 @@ class BaseGameSession:
         for gamer_id in range(0, len(self.gamers)):
             self.gamers[gamer_id].gamer_id = gamer_id + 1
             self.gamers[gamer_id].team_id = gamer_id + 1
-        self.score_manager.set_user_data(self.gamers[0].user_id, self.gamers[1].user_id)
         from Entities.Database import game_database
-        game_database.game_history_manager.create_game_history(self.game_id, self.gamers[0].user_id,
-                                                               self.gamers[1].user_id,
-                                                               str(self.game_type.value),
-                                                               str(self.game_score_type.value))
-        if self.game_score_type == GameScoreTypesEnum.NORMAL:
-            game_database.users_manager.update_user(self.gamers[0].user_id, open_game_id=self.game_id, )
-            game_database.users_manager.update_user(self.gamers[1].user_id, open_game_id=self.game_id, )
-        else:
-            from Entities.RewardManagerClass.reward_data import gametype_to_rewards
-            reward_data = gametype_to_rewards(self.game_type.value)
-            game_database.users_manager.update_user(self.gamers[0].user_id, open_game_id=self.game_id,
-                                                    coin=self.gamers[0].user_coin - reward_data[0])
-            game_database.users_manager.update_user(self.gamers[1].user_id, open_game_id=self.game_id,
-                                                    coin=self.gamers[1].user_coin - reward_data[0])
+        # self.score_manager.set_user_data(self.gamers[0].user_id, self.gamers[1].user_id)
+        # game_database.game_history_manager.create_game_history(self.game_id, self.gamers[0].user_id,
+        #                                                        self.gamers[1].user_id,
+        #                                                        str(self.game_type.value),
+        #                                                        str(self.game_score_type.value))
+        # if self.game_score_type == GameScoreTypesEnum.NORMAL:
+        #     game_database.users_manager.update_user(self.gamers[0].user_id, open_game_id=self.game_id, )
+        #     game_database.users_manager.update_user(self.gamers[1].user_id, open_game_id=self.game_id, )
+        # else:
+        #     from Entities.RewardManagerClass.reward_data import gametype_to_rewards
+        #     reward_data = gametype_to_rewards(self.game_type.value)
+        #     game_database.users_manager.update_user(self.gamers[0].user_id, open_game_id=self.game_id,
+        #                                             coin=self.gamers[0].user_coin - reward_data[0])
+        #     game_database.users_manager.update_user(self.gamers[1].user_id, open_game_id=self.game_id,
+        #                                             coin=self.gamers[1].user_coin - reward_data[0])
 
     async def send_command(self, command_id, command_data):
         from Entities.SocketIOManagerClass import send_command
@@ -252,6 +248,11 @@ class BaseGameSession:
         return False
 
     def finish_game(self, winner_gamer_id):
-        self.score_manager.finish_game(winner_gamer_id)
-        from Entities.SocketIOClass.game import delete_game
-        delete_game(self.game_id)
+        # self.score_manager.finish_game(winner_gamer_id)
+        from Entities.SocketIOClass.game import finish_single_game
+        user_id = "0"
+        if winner_gamer_id == self.gamers[0].gamer_id:
+            user_id = self.gamers[0].user_id
+        elif winner_gamer_id == self.gamers[1].gamer_id:
+            user_id = self.gamers[1].user_id
+        finish_single_game(self.game_id, user_id)

@@ -22,15 +22,14 @@ class BattleShipGameSession(BaseGameSession):
         def entrypoint():
             self.check_start_game()
 
-        self.timer.start(Join_Game_Limit_Time, self.join_game_limit_time)
+        # self.timer.start(Join_Game_Limit_Time, self.join_game_limit_time)
         t = threading.Thread(target=entrypoint, daemon=True)
         t.start()
 
     def check_start_game(self):
         while True:
-            if self.is_game_terminated:
-                break
             if self.check_all_players_joined():
+                time.sleep(3)
                 self.is_game_running = True
                 self.timer.stop()
                 self.prepare_gamers()
