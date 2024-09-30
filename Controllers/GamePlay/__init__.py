@@ -32,16 +32,19 @@ class BaseGamePlayClass:
         self.score_manager = RewardManagerClass(game_score_type, 'game_id', 'game_type')
 
     def select_random_games(self):
-        if self.game_score_type == GameScoreTypesEnum.NORMAL :
+        if self.game_score_type == GameScoreTypesEnum.NORMAL:
             games_length = 1
+            self.game_winners = [-1]
         else:
             games_length = 3
+            self.game_winners = [-1, -1, -1]
         games_types = []
         for i in range(games_length):
             random_type = random.choice(self.game_types)
             games_types.append(random_type)
             self.game_types.remove(random_type)
         self.game_types = games_types
+        random.shuffle(self.game_types)
 
     def join_game_limit_time(self):
         if not self.is_game_started:
@@ -64,34 +67,57 @@ class BaseGamePlayClass:
                 return False
         return True
 
-    def send_game_play_data(self):
+    def send_game_play_data(self, socket_id):
         game_data = {'gamers': [], 'games': self.game_types, 'game_score_type': self.game_score_type.value,
                      'current_game_index': self.current_game_index, 'winners': self.game_winners,
                      'gamer1_score': self.gamer1_score, 'gamer2_score': self.gamer2_score}
         for gamer in self.gamers:
             game_data['gamers'].append(gamer.to_json())
-        from Entities.SocketIOManagerClass import send_command
+        from Entities.SocketIOManagerClass import send_private_command
         asyncio.new_event_loop().run_until_complete(
-            send_command(command=make_command_json(id=commands.Game_Play_Data, data=game_data),
-                         game_id=self.game_play_id))
+            send_private_command(command=make_command_json(id=commands.Game_Play_Data, data=game_data),
+                                 game_id=self.game_play_id, socket_id=socket_id))
+
+    def navigate_to_game(self, socket_id):
+        game_data = {'current_game_index': self.current_game_index}
+        from Entities.SocketIOManagerClass import send_private_command
+        asyncio.new_event_loop().run_until_complete(
+            send_private_command(command=make_command_json(id=commands.Game_Play_Navigate, data=game_data),
+                                 game_id=self.game_play_id, socket_id=socket_id))
+
+    def send_timer_value(self, socket_id):
+        data = {'time': self.timer.counter + 1}
+        from Entities.SocketIOManagerClass import send_private_command
+        asyncio.new_event_loop().run_until_complete(
+            send_private_command(command=make_command_json(id=commands.Game_Play_Time, data=data),
+                                 game_id=self.game_play_id, socket_id=socket_id))
 
     def check_start_game(self):
+        def function():
+            for gamer_data in self.gamers:
+                self.navigate_to_game(gamer_data.socket_id)
+            # self.start_current_game()
+
         while True:
             if self.is_game_terminated:
                 break
             if self.check_all_players_joined():
+                time.sleep(2)
                 self.is_game_started = True
                 self.timer.stop()
                 self.select_random_games()
-                time.sleep(3)
-                self.send_game_play_data()
-                print(self.game_types[self.current_game_index])
-                # self.timer.start(Start_Game_Time, self.start_current_game)
+                for gamer in self.gamers:
+                    self.send_game_play_data(gamer.socket_id)
+                self.timer.start(Start_Game_Time, function)
+                for gamer in self.gamers:
+                    self.send_timer_value(gamer.socket_id)
                 break
             time.sleep(2)
 
-    def join_gamer(self, user_id: int, socket_id):
+    def join_gamer(self, user_id, socket_id):
+        self.change_gamer_socket_id(user_id, socket_id)
         if self.is_game_started:
+            self.send_game_play_data(socket_id)
             if self.game_session is not None:
                 self.game_session.join_gamer(user_id, socket_id)
         else:
@@ -131,3 +157,9 @@ class BaseGamePlayClass:
     def finish_current_game(self, winner_id):
         self.current_game_index += 1
         pass
+
+    def change_gamer_socket_id(self, user_id, socket_id):
+        for gamer in self.gamers:
+            if gamer.user_id == user_id:
+                gamer.socket_id = socket_id
+                break

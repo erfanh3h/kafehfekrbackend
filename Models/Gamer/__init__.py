@@ -1,5 +1,3 @@
-import asyncio
-
 from Entities.TimerClass.UserDisconnectTimerClass import UserDisconnectTimerClass
 from Models.User import UserModel
 
@@ -10,12 +8,10 @@ class GamerModel(UserModel):
         super().__init__(user_id, username, user_image, user_coin, user_score)
         self.socket_id = socket_id
         self.gamer_id: int = 0
-        self.user_id: str = user_id
         self.timer = UserDisconnectTimerClass(user_id=user_id)
         self.finish_reconnect_time_function = finish_reconnect_time_function
         self.is_joined_game: bool = False
         self.is_disconnected: bool = False
-        self.report_charge: int = 5
         self.not_played_turns: int = 0
         self.team_id: int = team_id
 
