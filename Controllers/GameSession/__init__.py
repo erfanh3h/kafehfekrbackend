@@ -13,12 +13,12 @@ from Models.Gamer import GamerModel
 
 
 class BaseGameSession:
-    def __init__(self, game_id: str, game_type, game_score_type):
+    def __init__(self, game_play_id: str, game_type, game_score_type):
         # self.temp_gamers: list[GamerModel] = [GamerModel(user_id=i, username=str(i)) for i in range(2)]
         self.gamers: list[GamerModel] = []
         self.timer = TimerClass()
         self.game_controller: BaseGameClass = BaseGameClass(None)
-        self.game_id = game_id
+        self.game_id = game_play_id
         self.game_history_id = ""
         self.is_game_running = False
         self.gamer_idies = []
@@ -28,7 +28,7 @@ class BaseGameSession:
         self.add_history_id()
 
     def add_history_id(self):
-        self.game_history_id = static_functions.create_random_game_id()
+        self.game_history_id = static_functions.create_random_game_id(length=8)
 
     def start_game_timer(self):
 

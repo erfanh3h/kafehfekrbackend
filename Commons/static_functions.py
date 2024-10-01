@@ -14,9 +14,9 @@ def create_random_name() -> str:
     return random_name
 
 
-def create_random_game_id() -> str:
+def create_random_game_id(length=7) -> str:
     char_set = string.ascii_uppercase + string.ascii_lowercase + string.digits
-    result = ''.join(random.sample(char_set * 6, 7))
+    result = ''.join(random.sample(char_set * 6, length))
     return result
 
 
