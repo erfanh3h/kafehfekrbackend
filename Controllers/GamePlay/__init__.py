@@ -34,12 +34,12 @@ class BaseGamePlayClass:
         self.score_manager = RewardManagerClass(game_score_type)
 
     def select_random_games(self):
-        if self.game_score_type == GameScoreTypesEnum.NORMAL:
-            games_length = 1
-            self.game_winners = [-1]
-        else:
+        if self.game_score_type == GameScoreTypesEnum.RANK:
             games_length = 3
             self.game_winners = [-1, -1, -1]
+        else:
+            games_length = 1
+            self.game_winners = [-1]
         games_types = []
         for i in range(games_length):
             random_type = random.choice(self.game_types)
@@ -58,7 +58,7 @@ class BaseGamePlayClass:
         if self.game_score_type == GameScoreTypesEnum.NORMAL:
             game_database.users_manager.update_user(self.gamers[0].user_id, open_game_id=self.game_play_id, )
             game_database.users_manager.update_user(self.gamers[1].user_id, open_game_id=self.game_play_id, )
-        else:
+        elif self.game_score_type == GameScoreTypesEnum.RANK:
             game_database.users_manager.update_user(self.gamers[0].user_id, open_game_id=self.game_play_id,
                                                     coin=self.gamers[0].user_coin - rank_coin_cost)
             game_database.users_manager.update_user(self.gamers[1].user_id, open_game_id=self.game_play_id,

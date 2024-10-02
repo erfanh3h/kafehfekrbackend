@@ -1,51 +1,65 @@
+import asyncio
 import threading
 import time
 
+from Commons import static_functions, commands
+from Commons.static_functions import make_command_json
 from Controllers.QueueSession import BaseQueueSession
-from Controllers.QueueSession.normal_queue_session_details import NormalQueueSessionDetails
-from Entities.Games.game_types import GameTypesEnum
 from Entities.RewardManagerClass import GameScoreTypesEnum
 from Models.Queuer import QueuerModel
-
-all_game_types = [game.value for game in GameTypesEnum]
 
 
 class NormalQueueSession(BaseQueueSession):
     def __init__(self):
         super().__init__(GameScoreTypesEnum.NORMAL)
-        self.queues: dict[str, NormalQueueSessionDetails] = {}
-        self.user_id_game_type_pair = {}
+        self.queuers: list[QueuerModel] = []
+
+    def find_gamer_from_user_id(self, user_id):
+        for queuer in self.queuers:
+            if queuer.user_id == user_id:
+                return queuer
+        return None
+
+    def start_new_game(self):
+        queuers_idis = [self.queuers[0].user_id, self.queuers[1].user_id]
+        queuers = []
+        from Entities.SocketIOManagerClass import send_queue_command
+        for queuer_id in queuers_idis:
+            queuer_data = self.find_gamer_from_user_id(queuer_id)
+            if queuer_data is None:
+                return False
+            queuers.append(queuer_data)
+        game_id = static_functions.create_random_game_id()
+        mix_game_type = []
+        mix_game_type.extend(queuers[0].game_types)
+        mix_game_type.extend(queuers[1].game_types)
+        final_game_types = list(set(mix_game_type))
+        # game_id = 'testgame'
+        game_data = {'game_id': game_id}
+        if len(queuers) == 2:
+            for queuer_data in queuers:
+                asyncio.new_event_loop().run_until_complete(
+                    send_queue_command(command=make_command_json(id=commands.Start_Game, data=game_data),
+                                       socket_id=queuer_data.socket_id))
+                self.queuers.remove(queuer_data)
+        from Entities.SocketIOClass.game import add_new_game
+        add_new_game(game_id, queuers, final_game_types, self.game_score_type)
 
     def check_start_new_game(self):
         while True:
-            for key in self.queues.keys():
-                if self.queues[key].queuers_length() >= 2:
-                    threading.Thread(target=self.queues[key].start_game, daemon=True).start()
-                    time.sleep(.25)
-                # if len(self.queues[key].queuers) > 0:
-                #     print(f"{self.game_score_type} {self.queues[key].game_type.value} queuer len : ",
-                #           len(self.queues[key].queuers))
-            # print("---------------------")
-            time.sleep(4)
-
-    def init_session(self):
-        games_values = [game.value for game in GameTypesEnum]
-        games_enums = [game for game in GameTypesEnum]
-        for index, item in enumerate(games_values):
-            self.queues[games_values[index]] = NormalQueueSessionDetails(games_enums[index], self.game_score_type)
-        super().init_session()
+            # if len(self.queuers) > 0:
+            #     print(f"{self.game_score_type} queuer len : ", len(self.queuers))
+            if len(self.queuers) >= 2:
+                threading.Thread(target=self.start_new_game, daemon=True).start()
+                time.sleep(1.25)
+            else:
+                time.sleep(4)
 
     def join_queuer(self, user_data: QueuerModel):
-        game_type = user_data.game_types[0]
-        if game_type in all_game_types:
-            self.queues[game_type].add_queuer(user_data)
-            self.user_id_game_type_pair[user_data.socket_id] = game_type
-            return True
-        return False
+        self.queuers.append(user_data)
 
-    def disconnect_user(self, user_socket_id):
-        for socket_id in self.user_id_game_type_pair.keys():
-            if socket_id == user_socket_id:
-                self.queues[self.user_id_game_type_pair[socket_id]].disconnect_user(socket_id)
-                del self.user_id_game_type_pair[socket_id]
+    def disconnect_user(self, socket_id):
+        for user_data in self.queuers:
+            if socket_id == user_data.socket_id:
+                self.queuers.remove(user_data)
                 break
