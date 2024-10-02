@@ -24,7 +24,6 @@ class BaseGameSession:
         self.gamer_idies = []
         self.game_type = game_type
         self.game_score_type = game_score_type
-        self.score_manager = RewardManagerClass(game_score_type, game_id, game_type)
         self.add_history_id()
 
     def add_history_id(self):
@@ -128,8 +127,8 @@ class BaseGameSession:
         for gamer_id in range(0, len(self.gamers)):
             self.gamers[gamer_id].gamer_id = gamer_id + 1
             self.gamers[gamer_id].team_id = gamer_id + 1
-        from Entities.Database import game_database
-        # self.score_manager.set_user_data(self.gamers[0].user_id, self.gamers[1].user_id)
+        # from Entities.Database import game_database
+        # # self.score_manager.set_user_data(self.gamers[0].user_id, self.gamers[1].user_id)
         # game_database.game_history_manager.create_game_history(self.game_id, self.gamers[0].user_id,
         #                                                        self.gamers[1].user_id,
         #                                                        str(self.game_type.value),
@@ -248,7 +247,11 @@ class BaseGameSession:
         return False
 
     def finish_game(self, winner_gamer_id):
-        # self.score_manager.finish_game(winner_gamer_id)
+        from Entities.Database import game_database
+        game_database.game_history_manager.create_game_history(self.game_history_id, self.game_id,
+                                                               self.gamers[0].user_id,
+                                                               self.gamers[1].user_id, str(self.game_type.value),
+                                                               self.game_score_type.value, winner_gamer_id)
         from Entities.SocketIOClass.game import finish_single_game
         user_id = "0"
         if winner_gamer_id == self.gamers[0].gamer_id:

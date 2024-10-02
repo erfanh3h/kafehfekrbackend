@@ -115,3 +115,5 @@ class UsersCollectionManager:
     def reset_coins(self):
         query = {'coin': {'$lt': 50}}
         self.collection.update_many(query, {'$set': {'coin': 50}})
+
+        # self.collection.find_one_and_update(query, {'$inc': {'coin': coin, 'score': score, 'xp': xp}})

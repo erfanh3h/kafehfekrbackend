@@ -31,7 +31,7 @@ class TimerClass:
 
     # develop this like to keep track of time for reconnect data
     def start_timer(self):
-        print(self.counter)
+        # print(self.counter)
         if self.is_canceled:
             return
         if self.counter >= self.max_time:

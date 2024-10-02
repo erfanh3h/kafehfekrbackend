@@ -21,10 +21,10 @@ class NormalQueueSession(BaseQueueSession):
             for key in self.queues.keys():
                 if self.queues[key].queuers_length() >= 2:
                     threading.Thread(target=self.queues[key].start_game, daemon=True).start()
-                    # self.queues[key].start_game()
-                if len(self.queues[key].queuers) > 0:
-                    print(f"{self.game_score_type} {self.queues[key].game_type.value} queuer len : ",
-                          len(self.queues[key].queuers))
+                    time.sleep(.25)
+                # if len(self.queues[key].queuers) > 0:
+                #     print(f"{self.game_score_type} {self.queues[key].game_type.value} queuer len : ",
+                #           len(self.queues[key].queuers))
             # print("---------------------")
             time.sleep(4)
 

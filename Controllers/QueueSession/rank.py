@@ -47,11 +47,11 @@ class RankQueueSession(BaseQueueSession):
 
     def check_start_new_game(self):
         while True:
-            if len(self.queuers) > 0:
-                print(f"{self.game_score_type} queuer len : ", len(self.queuers))
+            # if len(self.queuers) > 0:
+            #     print(f"{self.game_score_type} queuer len : ", len(self.queuers))
             if len(self.queuers) >= 2:
                 threading.Thread(target=self.start_new_game, daemon=True).start()
-                time.sleep(2)
+                time.sleep(1.5)
             else:
                 time.sleep(4)
 

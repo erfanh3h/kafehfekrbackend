@@ -2,6 +2,7 @@ import pymongo
 
 from Entities.Database.config_collection import ConfigCollectionManager
 from Entities.Database.game_history_collection import GameHistoryCollectionManager
+from Entities.Database.game_play_history_collection import GamePlayHistoryCollectionManager
 from Entities.Database.user_history_collection import UserHistoryCollectionManager
 from Entities.Database.users_collection import UsersCollectionManager
 
@@ -12,6 +13,7 @@ class DataBaseManager:
         self.base_db = self.db_client["KafehFekrDB"]
         self.users_manager = UsersCollectionManager(self.base_db['users'])
         self.user_history_manager = UserHistoryCollectionManager(self.base_db['user_history'])
+        self.game_play_history_manager = GamePlayHistoryCollectionManager(self.base_db['game_play_history'])
         self.game_history_manager = GameHistoryCollectionManager(self.base_db['game_history'])
         self.config_manager = ConfigCollectionManager(self.base_db['config'])
 
