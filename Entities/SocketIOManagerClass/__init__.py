@@ -36,7 +36,7 @@ async def send_queue_command(command, socket_id, namespace="/queue"):
 
 
 async def enter_lobby(socket_id, lobby_id, namespace="/lobby"):
-    await Socket_Server.enter_room(socket_id, lobby_id, namespace=namespace)
+    await Socket_Server.enter_room(sid=socket_id, room=lobby_id, namespace=namespace)
 
 
 async def leave_lobby(socket_id, lobby_id, namespace="/lobby"):

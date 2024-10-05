@@ -95,14 +95,12 @@ class LobbySession:
         if user_data is None:
             return
         lobby_id = static_functions.create_random_game_id(length=6)
-        self.socketid_lobbyid_pairs[lobby_id] = user_data.socket_id
         new_lobby = LobbyModel(lobby_id=lobby_id, creator_id=user_data.user_id, game_types=game_types,
                                lobby_name=lobby_name, lobby_password=lobby_password)
-        new_lobby.add_queuer(user_data)
         self.lobbies.append(new_lobby)
-        self.free_queuers.remove(user_data)
-        from Entities.SocketIOManagerClass import send_global_lobby_command
+        from Entities.SocketIOManagerClass import send_global_lobby_command, enter_lobby
         await send_global_lobby_command(command=make_command_json(id=commands.Lobby_Created, data=new_lobby.to_json()))
+        await self.join_lobby(user_data, lobby_id)
 
     async def join_queuers_list(self, user_data: QueuerModel):
         self.free_queuers.append(user_data)
@@ -111,15 +109,18 @@ class LobbySession:
             command=make_command_json(id=commands.Lobby_List, data=self.get_lobbies_data()),
             socket_id=user_data.socket_id)
 
-    def join_lobby(self, user_data: QueuerModel, lobby_id):
+    async def join_lobby(self, user_data: QueuerModel, lobby_id):
         self.socketid_lobbyid_pairs[lobby_id] = user_data.user_id
         lobby = self.find_lobby_from_id(lobby_id)
         if lobby is None:
             return
         lobby.add_queuer(user_data)
+        from Entities.SocketIOManagerClass import send_global_lobby_command, enter_lobby
+        await enter_lobby(socket_id=user_data.socket_id, lobby_id=lobby_id)
         self.free_queuers.remove(user_data)
 
     async def command_received(self, data, socket_id):
+        print(data)
         gamer_data = self.find_free_gamer_from_socket_id(socket_id)
         if gamer_data is None:
             lobby_id = self.find_lobbyid_from_socketid(socket_id)
@@ -132,7 +133,8 @@ class LobbySession:
         if data['id'] == commands.Lobby_Create:
             lobby_data = data['data']
             lobby_name = lobby_data['lobby_name']
-            lobby_password = lobby_data['lobby_password']
+            # lobby_password = lobby_data['lobby_password']
+            lobby_password = ""
             game_types = lobby_data['game_types']
             await self.create_lobby(user_id, game_types, lobby_name, lobby_password)
         if data['id'] == commands.Lobby_Player_Ready:
@@ -141,9 +143,19 @@ class LobbySession:
             if user_data is None:
                 return
             user_data.is_rdy = True
+            from Entities.SocketIOManagerClass import send_lobby_command
+            await send_lobby_command(
+                command=make_command_json(id=commands.Lobby_Full, data={'user_id': user_data.user_id}),
+                lobby_id=lobby_id)
         if data['id'] == commands.Lobby_Join:
             lobby_id = self.socketid_lobbyid_pairs[socket_id]
-            self.join_lobby(gamer_data, lobby_id)
+            lobby_data = self.find_lobby_from_id(lobby_id)
+            if len(lobby_data.queuers) >= 2:
+                await self.join_lobby(gamer_data, lobby_id)
+            else:
+                from Entities.SocketIOManagerClass import send_private_lobby_command
+                await send_private_lobby_command(
+                    command=make_command_json(id=commands.Lobby_Full, data={}), socket_id=socket_id)
         if data['id'] == commands.Lobby_Start_Game:
             lobby_id = self.socketid_lobbyid_pairs[socket_id]
             lobby_data = self.find_lobby_from_id(lobby_id)

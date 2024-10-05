@@ -41,11 +41,11 @@ class LobbySocketNameSpace(socketio.AsyncNamespace):
         await lobby_session.disconnect_user(socket_id)
 
 
-async def on_user_command(self, socket_id, data):
-    await lobby_session.command_received(data, socket_id)
-    print('User Sended command ', data)
+    async def on_user_command(self, socket_id, data):
+        print('User Sended command ', data)
+        await lobby_session.command_received(data, socket_id)
 
 
-async def on_user_reaction(self, socket_id, data):
-    await lobby_session.reaction_received(data, socket_id)
-    print('User Sended command ', data)
+    async def on_user_reaction(self, socket_id, data):
+        await lobby_session.reaction_received(data, socket_id)
+        print('User Sended command ', data)
