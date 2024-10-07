@@ -56,4 +56,6 @@ Lobby_Delete = "LobbyDelete"
 Lobby_Deleted = "LobbyDeleted"
 Lobby_Player_Ready = "LobbyPlayerReady"
 Lobby_Kick = "LobbyKick"
+Lobby_Request_Data = "LobbyRequestData"
+Lobby_Quit = "LobbyQuit"
 

@@ -85,7 +85,7 @@ class LobbySession:
         await send_lobby_command(command=make_command_json(id=commands.Start_Game, data=game_data), lobby_id=lobby_id)
         from Entities.SocketIOClass.game import add_new_game
         add_new_game(game_id, queuers, final_game_types, self.game_score_type)
-        await self.delete_lobby(lobby_id, need_send_message=False)
+        await self.delete_lobby(lobby_id, ignores_id=queuers_idis, need_send_message=False)
 
     async def create_lobby(self, user_id, game_types, lobby_name, lobby_password):
         user_data = self.find_free_gamer_from_user_id(user_id)
@@ -139,6 +139,11 @@ class LobbySession:
             lobby_password = ""
             game_types = lobby_data['game_types']
             await self.create_lobby(user_id, game_types, lobby_name, lobby_password)
+        if data['id'] == commands.Lobby_Request_Data:
+            from Entities.SocketIOManagerClass import send_private_lobby_command
+            await send_private_lobby_command(
+                command=make_command_json(id=commands.Lobby_List, data=self.get_lobbies_data()),
+                socket_id=gamer_data.socket_id)
         if data['id'] == commands.Lobby_Player_Ready:
             lobby_id = self.socketid_lobbyid_pairs[socket_id]
             user_data = self.find_gamer_from_user_id(lobby_id, user_id)
@@ -186,9 +191,29 @@ class LobbySession:
                 return
             del self.socketid_lobbyid_pairs[gamer_data.socket_id]
             lobby.remove_queuer(gamer_data.user_id)
+            gamer_data.is_rdy = False
+            self.free_queuers.append(gamer_data)
             from Entities.SocketIOManagerClass import send_private_lobby_command
             await send_private_lobby_command(
-                command=make_command_json(id=commands.Lobby_Kick, data={}), socket_id=gamer_data.socket_id)
+                command=make_command_json(id=commands.Lobby_Kick, data=self.get_lobbies_data()),
+                socket_id=gamer_data.socket_id)
+        if data['id'] == commands.Lobby_Quit:
+            lobby_id = self.socketid_lobbyid_pairs[socket_id]
+            lobby = self.find_lobby_from_id(lobby_id)
+            if lobby is None:
+                return
+            from Entities.SocketIOManagerClass import send_private_lobby_command , send_lobby_command , leave_lobby
+            del self.socketid_lobbyid_pairs[socket_id]
+            lobby.remove_queuer(gamer_data.user_id)
+            await leave_lobby(gamer_data.socket_id, lobby_id)
+            gamer_data.is_rdy = False
+            self.free_queuers.append(gamer_data)
+            await send_private_lobby_command(
+                command=make_command_json(id=commands.Lobby_List, data=self.get_lobbies_data()),
+                socket_id=gamer_data.socket_id)
+            await send_lobby_command(
+                command=make_command_json(id=commands.Lobby_Data, data=self.get_lobby_data(lobby_id)),
+                lobby_id=lobby_id)
 
     async def reaction_received(self, data, socket_id):
         lobby_id = self.find_lobbyid_from_socketid(socket_id)
@@ -211,7 +236,7 @@ class LobbySession:
             if gamer_data is None:
                 return
             if lobby.creator_id == gamer_data.user_id:
-                await self.delete_lobby(lobby_id)
+                await self.delete_lobby(lobby_id, ignores_id=[gamer_data.user_id])
             else:
                 del self.socketid_lobbyid_pairs[socket_id]
                 lobby.remove_queuer(gamer_data.user_id)
@@ -221,15 +246,18 @@ class LobbySession:
                     lobby_id=lobby_id)
 
         else:
-            gamer = self.find_free_gamer_from_user_id(socket_id)
+            gamer = self.find_free_gamer_from_socket_id(socket_id)
             if gamer is not None:
                 self.free_queuers.remove(gamer)
 
-    async def delete_lobby(self, lobby_id, ignore_id="", need_send_message=True):
+    async def delete_lobby(self, lobby_id, ignores_id=None, need_send_message=True):
+        if ignores_id is None:
+            ignores_id = []
         lobby = self.find_lobby_from_id(lobby_id)
         if lobby is None:
             return
         from Entities.SocketIOManagerClass import send_lobby_command, leave_lobby, send_private_lobby_command
+        self.lobbies.remove(lobby)
         lobbies_data = self.get_lobbies_data()
         if need_send_message:
             await send_lobby_command(command=make_command_json(id=commands.Lobby_Deleted, data={'lobby_id': lobby_id}),
@@ -237,10 +265,9 @@ class LobbySession:
         for user_data in lobby.queuers:
             await leave_lobby(user_data.socket_id, lobby_id)
             del self.socketid_lobbyid_pairs[user_data.socket_id]
-            if ignore_id != user_data.user_id:
-                user_data.is_rdy = False
-                # self.free_queuers.append(user_data)
-                # await send_private_lobby_command(
-                #     command=make_command_json(id=commands.Lobby_List, data=lobbies_data), socket_id=user_data.socket_id)
-        self.lobbies.remove(lobby)
-        print("lobby_deleted")
+            if ignores_id.__contains__(user_data.user_id):
+                continue
+            user_data.is_rdy = False
+            self.free_queuers.append(user_data)
+            await send_private_lobby_command(command=make_command_json(id=commands.Lobby_List, data=lobbies_data),
+                                             socket_id=user_data.socket_id)
