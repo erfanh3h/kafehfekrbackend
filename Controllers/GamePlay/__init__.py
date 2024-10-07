@@ -55,14 +55,14 @@ class BaseGamePlayClass:
                                                                          self.gamers[1].user_id,
                                                                          self.game_types,
                                                                          str(self.game_score_type.value))
-        if self.game_score_type == GameScoreTypesEnum.NORMAL:
-            game_database.users_manager.update_user(self.gamers[0].user_id, open_game_id=self.game_play_id, )
-            game_database.users_manager.update_user(self.gamers[1].user_id, open_game_id=self.game_play_id, )
-        elif self.game_score_type == GameScoreTypesEnum.RANK:
+        if self.game_score_type == GameScoreTypesEnum.RANK:
             game_database.users_manager.update_user(self.gamers[0].user_id, open_game_id=self.game_play_id,
                                                     coin=self.gamers[0].user_coin - rank_coin_cost)
             game_database.users_manager.update_user(self.gamers[1].user_id, open_game_id=self.game_play_id,
                                                     coin=self.gamers[1].user_coin - rank_coin_cost)
+        else:
+            game_database.users_manager.update_user(self.gamers[0].user_id, open_game_id=self.game_play_id, )
+            game_database.users_manager.update_user(self.gamers[1].user_id, open_game_id=self.game_play_id, )
 
     def join_game_limit_time(self):
         if not self.is_game_started:
