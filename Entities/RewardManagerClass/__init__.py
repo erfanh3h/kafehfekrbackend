@@ -55,14 +55,15 @@ class RewardManagerClass:
                 user1_new_score = user1_data['score'] + lose_score
                 user1_new_xp = user1_data['xp'] + lose_xp
                 user1_new_coin = user1_data['coin'] + lose_coin
-        user1_history, user2_history = self.get_history_map(winner_gamer_id)
         game_database.users_manager.update_user(self.player1_user_id, score=user1_new_score, xp=user1_new_xp,
                                                 coin=user1_new_coin, open_game_id="", last_time_played=datetime.now())
         game_database.users_manager.update_user(self.player2_user_id, score=user2_new_score, xp=user2_new_xp,
                                                 coin=user2_new_coin, open_game_id="", last_time_played=datetime.now())
-        game_database.user_history_manager.update_user_history(self.player1_user_id, user1_history)
-        game_database.user_history_manager.update_user_history(self.player2_user_id, user2_history)
-        # print("winner  :  ", winner_gamer_id)
+        is_lobby = self.game_score_type == GameScoreTypesEnum.LOBBY
+        if not is_lobby:
+            user1_history, user2_history = self.get_history_map(winner_gamer_id)
+            game_database.user_history_manager.update_user_history(self.player1_user_id, user1_history)
+            game_database.user_history_manager.update_user_history(self.player2_user_id, user2_history)
 
     def get_history_map(self, total_game_winner):
         is_rank = self.game_score_type == GameScoreTypesEnum.RANK

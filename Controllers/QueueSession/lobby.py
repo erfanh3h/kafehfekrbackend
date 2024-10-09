@@ -157,10 +157,15 @@ class LobbySession:
         if data['id'] == commands.Lobby_Join:
             lobby_id = data['data']['lobby_id']
             lobby_data = self.find_lobby_from_id(lobby_id)
+            from Entities.SocketIOManagerClass import send_private_lobby_command
+            if lobby_data is None:
+                await send_private_lobby_command(
+                    command=make_command_json(id=commands.Lobby_Not_Exists, data={'lobby_id': lobby_id}),
+                    socket_id=socket_id)
+                return
             if len(lobby_data.queuers) < 2:
                 await self.join_lobby(gamer_data, lobby_id)
             else:
-                from Entities.SocketIOManagerClass import send_private_lobby_command
                 await send_private_lobby_command(
                     command=make_command_json(id=commands.Lobby_Full, data={}), socket_id=socket_id)
         if data['id'] == commands.Lobby_Start_Game:
@@ -202,7 +207,7 @@ class LobbySession:
             lobby = self.find_lobby_from_id(lobby_id)
             if lobby is None:
                 return
-            from Entities.SocketIOManagerClass import send_private_lobby_command , send_lobby_command , leave_lobby
+            from Entities.SocketIOManagerClass import send_private_lobby_command, send_lobby_command, leave_lobby
             del self.socketid_lobbyid_pairs[socket_id]
             lobby.remove_queuer(gamer_data.user_id)
             await leave_lobby(gamer_data.socket_id, lobby_id)
