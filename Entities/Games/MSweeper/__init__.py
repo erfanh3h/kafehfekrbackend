@@ -42,8 +42,8 @@ class MSweeperGameClass(BaseGameClass):
             if not self.board[x][y].mine:
                 self.add_mine(x, y)
                 i += 1
-            else:
-                i -= 1
+            # else:
+                # i -= 1
         #print(self.show_board())
 
     def get_game_data_msweeper(self, gamer_id):
