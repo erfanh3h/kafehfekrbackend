@@ -35,6 +35,12 @@ async def send_queue_command(command, socket_id, namespace="/queue"):
     await Socket_Server.emit('command', command, to=socket_id, namespace=namespace)
 
 
+async def enter_pre_game(socket_id, pre_game_id, namespace="/queue"):
+    await Socket_Server.enter_room(sid=socket_id, room=pre_game_id, namespace=namespace)
+
+async def send_pre_game_command(command, pre_game_id, namespace="/queue"):
+    await Socket_Server.emit('command', command, room=pre_game_id, namespace=namespace)
+
 async def enter_lobby(socket_id, lobby_id, namespace="/lobby"):
     await Socket_Server.enter_room(sid=socket_id, room=lobby_id, namespace=namespace)
 

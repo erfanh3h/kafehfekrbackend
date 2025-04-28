@@ -59,4 +59,6 @@ Lobby_Player_Ready = "LobbyPlayerReady"
 Lobby_Kick = "LobbyKick"
 Lobby_Request_Data = "LobbyRequestData"
 Lobby_Quit = "LobbyQuit"
-
+Start_Pre_Game = "StartPreGame"
+Select_Game = "SelectGame"
+Ban_Game = "BanGame"

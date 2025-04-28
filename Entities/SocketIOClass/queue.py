@@ -1,13 +1,12 @@
 import socketio
 
 from Commons import static_functions
-from Controllers.QueueSession.normal import NormalQueueSession
 from Controllers.QueueSession.rank import RankQueueSession
 from Models.Queuer import QueuerModel
 from Commons import commands
 
-normal_queue_session = NormalQueueSession()
-normal_queue_session.init_session()
+# normal_queue_session = NormalQueueSession()
+# normal_queue_session.init_session()
 rank_queue_session = RankQueueSession()
 rank_queue_session.init_session()
 
@@ -21,8 +20,8 @@ class QueueSocketNameSpace(socketio.AsyncNamespace):
                 token_data = await extract_token(auth['token'])
                 if token_data is not None:
                     user_id = token_data['id']
-                    game_types = auth['game_types']
-                    game_score_type = auth['game_score_type']
+                    # game_types = auth['game_types']
+                    # game_score_type = auth['game_score_type']
                 else:
                     await self.disconnect(socket_id, namespace="/queue")
                     return
@@ -32,32 +31,22 @@ class QueueSocketNameSpace(socketio.AsyncNamespace):
         else:
             await self.disconnect(socket_id, namespace="/queue")
             return
-        if game_types is None:
-            await self.disconnect(socket_id, namespace="/queue")
+        from Entities.Database import game_database
+        user_data = game_database.users_manager.read_user(user_id)
+        queuer_data = QueuerModel(user_id, user_data["username"], socket_id=socket_id,
+                                  user_image=user_data['image'], user_coin=user_data['coin'],
+                                  user_score=user_data['score'])
+        if user_data['coin'] < 15:  # check user coin
+            await self.emit('command', {'id': commands.Not_Enough_Coin}, to=socket_id, namespace="/queue")
         else:
-            from Entities.Database import game_database
-            user_data = game_database.users_manager.read_user(user_id)
-            queuer_data = QueuerModel(user_id, user_data["username"], socket_id=socket_id,
-                                      user_image=user_data['image'], user_coin=user_data['coin'],
-                                      user_score=user_data['score'], game_types=game_types)
-            if game_score_type == "Normal":
-                normal_queue_session.join_queuer(queuer_data)
-            else:
-                if user_data['coin'] < 15:  # check user coin
-                    await self.emit('command', {'id': commands.Not_Enough_Coin}, to=socket_id, namespace="/queue")
-                else:
-                    rank_queue_session.join_queuer(queuer_data)
+            rank_queue_session.join_queuer(queuer_data)
 
     async def on_disconnect(self, socket_id):
-        normal_queue_session.disconnect_user(socket_id)
         rank_queue_session.disconnect_user(socket_id)
 
 
 async def on_user_command(self, socket_id, data):
-    # game_id = return_gameid_from_socketid(socket_id)
-    # if game_id is not None:
-    #     await games[game_id].command_received(data, socket_id)
-    #     print('User Sended command ', data)
+    await rank_queue_session.command_received(data, socket_id)
     print('User Sended command ', data)
 
 

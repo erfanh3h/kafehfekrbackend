@@ -30,7 +30,7 @@ class LobbySocketNameSpace(socketio.AsyncNamespace):
         user_data = game_database.users_manager.read_user(user_id)
         queuer_data = QueuerModel(user_id, user_data["username"], socket_id=socket_id,
                                   user_image=user_data['image'], user_coin=user_data['coin'],
-                                  user_score=user_data['score'], game_types=[], is_rdy=False)
+                                  user_score=user_data['score'], is_rdy=False)
         await lobby_session.join_queuers_list(queuer_data)
         # if user_data['coin'] < 5:  # check user coin
         #     await self.emit('command', {'id': commands.Not_Enough_Coin}, to=socket_id, namespace="/lobby")
@@ -40,11 +40,9 @@ class LobbySocketNameSpace(socketio.AsyncNamespace):
     async def on_disconnect(self, socket_id):
         await lobby_session.disconnect_user(socket_id)
 
-
     async def on_user_command(self, socket_id, data):
         print('User Sended command ', data)
         await lobby_session.command_received(data, socket_id)
-
 
     async def on_user_reaction(self, socket_id, data):
         await lobby_session.reaction_received(data, socket_id)
