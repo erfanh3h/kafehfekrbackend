@@ -44,10 +44,9 @@ class QueueSocketNameSpace(socketio.AsyncNamespace):
     async def on_disconnect(self, socket_id):
         rank_queue_session.disconnect_user(socket_id)
 
-
-async def on_user_command(self, socket_id, data):
-    await rank_queue_session.command_received(data, socket_id)
-    print('User Sended command ', data)
+    async def on_user_command(self, socket_id, data):
+        print('User Sended command ', data)
+        await rank_queue_session.command_received(data, socket_id)
 
 
 def return_random_id():

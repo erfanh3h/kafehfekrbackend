@@ -29,7 +29,6 @@ class RankQueueSession(BaseQueueSession):
         return None
 
     async def command_received(self, data, socket_id):
-        print(data)
         pre_game_id = data['pre_game_id']
         if pre_game_id is None:
             return
@@ -60,11 +59,14 @@ class RankQueueSession(BaseQueueSession):
             if queuer_data is None:
                 return False
             queuers.append(queuer_data)
-        pre_game_id = static_functions.create_random_game_id()
-        game_data = {'id': pre_game_id}
         if len(queuers) != 2:
             return
-        from Entities.SocketIOManagerClass import enter_pre_game , send_queue_command
+        pre_game_id = static_functions.create_random_game_id()
+        queurs_data = []
+        for queuer_data in queuers:
+            queurs_data.append(queuer_data.to_json())
+        game_data = {'id': pre_game_id, 'queuers': queurs_data}
+        from Entities.SocketIOManagerClass import enter_pre_game, send_queue_command
         for queuer_data in queuers:
             print(queuer_data.socket_id)
             asyncio.new_event_loop().run_until_complete(
