@@ -36,10 +36,10 @@ class QueueSocketNameSpace(socketio.AsyncNamespace):
         queuer_data = QueuerModel(user_id, user_data["username"], socket_id=socket_id,
                                   user_image=user_data['image'], user_coin=user_data['coin'],
                                   user_score=user_data['score'])
-        if user_data['coin'] < 15:  # check user coin
-            await self.emit('command', {'id': commands.Not_Enough_Coin}, to=socket_id, namespace="/queue")
-        else:
-            rank_queue_session.join_queuer(queuer_data)
+        # if user_data['coin'] < 15:  # check user coin
+        #     await self.emit('command', {'id': commands.Not_Enough_Coin}, to=socket_id, namespace="/queue")
+        # else:
+        rank_queue_session.join_queuer(queuer_data)
 
     async def on_disconnect(self, socket_id):
         rank_queue_session.disconnect_user(socket_id)

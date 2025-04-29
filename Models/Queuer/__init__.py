@@ -10,6 +10,10 @@ class QueuerModel(UserModel):
         self.is_rdy = is_rdy
         self.selected_game = None
         self.banned_games = []
+        self.queuer_index = 0
+
+    def set_index(self, queuer_index):
+        self.queuer_index = queuer_index
 
     def join_queue(self, socket_id):
         self.socket_id = socket_id
