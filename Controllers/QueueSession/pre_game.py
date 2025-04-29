@@ -59,30 +59,41 @@ class PreGameClass:
     async def command_received(self, data, socket_id):
         from Entities.SocketIOManagerClass import send_pre_game_command
         gamer_data = self.find_gamer_from_socket_id(socket_id)
-        user_id = gamer_data.user_id
         if data['id'] == commands.Select_Game:
-            if gamer_data.selected_game is not None:
-                return
-            if self.select_turn_index == 1 and len(self.queuers[0].banned_games) != 0:
-                return
-            if self.select_turn_index == 2 and len(self.queuers[1].banned_games) != 0:
-                return
-            if self.select_turn_index == 3 and self.queuers[0].selected_game is not None:
-                return
-            if self.select_turn_index == 4 and self.queuers[1].selected_game is not None:
-                return
-            if self.select_turn_index == 5 and len(self.queuers[0].banned_games) != 1:
-                return
-            if self.select_turn_index == 6 and len(self.queuers[1].banned_games) != 1:
-                return
-            gamer_data.selected_game = data['game_type']
+            game_type = data['game_type']
+            if self.select_turn_index == 1:
+                if len(self.queuers[0].banned_games) != 0:
+                    return
+                self.queuers[0].banned_games.append(game_type)
+            elif self.select_turn_index == 2:
+                if len(self.queuers[1].banned_games) != 0:
+                    return
+                self.queuers[1].banned_games.append(game_type)
+            elif self.select_turn_index == 3:
+                if self.queuers[0].selected_game is not None:
+                    return
+                self.queuers[0].selected_game = game_type
+            elif self.select_turn_index == 4:
+                if self.queuers[1].selected_game is not None:
+                    return
+                self.queuers[1].selected_game = game_type
+            elif self.select_turn_index == 5:
+                if len(self.queuers[0].banned_games) != 1:
+                    return
+                self.queuers[0].banned_games.append(game_type)
+            elif self.select_turn_index == 6:
+                if len(self.queuers[1].banned_games) != 1:
+                    return
+                self.queuers[1].banned_games.append(game_type)
             await send_pre_game_command(command=make_command_json(id=commands.Selected_Game,
                                                                   data={'active_index': self.select_turn_index,
                                                                         'game_type': data['game_type']}),
                                         pre_game_id=self.pre_game_id)
-            self.timer.stop()
+            self.send_current_turn()
+            # self.timer.stop()
 
     def send_current_turn(self):
+        self.select_turn_index += 1
         if self.select_turn_index == 8:  # last turn
             print("start game")
             # self.start_game_function(self.queuers, [self.queuers[0].selected_game, self.queuers[1].selected_game,
@@ -95,12 +106,11 @@ class PreGameClass:
             asyncio.new_event_loop().run_until_complete(
                 send_pre_game_command(command=make_command_json(id=commands.Selected_Game,
                                                                 data={'active_index': self.select_turn_index,
-                                                                      'game_type': readable_data})))
-            self.select_turn_index += 1
-            # self.timer.start(5, self.send_current_turn)
+                                                                      'game_type': readable_data}),
+                                      pre_game_id=self.pre_game_id))
+            self.timer.start(5, self.send_current_turn)
 
         else:
-            self.select_turn_index += 1
             from Entities.SocketIOManagerClass import send_pre_game_command
             import asyncio
             if self.select_turn_index % 2 == 1:
