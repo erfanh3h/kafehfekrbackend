@@ -25,6 +25,8 @@ class BaseGameSession:
         self.game_type = game_type
         self.game_score_type = game_score_type
         self.add_history_id()
+        self.is_game_finished = False
+
 
     def add_history_id(self):
         self.game_history_id = static_functions.create_random_game_id(length=8)
@@ -247,6 +249,9 @@ class BaseGameSession:
         return False
 
     def finish_game(self, winner_gamer_id):
+        if self.is_game_finished:
+            return
+        self.is_game_finished = True
         from Entities.Database import game_database
         game_database.game_history_manager.create_game_history(self.game_history_id, self.game_id,
                                                                self.gamers[0].user_id,

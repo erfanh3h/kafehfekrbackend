@@ -22,7 +22,6 @@ class PreGameClass:
         for game in self.active_game_types:
             if game.value == game_type:
                 self.active_game_types.remove(game)
-                print(len(self.active_game_types))
                 return
 
     def find_gamer_from_user_id(self, user_id):
@@ -104,7 +103,6 @@ class PreGameClass:
     def send_current_turn(self):
         self.select_turn_index += 1
         if self.select_turn_index == 8:  # last turn
-            print("start game")
             self.start_game_function(self.queuers, [self.queuers[0].selected_game, self.queuers[1].selected_game,
                                                     self.system_selected_game])
         elif self.select_turn_index == 7:
