@@ -91,6 +91,9 @@ class RankQueueSession(BaseQueueSession):
     def join_queuer(self, user_data: QueuerModel):
         self.queuers.append(user_data)
 
+    def reconnect_queuer(self, pre_game_id, user_data: QueuerModel):
+        print(pre_game_id)
+
     def disconnect_user(self, socket_id):
         for user_data in self.queuers:
             if socket_id == user_data.socket_id:

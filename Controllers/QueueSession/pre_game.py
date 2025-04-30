@@ -2,6 +2,7 @@ import random
 
 from Commons import commands
 from Commons.static_functions import make_command_json
+from Entities.Database import game_database
 from Entities.Games.game_types import GameTypesEnum
 from Entities.TimerClass import TimerClass
 from Models.Queuer import QueuerModel
@@ -51,6 +52,7 @@ class PreGameClass:
         return data
 
     def start_pre_game(self):
+        self.set_pre_game_id_db(self.pre_game_id)
         from Entities.SocketIOManagerClass import send_pre_game_command
         import asyncio
         for index, queuer in enumerate(self.queuers):
@@ -103,6 +105,7 @@ class PreGameClass:
     def send_current_turn(self):
         self.select_turn_index += 1
         if self.select_turn_index == 8:  # last turn
+            self.set_pre_game_id_db("")
             self.start_game_function(self.queuers, [self.queuers[0].selected_game, self.queuers[1].selected_game,
                                                     self.system_selected_game])
         elif self.select_turn_index == 7:
@@ -129,3 +132,7 @@ class PreGameClass:
                 send_pre_game_command(command=make_command_json(id=commands.Select_Game,
                                                                 data=current_queuer_id), pre_game_id=self.pre_game_id))
             # self.timer.start(25, self.send_current_turn)
+
+    def set_pre_game_id_db(self, pre_game_id):
+        game_database.users_manager.update_user(self.queuers[0].user_id, open_pre_game_id=pre_game_id)
+        game_database.users_manager.update_user(self.queuers[1].user_id, open_pre_game_id=pre_game_id)

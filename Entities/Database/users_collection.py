@@ -8,7 +8,8 @@ from Commons.static_functions import create_random_user_id
 def create_user_json(phone, name="", device_id="") -> dict:
     random_id = create_random_user_id()
     return {'_id': random_id, 'phone': phone, 'username': name, "score": 0, "xp": 0, "coin": 50, "image": 0, "token": 0,
-            "open_game_id": "", "device_id": device_id, "last_time_played": datetime(2000, 1, 1),
+            "open_game_id": "", "open_pre_game_id": "", "device_id": device_id,
+            "last_time_played": datetime(2000, 1, 1),
             "last_time_chance": datetime(2000, 1, 1), "is_active": True, "join_date": datetime.now()}
 
 
@@ -70,7 +71,8 @@ class UsersCollectionManager:
         return data
 
     def update_user(self, user_id, username=None, score=None, xp=None, coin=None, image=None, token=None,
-                    open_game_id=None, device_id=None, last_time_played=None, last_time_chance=None, is_active=None):
+                    open_game_id=None, open_pre_game_id=None, device_id=None, last_time_played=None,
+                    last_time_chance=None, is_active=None):
         query = {'_id': user_id}
         update_data = {}
         if username is not None:
@@ -87,6 +89,8 @@ class UsersCollectionManager:
             update_data['token'] = token
         if open_game_id is not None:
             update_data['open_game_id'] = open_game_id
+        if open_pre_game_id is not None:
+            update_data['open_pre_game_id'] = open_pre_game_id
         if device_id is not None:
             update_data['device_id'] = device_id
         if last_time_played is not None:

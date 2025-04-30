@@ -20,6 +20,7 @@ class QueueSocketNameSpace(socketio.AsyncNamespace):
                 token_data = await extract_token(auth['token'])
                 if token_data is not None:
                     user_id = token_data['id']
+                    pre_game_id = auth['pre_game_id']
                     # game_types = auth['game_types']
                     # game_score_type = auth['game_score_type']
                 else:
@@ -39,7 +40,10 @@ class QueueSocketNameSpace(socketio.AsyncNamespace):
         # if user_data['coin'] < 15:  # check user coin
         #     await self.emit('command', {'id': commands.Not_Enough_Coin}, to=socket_id, namespace="/queue")
         # else:
-        rank_queue_session.join_queuer(queuer_data)
+        if pre_game_id is None:
+            rank_queue_session.join_queuer(queuer_data)
+        else:
+            rank_queue_session.reconnect_queuer(pre_game_id, queuer_data)
 
     async def on_disconnect(self, socket_id):
         rank_queue_session.disconnect_user(socket_id)
