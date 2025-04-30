@@ -6,6 +6,7 @@ from Commons import static_functions, commands
 from Commons.static_functions import make_command_json
 from Controllers.QueueSession import BaseQueueSession
 from Controllers.QueueSession.pre_game import PreGameClass
+from Entities.Database import game_database
 from Entities.RewardManagerClass import GameScoreTypesEnum
 from Models.Queuer import QueuerModel
 
@@ -92,7 +93,20 @@ class RankQueueSession(BaseQueueSession):
         self.queuers.append(user_data)
 
     def reconnect_queuer(self, pre_game_id, user_data: QueuerModel):
-        print(pre_game_id)
+        from Entities.SocketIOManagerClass import send_queue_command, enter_pre_game
+        if pre_game_id not in self.active_pre_games.keys():
+            asyncio.new_event_loop().run_until_complete(
+                send_queue_command(command=make_command_json(id=commands.Game_Finished, data={}),
+                                   socket_id=user_data.socket_id))
+            game_database.users_manager.update_user(user_data.user_id, open_pre_game_id="")
+            return
+        self.active_pre_games[pre_game_id].change_queuer_socket_id(user_data.socket_id, user_data.user_id)
+        asyncio.new_event_loop().run_until_complete(
+            enter_pre_game(socket_id=user_data.socket_id, pre_game_id=pre_game_id))
+        data = self.active_pre_games[pre_game_id].get_reconnect_data()
+        asyncio.new_event_loop().run_until_complete(
+            send_queue_command(command=make_command_json(id=commands.Reconnect_Data, data=data),
+                               socket_id=user_data.socket_id))
 
     def disconnect_user(self, socket_id):
         for user_data in self.queuers:

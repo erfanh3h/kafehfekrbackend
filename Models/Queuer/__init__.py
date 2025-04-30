@@ -23,3 +23,7 @@ class QueuerModel(UserModel):
 
     def to_lobby_json(self):
         return {'name': self.username, 'user_id': self.user_id, 'image': self.user_image, 'is_rdy': self.is_rdy}
+
+    def to_queue_json(self):
+        return {'name': self.username, 'user_id': self.user_id, 'image': self.user_image,
+                'selected_game': self.selected_game, 'banned_games': self.banned_games}

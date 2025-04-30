@@ -19,6 +19,12 @@ class PreGameClass:
         self.system_selected_game: GameTypesEnum = None
         self.select_turn_index = 0
 
+    def change_queuer_socket_id(self, socket_id, queuer_id):
+        for queuer in self.queuers:
+            if queuer.user_id == queuer_id:
+                queuer.socket_id = socket_id
+                return
+
     def remove_game_type_from_list(self, game_type):
         for game in self.active_game_types:
             if game.value == game_type:
@@ -37,18 +43,21 @@ class PreGameClass:
                 return queuer
         return None
 
-    def to_json(self):
-        data = {'pre_game_id': self.pre_game_id, 'pre_game_name': self.pre_game_name, 'creator_id': self.creator_id,
-                'game_types': self.game_types, 'queuers_length': len(self.queuers)}
-        return data
-
-    def to_complete_json(self):
-        data = {'pre_game_id': self.pre_game_id, 'pre_game_name': self.pre_game_name, 'creator_id': self.creator_id,
-                'game_types': self.game_types, }
-        queuer_data = []
-        # for queuer in self.queuers:
-        #     queuer_data.append(queuer.to_pre_game_json())
-        data['queuers'] = queuer_data
+    def get_reconnect_data(self):
+        queuers_data = []
+        pre_bans = [game.value for game in self.pre_bans]
+        if self.system_selected_game is not None:
+            system_selected_game = self.system_selected_game.value
+        else:
+            system_selected_game = None
+        for queuer in self.queuers:
+            queuers_data.append(queuer.to_queue_json())
+        if self.select_turn_index % 2 == 1:
+            current_queuer_id = self.queuers[0].user_id
+        else:
+            current_queuer_id = self.queuers[1].user_id
+        data = {'pre_bans': pre_bans, 'queuers': queuers_data, 'system_selected_game': system_selected_game,
+                'active_index': self.select_turn_index, 'active_user_id': current_queuer_id}
         return data
 
     def start_pre_game(self):

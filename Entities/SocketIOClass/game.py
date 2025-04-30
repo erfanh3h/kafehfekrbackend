@@ -1,6 +1,7 @@
 import socketio
 
 from Commons import static_functions
+from Commons import commands
 from Controllers.GamePlay import BaseGamePlayClass
 
 # current_game_id = "gameId"
@@ -78,7 +79,7 @@ class GameSocketNameSpace(socketio.AsyncNamespace):
                 await self.disconnect(socket_id, namespace="/game")
                 return
         else:
-            await self.emit('command', {'id': 'GameFinished'}, to=socket_id, namespace="/game")
+            await self.emit('command', {'id': commands.Game_Finished}, to=socket_id, namespace="/game")
             # await self.disconnect(socket_id, namespace="/game")
 
     async def on_disconnect(self, socket_id):
