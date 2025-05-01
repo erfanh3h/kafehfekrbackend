@@ -3,6 +3,7 @@ import socketio
 from Commons import static_functions
 from Commons import commands
 from Controllers.GamePlay import BaseGamePlayClass
+from Entities.Database import game_database
 
 # current_game_id = "gameId"
 # gameSession = YinshGameSession(game_id=current_game_id, game_score_type=GameScoreTypesEnum.NORMAL,
@@ -80,6 +81,7 @@ class GameSocketNameSpace(socketio.AsyncNamespace):
                 return
         else:
             await self.emit('command', {'id': commands.Game_Finished}, to=socket_id, namespace="/game")
+            game_database.users_manager.update_user(user_id, open_game_id="")
             # await self.disconnect(socket_id, namespace="/game")
 
     async def on_disconnect(self, socket_id):

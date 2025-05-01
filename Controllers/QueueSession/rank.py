@@ -97,6 +97,7 @@ class RankQueueSession(BaseQueueSession):
 
     def reconnect_queuer(self, pre_game_id, user_data: QueuerModel):
         from Entities.SocketIOManagerClass import send_queue_command, enter_pre_game
+        print(self.active_pre_games.keys() , pre_game_id)
         if pre_game_id not in self.active_pre_games.keys():
             asyncio.new_event_loop().run_until_complete(
                 send_queue_command(command=make_command_json(id=commands.Game_Finished, data={}),
