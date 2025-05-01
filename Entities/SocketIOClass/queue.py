@@ -46,7 +46,7 @@ class QueueSocketNameSpace(socketio.AsyncNamespace):
             rank_queue_session.reconnect_queuer(pre_game_id, queuer_data)
 
     async def on_disconnect(self, socket_id):
-        rank_queue_session.disconnect_user(socket_id)
+        await rank_queue_session.disconnect_user(socket_id)
 
     async def on_user_command(self, socket_id, data):
         print('User Sended command ', data)

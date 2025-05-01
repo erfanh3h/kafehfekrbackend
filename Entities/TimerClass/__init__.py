@@ -9,6 +9,7 @@ class TimerClass:
         self.max_time = max_time
         self.return_function = return_function
         self.is_canceled = False
+        self.is_paused = False
         self.counter = 0
         self.is_user_turn = False
         self.timer = threading.Timer(self.max_time, self.return_function)
@@ -32,14 +33,23 @@ class TimerClass:
     # develop this like to keep track of time for reconnect data
     def start_timer(self):
         # print(self.counter)
-        if self.is_canceled:
+        if self.is_canceled or self.is_paused:
             return
-        if self.counter >= self.max_time:
+        elif self.counter >= self.max_time:
             self.timer.cancel()
             self.is_user_turn = False
             if self.return_function is not None:
                 self.return_function()
         else:
             self.counter += 1
+            print("main counter : " , self.counter)
             self.timer = threading.Timer(1, self.start_timer)
             self.timer.start()
+
+    def pause(self):
+        self.is_paused = True
+
+    def resume(self):
+        self.is_paused = False
+        self.timer = threading.Timer(1, self.start_timer)
+        self.timer.start()

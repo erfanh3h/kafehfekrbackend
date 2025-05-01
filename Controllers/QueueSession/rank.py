@@ -16,6 +16,7 @@ class RankQueueSession(BaseQueueSession):
         super().__init__(GameScoreTypesEnum.RANK)
         self.queuers: list[QueuerModel] = []
         self.active_pre_games: dict[str, PreGameClass] = {}
+        self.socket_id_pre_games_pairs: dict[str, str] = {}
 
     def find_gamer_from_user_id(self, user_id):
         for queuer in self.queuers:
@@ -40,6 +41,8 @@ class RankQueueSession(BaseQueueSession):
     def start_new_game(self, queuers, game_types):
         if len(queuers) != 2:
             return
+        del self.socket_id_pre_games_pairs[queuers[0].socket_id]
+        del self.socket_id_pre_games_pairs[queuers[1].socket_id]
         from Entities.SocketIOManagerClass import send_queue_command
         game_id = static_functions.create_random_game_id()
         final_game_types = game_types
@@ -69,7 +72,7 @@ class RankQueueSession(BaseQueueSession):
         game_data = {'id': pre_game_id, 'queuers': queurs_data}
         from Entities.SocketIOManagerClass import enter_pre_game, send_queue_command
         for queuer_data in queuers:
-            print(queuer_data.socket_id)
+            self.socket_id_pre_games_pairs[queuer_data.socket_id] = pre_game_id
             asyncio.new_event_loop().run_until_complete(
                 send_queue_command(command=make_command_json(id=commands.Start_Pre_Game, data=game_data),
                                    socket_id=queuer_data.socket_id))
@@ -100,7 +103,8 @@ class RankQueueSession(BaseQueueSession):
                                    socket_id=user_data.socket_id))
             game_database.users_manager.update_user(user_data.user_id, open_pre_game_id="")
             return
-        self.active_pre_games[pre_game_id].change_queuer_socket_id(user_data.socket_id, user_data.user_id)
+        self.socket_id_pre_games_pairs[user_data.socket_id] = pre_game_id
+        self.active_pre_games[pre_game_id].reconnect_user(user_data.socket_id, user_data.user_id)
         asyncio.new_event_loop().run_until_complete(
             enter_pre_game(socket_id=user_data.socket_id, pre_game_id=pre_game_id))
         data = self.active_pre_games[pre_game_id].get_reconnect_data()
@@ -108,7 +112,11 @@ class RankQueueSession(BaseQueueSession):
             send_queue_command(command=make_command_json(id=commands.Reconnect_Data, data=data),
                                socket_id=user_data.socket_id))
 
-    def disconnect_user(self, socket_id):
+    async def disconnect_user(self, socket_id):
+        if not self.socket_id_pre_games_pairs.keys().__contains__(socket_id):
+            return
+        game_id = self.socket_id_pre_games_pairs[socket_id]
+        self.active_pre_games[game_id].disconnect_user(socket_id)
         for user_data in self.queuers:
             if socket_id == user_data.socket_id:
                 self.queuers.remove(user_data)

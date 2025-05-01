@@ -11,6 +11,7 @@ from Models.Queuer import QueuerModel
 class PreGameClass:
     def __init__(self, pre_game_id: str, queuers, start_game_function):
         self.timer = TimerClass()
+        self.dc_timer = TimerClass()
         self.start_game_function = start_game_function
         self.pre_game_id: str = pre_game_id
         self.active_game_types = []
@@ -18,12 +19,7 @@ class PreGameClass:
         self.pre_bans: list[GameTypesEnum] = []
         self.system_selected_game: GameTypesEnum = None
         self.select_turn_index = 0
-
-    def change_queuer_socket_id(self, socket_id, queuer_id):
-        for queuer in self.queuers:
-            if queuer.user_id == queuer_id:
-                queuer.socket_id = socket_id
-                return
+        # self.is_current_pick_happens = False
 
     def remove_game_type_from_list(self, game_type):
         for game in self.active_game_types:
@@ -66,6 +62,7 @@ class PreGameClass:
         import asyncio
         for index, queuer in enumerate(self.queuers):
             queuer.set_index(index)
+            queuer.set_finish_reconnect_time_function(self.finish_dc_timer)
         self.pre_bans = random.sample(list(GameTypesEnum), 3)  # randomly ban 3 games
         self.active_game_types = [game for game in GameTypesEnum if game not in self.pre_bans]
         readable_data = [game.value for game in self.pre_bans]
@@ -108,8 +105,8 @@ class PreGameClass:
                                                                   data={'active_index': self.select_turn_index,
                                                                         'game_type': data['game_type']}),
                                         pre_game_id=self.pre_game_id)
-            self.send_current_turn()
-            # self.timer.stop()
+            # self.send_current_turn()
+            self.timer.stop()
 
     def send_current_turn(self):
         self.select_turn_index += 1
@@ -140,8 +137,36 @@ class PreGameClass:
             asyncio.new_event_loop().run_until_complete(
                 send_pre_game_command(command=make_command_json(id=commands.Select_Game,
                                                                 data=current_queuer_id), pre_game_id=self.pre_game_id))
-            # self.timer.start(25, self.send_current_turn)
+            self.timer.start(20, self.send_current_turn)
 
     def set_pre_game_id_db(self, pre_game_id):
         game_database.users_manager.update_user(self.queuers[0].user_id, open_pre_game_id=pre_game_id)
         game_database.users_manager.update_user(self.queuers[1].user_id, open_pre_game_id=pre_game_id)
+
+    def disconnect_user(self, socket_id):
+        from Entities.SocketIOManagerClass import send_pre_game_command
+        import asyncio
+        user_data = self.find_gamer_from_socket_id(socket_id)
+        if user_data is not None:
+            self.timer.pause()
+            user_data.disconnect()
+            asyncio.new_event_loop().run_until_complete(
+                send_pre_game_command(command=make_command_json(id=commands.User_Disconnected,
+                                                                data={"user_id": user_data.user_id,
+                                                                      "time": user_data.timer.max_time}),
+                                      pre_game_id=self.pre_game_id))
+
+    def reconnect_user(self, socket_id, user_id):
+        from Entities.SocketIOManagerClass import send_pre_game_command
+        import asyncio
+        user_data = self.find_gamer_from_user_id(user_id)
+        if user_data is not None:
+            self.timer.resume()
+            user_data.reconnect(socket_id)
+            asyncio.new_event_loop().run_until_complete(
+                send_pre_game_command(
+                    command=make_command_json(id=commands.User_Reconnected, data={"user_id": user_data.user_id}),
+                    pre_game_id=self.pre_game_id))
+
+    def finish_dc_timer(self, user_id):
+        print(f"{user_id} finished dc time!")

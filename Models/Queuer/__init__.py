@@ -1,3 +1,4 @@
+from Entities.TimerClass.UserDisconnectTimerClass import UserDisconnectTimerClass
 from Models.User import UserModel
 
 
@@ -11,12 +12,27 @@ class QueuerModel(UserModel):
         self.selected_game = None
         self.banned_games = []
         self.queuer_index = 0
+        self.is_disconnected: bool = False
+        self.timer = UserDisconnectTimerClass(user_id=user_id)
 
     def set_index(self, queuer_index):
         self.queuer_index = queuer_index
 
     def join_queue(self, socket_id):
         self.socket_id = socket_id
+
+    def set_finish_reconnect_time_function(self, finish_reconnect_time_function):
+        self.timer.set_finish_timer_function(finish_reconnect_time_function)
+
+    def reconnect(self, socket_id):
+        self.is_disconnected = False
+        self.socket_id = socket_id
+        self.timer.stop()
+
+    def disconnect(self):
+        self.is_disconnected = True
+        self.socket_id = ""
+        self.timer.start()
 
     def to_json(self):
         return {'name': self.username, 'user_id': self.user_id, 'image': self.user_image}
@@ -26,4 +42,5 @@ class QueuerModel(UserModel):
 
     def to_queue_json(self):
         return {'name': self.username, 'user_id': self.user_id, 'image': self.user_image,
-                'selected_game': self.selected_game, 'banned_games': self.banned_games}
+                'selected_game': self.selected_game, 'banned_games': self.banned_games,
+                'remaining_time':  self.timer.max_time}
