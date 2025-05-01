@@ -33,6 +33,12 @@ class PreGameClass:
                 return queuer
         return None
 
+    def is_some_one_offline(self):
+        for queuer in self.queuers:
+            if queuer.is_disconnected:
+                return True
+        return False
+
     def find_gamer_from_socket_id(self, socket_id):
         for queuer in self.queuers:
             if queuer.socket_id == socket_id:
@@ -181,7 +187,8 @@ class PreGameClass:
         import asyncio
         user_data = self.find_gamer_from_user_id(user_id)
         if user_data is not None:
-            self.timer.resume()
+            if not self.is_some_one_offline():
+                self.timer.resume()
             user_data.reconnect(socket_id)
             asyncio.new_event_loop().run_until_complete(send_pre_game_command(
                 command=make_command_json(id=commands.User_Reconnected,

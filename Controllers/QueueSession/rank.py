@@ -115,6 +115,10 @@ class RankQueueSession(BaseQueueSession):
 
     async def disconnect_user(self, socket_id):
         if not self.socket_id_pre_games_pairs.keys().__contains__(socket_id):
+            for user_data in self.queuers:
+                if socket_id == user_data.socket_id:
+                    self.queuers.remove(user_data)
+                    break
             return
         game_id = self.socket_id_pre_games_pairs[socket_id]
         self.active_pre_games[game_id].disconnect_user(socket_id)
