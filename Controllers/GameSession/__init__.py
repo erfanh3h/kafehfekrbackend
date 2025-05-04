@@ -27,7 +27,6 @@ class BaseGameSession:
         self.add_history_id()
         self.is_game_finished = False
 
-
     def add_history_id(self):
         self.game_history_id = static_functions.create_random_game_id(length=8)
 
@@ -84,7 +83,7 @@ class BaseGameSession:
         self.gamer_idies.append(gamer.user_id)
 
     def join_gamer(self, user_id: int, socket_id):
-        def send_reconnect_data():  # used this ilke to give device change socket handler functions
+        def send_reconnect_data():  # used this like to give device change socket handler functions
             time.sleep(2)
             self.send_reconnect_data(socket_id)
 
@@ -92,9 +91,11 @@ class BaseGameSession:
         if gamer_index is not None:
             self.gamers[gamer_index].set_finish_reconnect_time_function(self.finish_reconnect_time)
             if self.gamers[gamer_index].is_joined_game:
+                self.timer.resume()
                 self.gamers[gamer_index].reconnect(socket_id)
                 asyncio.new_event_loop().run_until_complete(
-                    self.send_command(commands.User_Reconnected, {"user_id": user_id}))
+                    self.send_command(commands.User_Reconnected,
+                                      {"user_id": user_id, 'time': self.timer.max_time - self.timer.counter}))
                 t = threading.Thread(target=send_reconnect_data, daemon=True)
                 t.start()
             else:
@@ -193,6 +194,7 @@ class BaseGameSession:
                         self.send_command(commands.User_Disconnected,
                                           {"user_id": user_data.user_id, "time": user_data.timer.max_time}))
                 self.gamers[gamer_index].disconnect()
+                self.timer.pause()
                 break
 
     def finish_reconnect_time(self, user_id):
