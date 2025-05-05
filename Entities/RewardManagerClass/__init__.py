@@ -90,14 +90,5 @@ class RewardManagerClass:
                     user1_history[f"{game_type.lower()}_draw"] = 1
                     user2_history[f"{game_type.lower()}_draw"] = 1
         else:
-            if total_game_winner == 0:
-                user1_history = {"draw_normal": 1}
-                user2_history = {"draw_normal": 1}
-            else:
-                if total_game_winner == 1:
-                    user1_history = {"win_normal": 1}
-                    user2_history = {"lose_normal": 1}
-                else:
-                    user2_history = {"win_normal": 1}
-                    user1_history = {"lose_normal": 1}
+            pass
         return user1_history, user2_history

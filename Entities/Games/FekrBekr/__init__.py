@@ -76,45 +76,39 @@ class FekrBekrGameClass(BaseGameClass):
                 winner = 0
         return winner
 
-    def board_contains_number(self, gamer_id, number, ignore_list):
+    def board_contains_number(self, gamer_id, number):
         if gamer_id == 1:
             for index, num in enumerate(self.player1_board):
-                if num == number and not ignore_list.__contains__(index):
+                if num == number:
                     return True, index
         elif gamer_id == 2:
             for index, num in enumerate(self.player2_board):
-                if num == number and not ignore_list.__contains__(index):
+                if num == number:
                     return True, index
         return False, 0
 
     def check_player1(self, data):
         result = []
-        ignores_list = []
         for index, number in enumerate(data):
             if number == self.player1_board[index]:
                 result.append(2)
-                ignores_list.append(index)
                 continue
-            contains_number, number_index = self.board_contains_number(1, number, ignores_list)
+            contains_number, number_index = self.board_contains_number(1, number)
             if contains_number:
                 result.append(1)
-                ignores_list.append(number_index)
                 continue
             result.append(0)
         return result
 
     def check_player2(self, data):
         result = []
-        ignores_list = []
         for index, number in enumerate(data):
             if number == self.player2_board[index]:
                 result.append(2)
-                ignores_list.append(index)
                 continue
-            contains_number, number_index = self.board_contains_number(2, number, ignores_list)
+            contains_number, number_index = self.board_contains_number(2, number)
             if contains_number:
                 result.append(1)
-                ignores_list.append(number_index)
                 continue
             result.append(0)
         return result
@@ -167,5 +161,7 @@ class FekrBekrGameClass(BaseGameClass):
         if gamer_id == 2 and self.player2_board_rdy:
             return False
         if len(data) != 4:
+            return False
+        if len(data) > len(set(data)):
             return False
         return True
