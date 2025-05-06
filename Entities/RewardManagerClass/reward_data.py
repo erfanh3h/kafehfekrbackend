@@ -7,9 +7,9 @@ rank_draw_coin = 5
 rank_win_score = 10
 rank_draw_score = 0
 rank_lose_score = -5
-rank_win_xp = 8
-rank_draw_xp = 4
-rank_lose_xp = 2
+rank_win_xp = 15
+rank_draw_xp = 12
+rank_lose_xp = 10
 
 
 def gametype_to_rewards(game_type):

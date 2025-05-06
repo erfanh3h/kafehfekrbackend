@@ -81,8 +81,9 @@ class UsersCollectionManager:
             update_data['score'] = int(score)
         if xp is not None and xp >= 0:
             update_data['xp'] = int(xp)
-        if coin is not None and coin >= 0:
-            update_data['coin'] = int(coin)
+        if coin is not None and coin >= 0: #TODO : coin removed temporary
+            pass
+            # update_data['coin'] = int(coin)
         if image is not None:
             update_data['image'] = int(image)
         if token is not None:
