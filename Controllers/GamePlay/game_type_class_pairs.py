@@ -17,6 +17,7 @@ from Controllers.GameSession.sudoku_game_session import SudokuGameSession
 from Controllers.GameSession.ten_game_session import TenGameSession
 from Controllers.GameSession.tictactoe_game_session import TicTacToeGameSession
 from Controllers.GameSession.yatzy_game_session import YatzyGameSession
+from Controllers.GameSession.ludo_game_session import LudoGameSession
 from Controllers.GameSession.yinsh_game_session import YinshGameSession
 
 game_type_class_pairs = {GameTypesEnum.TIC_TAC_TOE.value: TicTacToeGameSession,
@@ -32,5 +33,5 @@ game_type_class_pairs = {GameTypesEnum.TIC_TAC_TOE.value: TicTacToeGameSession,
                          GameTypesEnum.BOXFOUR.value: BoxFourGameSession,
                          GameTypesEnum.FEKRBEKR.value: FekrBekrGameSession,
                          GameTypesEnum.PENTAGO.value: PentagoGameSession,
-                         GameTypesEnum.YINSH.value: YinshGameSession,
+                         GameTypesEnum.YINSH.value: YinshGameSession, GameTypesEnum.LUDO.value: LudoGameSession,
                          GameTypesEnum.BACKGAMMON.value: BackGammonGameSession}

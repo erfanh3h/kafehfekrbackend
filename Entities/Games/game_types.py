@@ -20,4 +20,5 @@ class GameTypesEnum(Enum):
     CHECKERS = "Checkers"
     OTHELLO = "Othello"
     MILL = "Mill"
+    LUDO = "Ludo"
     BACKGAMMON = "BackGammon"

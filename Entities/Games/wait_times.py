@@ -31,5 +31,6 @@ BoxFour_Turn_Time = 12
 FekrBekr_Board_Time = 60
 FekrBekr_Round_Time = 60
 FekrBekr_Round_Wait_Time = 5
+Ludo_Turn_Time = 20
 BackGammon_Turn_Time = 30
 BackGammon_Out_Of_Move_time = 5
