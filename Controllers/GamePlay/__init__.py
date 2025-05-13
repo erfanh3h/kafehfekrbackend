@@ -51,18 +51,21 @@ class BaseGamePlayClass:
     def prepare_database(self):
         from Entities.Database import game_database
         self.score_manager.set_user_data(self.gamers[0].user_id, self.gamers[1].user_id)
+        game_database.game_play_history_manager.delete_game_play_history(self.game_play_id)
         game_database.game_play_history_manager.create_game_play_history(self.game_play_id, self.gamers[0].user_id,
                                                                          self.gamers[1].user_id,
                                                                          self.game_types,
                                                                          str(self.game_score_type.value))
-        if self.game_score_type == GameScoreTypesEnum.RANK:
-            game_database.users_manager.update_user(self.gamers[0].user_id, open_game_id=self.game_play_id,
-                                                    coin=self.gamers[0].user_coin - rank_coin_cost)
-            game_database.users_manager.update_user(self.gamers[1].user_id, open_game_id=self.game_play_id,
-                                                    coin=self.gamers[1].user_coin - rank_coin_cost)
-        else:
-            game_database.users_manager.update_user(self.gamers[0].user_id, open_game_id=self.game_play_id, )
-            game_database.users_manager.update_user(self.gamers[1].user_id, open_game_id=self.game_play_id, )
+        game_database.users_manager.update_user(self.gamers[0].user_id, open_game_id=self.game_play_id, )
+        game_database.users_manager.update_user(self.gamers[1].user_id, open_game_id=self.game_play_id, )
+        # if self.game_score_type == GameScoreTypesEnum.RANK:
+        #     game_database.users_manager.update_user(self.gamers[0].user_id, open_game_id=self.game_play_id,
+        #                                             coin=self.gamers[0].user_coin - rank_coin_cost)
+        #     game_database.users_manager.update_user(self.gamers[1].user_id, open_game_id=self.game_play_id,
+        #                                             coin=self.gamers[1].user_coin - rank_coin_cost)
+        # else:
+        #     game_database.users_manager.update_user(self.gamers[0].user_id, open_game_id=self.game_play_id, )
+        #     game_database.users_manager.update_user(self.gamers[1].user_id, open_game_id=self.game_play_id, )
 
     def join_game_limit_time(self):
         if not self.is_game_started:
@@ -80,9 +83,10 @@ class BaseGamePlayClass:
         t.start()
 
     def check_all_players_joined(self):
-        for is_gamer_joined in self.is_gamers_join_game:
-            if not is_gamer_joined:
-                return False
+        #TODO : return this
+        # for is_gamer_joined in self.is_gamers_join_game:
+        #     if not is_gamer_joined:
+        #         return False
         return True
 
     def send_game_play_data(self, socket_id):

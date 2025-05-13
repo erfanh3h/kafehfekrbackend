@@ -30,9 +30,12 @@ class LudoGameSession(BaseGameSession):
             if is_selection_correct:
                 await self.game_controller.recieve_data(data['id'], selection_data, gamer_id)
                 # if is_turn_finished or self.game_controller.is_game_finished:
-                self.timer.stop()
+                # self.timer.stop() #TODO : fix this
+                self.send_current_turn()
+
 
     def send_current_turn(self):
+        print("here")
         if self.check_finish_game():
             return
         self.game_controller.change_turn()
@@ -41,7 +44,7 @@ class LudoGameSession(BaseGameSession):
             send_command(
                 command=make_command_json(id=commands.Current_Turn, data={'turn': self.game_controller.current_turn}),
                 game_id=self.game_id))
-        self.timer.start(Ludo_Turn_Time, self.send_current_turn)
+        # self.timer.start(Ludo_Turn_Time, self.send_current_turn) #TODO : fix this
 
     def send_dice(self):
         from Entities.SocketIOManagerClass import send_command
