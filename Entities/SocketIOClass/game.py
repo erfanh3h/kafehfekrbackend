@@ -15,21 +15,13 @@ game_idies = []
 socketid_gameid_pairs = {}
 
 def start_new_test_game():
-    # gameSession.add_gamer(
-    #     GamerModel("kC8GgJ", username="test", user_image=64,
-    #                user_score=1000, user_coin=1000))
     user1 = QueuerModel("NHD6bL", username="Windows", user_image=60,
                         user_score=1000, user_coin=1000)
     user2 = QueuerModel("kFIrrF", username="Mobile", user_image=60,
                         user_score=1000, user_coin=1000)
-    # games = {current_game_id: gameSession}
-    # game_idies = [current_game_id]
-    # socketid_gameid_pairs = {}
     queuers = [user1, user2]
     final_game_types = [GameTypesEnum.LUDO.value]
     game_id = 'testgame'
-    game_data = {'game_id': game_id}
-    # await send_lobby_command(command=make_command_json(id=commands.Start_Game, data=game_data), lobby_id=lobby_id)
     add_new_game(game_id, queuers, final_game_types, GameScoreTypesEnum.LOBBY)
 
 

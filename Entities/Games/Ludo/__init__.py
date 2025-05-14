@@ -87,6 +87,7 @@ class LudoGameClass(BaseGameClass):
 
         data = {"board": board_data, "players_out_pieces": self.players_out_pieces, "current_turn": self.current_turn,
                 "current_dice": self.current_dice, "current_turn_player_rolled": self.current_turn_player_rolled, }
+        print(data)
         return data
 
     async def recieve_data(self, command_id, data, gamer_id):
@@ -99,7 +100,8 @@ class LudoGameClass(BaseGameClass):
                 self.has_more_dice = True
         if command_id == commands.Select_Peace:
             index = data['index']
-            self.move_piece(index)
+            self.move_piece(index , gamer_id)
+            await self.send_data_function(commands.Peace_Selected, {'gamer_id': gamer_id, 'index': index})
 
     def get_game_winner(self):
         winner = super().get_game_winner()
@@ -126,12 +128,12 @@ class LudoGameClass(BaseGameClass):
                 self.current_turn = 1
         else:
             self.current_turn = 1
+        self.set_available_moves()
 
     def check_game_ended(self):
         return False
 
-    def move_piece(self, index):
-        gamer_id = self.board[index].equipped_user
+    def move_piece(self, index , gamer_id):
         target_index = 0
         if index == -1:  # enter game from out
             if gamer_id == 1:
@@ -146,9 +148,8 @@ class LudoGameClass(BaseGameClass):
         elif (gamer_id == 1 and index <= 33) or (gamer_id == 2 and (index <= 13 or index >= 20)) or (
                 gamer_id == 3 and (index <= 23 or index >= 30)) or (gamer_id == 4 and (index <= 3 or index >= 10)):
             target_index = (index + self.current_dice) % 40
-            self.board[index].clear()
         else:
-            is_index_winable = gamer_pieces_win_map[gamer_id - 1][index][self.current_dice]
+            is_index_winable = gamer_pieces_win_map[gamer_id][index][self.current_dice]
             if is_index_winable is None:
                 pass
             elif is_index_winable:
@@ -165,6 +166,7 @@ class LudoGameClass(BaseGameClass):
                 enemy_count = self.board[target_index].count
                 self.players_out_pieces[enemy_index] += enemy_count
                 self.board[target_index].clear()
+        self.board[index].remove_piece()
         self.board[target_index].add_piece(gamer_id)
 
     def get_my_piece_indexes(self, gamer_id):
@@ -184,22 +186,22 @@ class LudoGameClass(BaseGameClass):
             return True
         if gamer_id == 4 and (index <= 3 or index >= 10):
             return True
-        is_index_winable = gamer_pieces_win_map[gamer_id - 1][index][self.current_dice]
+        is_index_winable = gamer_pieces_win_map[gamer_id][index][self.current_dice]
         if is_index_winable is None:
             return False
         if is_index_winable:
-            win_index = gamer_win_indexes_map[gamer_id - 1][index][self.current_dice]
+            win_index = gamer_win_indexes_map[gamer_id][index][self.current_dice]
             if self.board[win_index].is_empty():
                 return True
             return False
         return True
 
-    def set_available_move(self, gamer_id):
-        pieces = self.get_my_piece_indexes(gamer_id)
+    def set_available_moves(self):
+        pieces = self.get_my_piece_indexes(self.current_turn)
         for piece_index in pieces:
             if self.check_index_available(piece_index):
                 self.current_available_indexes.append(piece_index)
-        have_piece_out = self.check_gamer_piece_is_out(gamer_id)
+        have_piece_out = self.check_gamer_piece_is_out(self.current_turn)
         if have_piece_out:
             self.current_available_indexes.append(-1)
 
