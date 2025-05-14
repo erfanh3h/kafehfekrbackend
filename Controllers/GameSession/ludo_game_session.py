@@ -22,8 +22,10 @@ class LudoGameSession(BaseGameSession):
         if gamer_id is None:
             return
         if data['id'] == commands.Roll_Dice:
-            await self.game_controller.recieve_data(data['id'], data['data'], gamer_id)
+            have_move = await self.game_controller.recieve_data(data['id'], data['data'], gamer_id)
             self.send_dice()
+            if not have_move:
+                self.send_current_turn()
         if data['id'] == commands.Select_Peace:
             selection_data = data['data']
             is_selection_correct = self.game_controller.check_authority(selection_data, gamer_id)
@@ -31,8 +33,8 @@ class LudoGameSession(BaseGameSession):
                 await self.game_controller.recieve_data(data['id'], selection_data, gamer_id)
                 # if is_turn_finished or self.game_controller.is_game_finished:
                 # self.timer.stop() #TODO : fix this
-                self.send_current_turn()
-
+                if not self.game_controller.has_more_dice:
+                    self.send_current_turn()
 
     def send_current_turn(self):
         print("here")

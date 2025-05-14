@@ -27,6 +27,7 @@ class BoardSpotClass:
         return self.equipped_user == gamer_id
 
     def is_enemy_spot(self, gamer_id):
+        print(gamer_id , self.equipped_user)
         return self.equipped_user != 0 and self.equipped_user != gamer_id
 
     def to_json(self):
