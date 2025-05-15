@@ -32,7 +32,7 @@ class LudoGameSession(BaseGameSession):
             if is_selection_correct:
                 await self.game_controller.recieve_data(data['id'], selection_data, gamer_id)
                 # if is_turn_finished or self.game_controller.is_game_finished:
-                # self.timer.stop() #TODO : fix this
+                # self.timer.stop() #TODO : return this
                 if not self.game_controller.has_more_dice:
                     self.send_current_turn()
 

@@ -32,8 +32,8 @@ def add_new_game(game_id, queuers, game_types, game_score_type):
     game_idies.append(game_id)
 
 
-start_new_test_game()
-print(games)
+# start_new_test_game()
+# print(games)
 def finish_single_game(game_id, user_id):
     games[game_id].finish_current_game(user_id)
 

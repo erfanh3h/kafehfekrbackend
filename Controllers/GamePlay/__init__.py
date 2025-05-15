@@ -83,10 +83,9 @@ class BaseGamePlayClass:
         t.start()
 
     def check_all_players_joined(self):
-        #TODO : return this
-        # for is_gamer_joined in self.is_gamers_join_game:
-        #     if not is_gamer_joined:
-        #         return False
+        for is_gamer_joined in self.is_gamers_join_game:
+            if not is_gamer_joined:
+                return False
         return True
 
     def send_game_play_data(self, socket_id):
