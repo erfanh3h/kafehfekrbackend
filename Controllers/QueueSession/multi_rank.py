@@ -28,8 +28,12 @@ class MultiRankQueueSession(BaseQueueSession):
         return None
 
     async def command_received(self, data, socket_id):
+        from Entities.SocketIOManagerClass import send_global_queue_command
         if data['id'] == commands.Message:
-            pass
+            gamer = self.find_gamer_from_socket_id(socket_id)
+            send_data = {'name': gamer.username, 'content': data['content']}
+            asyncio.new_event_loop().run_until_complete(
+                send_global_queue_command(command=make_command_json(id=commands.Message, data=send_data), ))
 
     def start_new_game(self, queuers, game_type):
         from Entities.SocketIOManagerClass import send_queue_command
@@ -39,19 +43,19 @@ class MultiRankQueueSession(BaseQueueSession):
         for queuer_data in queuers:
             asyncio.new_event_loop().run_until_complete(
                 send_queue_command(command=make_command_json(id=commands.Start_Game, data=game_data),
-                                   socket_id=queuer_data.socket_id))
+                                   socket_id=queuer_data.socket_id, namespace='/multi-queue'))
             self.ludo_queuers.remove(queuer_data)
         from Entities.SocketIOClass.game import add_new_game
         add_new_game(game_id, queuers, final_game_types, self.game_score_type)
 
     def check_start_new_game(self):
         def start_ludo():
-            self.start_new_game(self.ludo_queuers[0: 1], GameTypesEnum.LUDO.value)
+            self.start_new_game(self.ludo_queuers[0: 3], GameTypesEnum.LUDO.value)
 
         while True:
             if len(self.ludo_queuers) > 0:
                 print(f"ludo queuer len : ", len(self.ludo_queuers))
-            if len(self.ludo_queuers) >= 2:
+            if len(self.ludo_queuers) >= 3:
                 threading.Thread(target=start_ludo, daemon=True).start()
                 time.sleep(1.5)
             else:
