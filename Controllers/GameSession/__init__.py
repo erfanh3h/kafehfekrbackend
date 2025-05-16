@@ -91,8 +91,8 @@ class BaseGameSession:
         if gamer_index is not None:
             self.gamers[gamer_index].set_finish_reconnect_time_function(self.finish_reconnect_time)
             if self.gamers[gamer_index].is_joined_game:
-                # TODO : return this
-                # self.timer.resume()
+                # Test : remove this
+                self.timer.resume()
                 self.gamers[gamer_index].reconnect(socket_id)
                 asyncio.new_event_loop().run_until_complete(
                     self.send_command(commands.User_Reconnected,
@@ -195,8 +195,8 @@ class BaseGameSession:
                         self.send_command(commands.User_Disconnected,
                                           {"user_id": user_data.user_id, "time": user_data.timer.max_time}))
                 self.gamers[gamer_index].disconnect()
-                # TODO : return this
-                # self.timer.pause()
+                # Test : remove this
+                self.timer.pause()
                 break
 
     def finish_reconnect_time(self, user_id):
@@ -204,8 +204,8 @@ class BaseGameSession:
             self.send_command(commands.Finish_Reconnect_Time, {"user_id": user_id}))
         gamer_id = self.find_gamer_id_from_user_id(user_id)
         self.game_controller.finish_reconnect_time(gamer_id)
-        # TODO : return this
-        # self.timer.stop()
+        # Test : remove this
+        self.timer.stop()
 
     def check_finish_game_by_not_play_turn(self, current_turn):
         from Entities.SocketIOManagerClass import send_command

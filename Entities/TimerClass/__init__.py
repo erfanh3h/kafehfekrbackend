@@ -42,8 +42,7 @@ class TimerClass:
                 self.return_function()
         else:
             self.counter += 1
-            print("Timer : "  ,self.counter)
-            # print("main counter : " , self.counter)
+            # print("Timer : "  ,self.counter)
             self.timer = threading.Timer(1, self.start_timer)
             self.timer.start()
 

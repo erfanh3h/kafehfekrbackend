@@ -77,7 +77,7 @@ class LudoGameClass(BaseGameClass):
         self.players_count = players_count
         self.players_out_pieces = []
         self.init_board()
-        self.current_turn = 1
+        self.current_turn = 0
         self.current_dice = 0
         self.current_turn_player_rolled = False
         self.has_more_dice = False
@@ -104,9 +104,9 @@ class LudoGameClass(BaseGameClass):
     async def recieve_data(self, command_id, data, gamer_id):
         # print("here",command_id, data, gamer_id)
         if command_id == commands.Roll_Dice:
-            self.current_dice = data['dice']
-            if self.current_dice == 0:
-                self.current_dice = roll_dice()
+            # self.current_dice = data['dice']
+            # if self.current_dice == 0:
+            self.current_dice = roll_dice()
             self.current_turn_player_rolled = True
             if self.current_dice == 6:
                 self.has_more_dice = True
@@ -116,6 +116,7 @@ class LudoGameClass(BaseGameClass):
             if len(self.current_available_indexes) == 0:
                 return False
         if command_id == commands.Select_Peace:
+            self.current_turn_player_rolled = False
             index = data['index']
             # gamer_id = self.current_turn
             move_type, target_index = self.move_piece(index, gamer_id)
@@ -123,13 +124,9 @@ class LudoGameClass(BaseGameClass):
                                           {'gamer_id': gamer_id, 'index': index, "target_index": target_index,
                                            "type": move_type})
             self.current_dice = 0
-            self.current_turn_player_rolled = False
             self.current_available_indexes.clear()
+            self.is_game_finished = self.check_game_ended()
         return True
-
-    def get_game_winner(self):
-        winner = super().get_game_winner()
-        return winner
 
     def change_turn(self):
         self.current_available_indexes.clear()
@@ -154,6 +151,21 @@ class LudoGameClass(BaseGameClass):
                     self.current_turn = 1
             else:
                 self.current_turn = 1
+
+    def get_game_winner(self):
+        if (self.board[36].equipped_user == 1 and self.board[37].equipped_user == 1 and
+                self.board[38].equipped_user == 1 and self.board[39].equipped_user == 1):
+            return 1
+        if (self.board[40].equipped_user == 2 and self.board[41].equipped_user == 2 and
+                self.board[42].equipped_user == 2 and self.board[43].equipped_user == 2):
+            return 2
+        if (self.board[44].equipped_user == 3 and self.board[45].equipped_user == 3 and
+                self.board[46].equipped_user == 3 and self.board[47].equipped_user == 3):
+            return 3
+        if (self.board[48].equipped_user == 4 and self.board[49].equipped_user == 4 and
+                self.board[50].equipped_user == 4 and self.board[51].equipped_user == 4):
+            return 4
+        return 0
 
     def check_game_ended(self):
         if self.current_turn == 1:
@@ -236,7 +248,9 @@ class LudoGameClass(BaseGameClass):
         gamer_id = self.board[index].equipped_user
         is_win_piece_touchable = gamer_in_win_indexes_map[gamer_id][index].keys().__contains__(self.current_dice)
         if is_win_piece_touchable:
-            return True
+            target_index = gamer_in_win_indexes_map[gamer_id][index][self.current_dice]
+            if self.board[target_index].count == 0 : # every target win home must be empty
+                return True
         return False
 
     def check_index_available(self, index):
@@ -274,7 +288,7 @@ class LudoGameClass(BaseGameClass):
         if self.start_pieces[self.current_turn - 1].count != 0:
             self.current_available_indexes.append(-1)
 
-        print("active moves : ", self.current_available_indexes, self.current_dice)
+        # print("active moves : ", self.current_available_indexes, self.current_dice)
 
     def check_gamer_piece_is_out(self, gamer_id):
         if self.players_out_pieces[gamer_id - 1] > 0:
@@ -282,10 +296,17 @@ class LudoGameClass(BaseGameClass):
         return False
 
     def check_authority(self, data, gamer_id: int):
-        # if (self.current_turn == 1 and gamer_id != 1) or (self.current_turn == 2 and gamer_id != 2) or (
-        #         self.current_turn == 3 and gamer_id != 3) or (self.current_turn == 4 and gamer_id != 4):
-        #     print("not turn of : ", gamer_id)
-        #     return False
-        # if self.is_game_finished:
-        #     return False
+        if (self.current_turn == 1 and gamer_id != 1) or (self.current_turn == 2 and gamer_id != 2) or (
+                self.current_turn == 3 and gamer_id != 3) or (self.current_turn == 4 and gamer_id != 4):
+            print("not turn of : ", gamer_id)
+            return False
+        if self.is_game_finished:
+            return False
+        if self.current_turn_player_rolled and data['id'] == commands.Roll_Dice:
+            return False
+        if not self.current_turn_player_rolled and data['id'] == commands.Select_Peace:
+            return False
+        if self.current_turn_player_rolled and data['id'] == commands.Select_Peace:
+            if not self.current_available_indexes.__contains__(data['data']['index']):
+                return False
         return True
