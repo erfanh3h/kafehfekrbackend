@@ -7,15 +7,13 @@ from Entities.RewardManagerClass.reward_data import rank_win_coin, rank_lose_xp,
 
 class RewardManagerClass:
     def __init__(self, game_score_type):
-        self.player1_user_id = ""
-        self.player2_user_id = ""
+        self.players_idis = []
         self.game_score_type = game_score_type
         self.game_types = []
         self.game_winners = []
 
-    def set_user_data(self, player1_user_id, player2_user_id):
-        self.player1_user_id = player1_user_id
-        self.player2_user_id = player2_user_id
+    def set_user_data(self, idis):
+        self.players_idis = idis
 
     def finish_game(self, winner_gamer_id, game_types, game_winners):
         # -1 is when game terminated by not joining users
@@ -31,8 +29,8 @@ class RewardManagerClass:
         else:
             win_coin, lose_coin, draw_coin, win_score, lose_score, draw_score, win_xp, lose_xp, draw_xp = (
                 0, 0, 0, 0, 0, 0, 0, 0, 0)
-        user1_data = game_database.users_manager.read_user(self.player1_user_id)
-        user2_data = game_database.users_manager.read_user(self.player2_user_id)
+        user1_data = game_database.users_manager.read_user(self.players_idis[0])
+        user2_data = game_database.users_manager.read_user(self.players_idis[1])
         if winner_gamer_id == 0:
             user1_new_score = user1_data['score'] + draw_score
             user1_new_xp = user1_data['xp'] + draw_xp
@@ -55,15 +53,15 @@ class RewardManagerClass:
                 user1_new_score = user1_data['score'] + lose_score
                 user1_new_xp = user1_data['xp'] + lose_xp
                 user1_new_coin = user1_data['coin'] + lose_coin
-        game_database.users_manager.update_user(self.player1_user_id, score=user1_new_score, xp=user1_new_xp,
+        game_database.users_manager.update_user(self.players_idis[0], score=user1_new_score, xp=user1_new_xp,
                                                 coin=user1_new_coin, open_game_id="", last_time_played=datetime.now())
-        game_database.users_manager.update_user(self.player2_user_id, score=user2_new_score, xp=user2_new_xp,
+        game_database.users_manager.update_user(self.players_idis[1], score=user2_new_score, xp=user2_new_xp,
                                                 coin=user2_new_coin, open_game_id="", last_time_played=datetime.now())
         is_lobby = self.game_score_type == GameScoreTypesEnum.LOBBY
         if not is_lobby:
             user1_history, user2_history = self.get_history_map(winner_gamer_id)
-            game_database.user_history_manager.update_user_history(self.player1_user_id, user1_history)
-            game_database.user_history_manager.update_user_history(self.player2_user_id, user2_history)
+            game_database.user_history_manager.update_user_history(self.players_idis[0], user1_history)
+            game_database.user_history_manager.update_user_history(self.players_idis[1], user2_history)
 
     def get_history_map(self, total_game_winner):
         is_rank = self.game_score_type == GameScoreTypesEnum.RANK

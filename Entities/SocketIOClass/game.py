@@ -39,11 +39,12 @@ def finish_single_game(game_id, user_id):
 
 
 def delete_game(game_id):
-    try:
-        del games[game_id]
-        game_idies.remove(game_id)
-    except:
-        pass
+    print("here")
+    # try:
+    del games[game_id]
+    game_idies.remove(game_id)
+    # except:
+    #     pass
 
 
 class GameSocketNameSpace(socketio.AsyncNamespace):
@@ -96,10 +97,10 @@ class GameSocketNameSpace(socketio.AsyncNamespace):
     async def on_user_command(self, socket_id, data):
         game_id = return_gameid_from_socketid(socket_id)
         if game_id is not None:
-            try:
-                await games[game_id].command_received(data, socket_id)
-            except:
-                pass
+            # try:
+            await games[game_id].command_received(data, socket_id)
+            # except:
+            #     pass
             print('User Sended command ', data)
 
     async def on_user_reaction(self, socket_id, data):

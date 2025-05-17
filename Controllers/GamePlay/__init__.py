@@ -8,7 +8,6 @@ from Commons.static_functions import make_command_json
 from Controllers.GamePlay.game_type_class_pairs import game_type_class_pairs
 from Entities.Games.wait_times import Join_Game_Limit_Time, Start_Game_Time, Game_Play_Round_Time
 from Entities.RewardManagerClass import RewardManagerClass, GameScoreTypesEnum
-from Entities.RewardManagerClass.reward_data import rank_coin_cost
 from Entities.TimerClass import TimerClass
 from Models.Gamer import GamerModel
 
@@ -21,8 +20,9 @@ class BaseGamePlayClass:
         self.game_types = game_types
         self.game_score_type = game_score_type
         self.game_session = None
-        self.gamer1_score = 0
-        self.gamer2_score = 0
+        self.gamer_scores = [0 for g in gamers]
+        # self.gamer1_score = 0
+        # self.gamer2_score = 0
         self.current_game_index = 0
         self.game_winners = []
         self.is_gamers_join_game = {}
@@ -31,6 +31,7 @@ class BaseGamePlayClass:
         self.is_game_terminated = False
         self.is_game_finished = False
         self.active_game_id = ""
+        self.game_winner_id = None
         self.score_manager = RewardManagerClass(game_score_type)
 
     def select_random_games(self):
@@ -50,15 +51,14 @@ class BaseGamePlayClass:
 
     def prepare_database(self):
         from Entities.Database import game_database
-        self.score_manager.set_user_data(self.gamers[0].user_id, self.gamers[1].user_id)
+        user_idis = [g.user_id for g in self.gamers]
+        self.score_manager.set_user_data(user_idis)
         game_database.game_play_history_manager.delete_game_play_history(self.game_play_id)
-        game_database.game_play_history_manager.create_game_play_history(self.game_play_id, self.gamers[0].user_id,
-                                                                         self.gamers[1].user_id,
-                                                                         self.game_types,
+        game_database.game_play_history_manager.create_game_play_history(self.game_play_id, user_idis, self.game_types,
                                                                          str(self.game_score_type.value))
-        game_database.users_manager.update_user(self.gamers[0].user_id, open_game_id=self.game_play_id, )
-        game_database.users_manager.update_user(self.gamers[1].user_id, open_game_id=self.game_play_id, )
-        # if self.game_score_type == GameScoreTypesEnum.RANK:
+        for user_id in user_idis:
+            game_database.users_manager.update_user(user_id, open_game_id=self.game_play_id, )
+        # if self.game_score_type == GameScoreTypesEnum.RANK: #TODO : return this for coin
         #     game_database.users_manager.update_user(self.gamers[0].user_id, open_game_id=self.game_play_id,
         #                                             coin=self.gamers[0].user_coin - rank_coin_cost)
         #     game_database.users_manager.update_user(self.gamers[1].user_id, open_game_id=self.game_play_id,
@@ -72,8 +72,9 @@ class BaseGamePlayClass:
             self.is_game_terminated = True
 
     def start_game_timer(self):
-        self.is_gamers_join_game[self.gamers[0].user_id] = False
-        self.is_gamers_join_game[self.gamers[1].user_id] = False
+        user_idis = [g.user_id for g in self.gamers]
+        for user_id in user_idis:
+            self.is_gamers_join_game[user_id] = False
 
         def entrypoint():
             self.check_start_game()
@@ -91,8 +92,8 @@ class BaseGamePlayClass:
     def send_game_play_data(self, socket_id):
         game_data = {'gamers': [], 'games': self.game_types, 'game_score_type': self.game_score_type.value,
                      'current_game_index': self.current_game_index, 'winners': self.game_winners,
-                     'gamer1_score': self.gamer1_score, 'gamer2_score': self.gamer2_score,
-                     'is_game_finished': self.is_game_finished, }
+                     'is_game_finished': self.is_game_finished, 'scores': self.gamer_scores,
+                     'game_winner_id': self.game_winner_id}
         for gamer in self.gamers:
             game_data['gamers'].append(gamer.to_json())
         from Entities.SocketIOManagerClass import send_private_command
@@ -165,16 +166,11 @@ class BaseGamePlayClass:
         game_type = self.game_types[self.current_game_index]
         self.game_session = game_type_class_pairs[game_type](game_id=self.game_play_id, game_type=game_type,
                                                              game_score_type=self.game_score_type)
-        self.game_session.add_gamer(
-            GamerModel(user_id=self.gamers[0].user_id, username=self.gamers[0].username,
-                       user_image=self.gamers[0].user_image,
-                       user_score=self.gamers[0].user_score, user_coin=self.gamers[0].user_coin))
-        self.game_session.join_gamer(self.gamers[0].user_id, self.gamers[0].socket_id)
-        self.game_session.add_gamer(
-            GamerModel(user_id=self.gamers[1].user_id, username=self.gamers[1].username,
-                       user_image=self.gamers[1].user_image,
-                       user_score=self.gamers[1].user_score, user_coin=self.gamers[1].user_coin))
-        self.game_session.join_gamer(self.gamers[1].user_id, self.gamers[1].socket_id)
+        for gamer in self.gamers:
+            self.game_session.add_gamer(
+                GamerModel(user_id=gamer.user_id, username=gamer.username, user_image=gamer.user_image,
+                           user_score=gamer.user_score, user_coin=gamer.user_coin))
+            self.game_session.join_gamer(gamer.user_id, gamer.socket_id)
         self.game_session.start_game_timer()
 
     def is_user_id_valid(self, user_id):
@@ -183,28 +179,28 @@ class BaseGamePlayClass:
                 return True
         return False
 
+    def check_is_game_finished(self):
+        for index, gamer_score in enumerate(self.gamer_scores):
+            if len(self.game_types) == 1 and gamer_score == 1:
+                return True, self.gamers[index].user_id
+            if len(self.game_types) == 3 and gamer_score >= 2:
+                return True, self.gamers[index].user_id
+        return False, None
+
     def finish_current_game(self, currnet_game_winner_id):
         def start_new_game_function():
             for gamer_data in self.gamers:
                 self.navigate_to_game(gamer_data.socket_id)
             self.start_current_game()
 
-        if currnet_game_winner_id == self.gamers[0].user_id:
-            self.gamer1_score += 2
-            self.game_winners[self.current_game_index] = 1
-        elif currnet_game_winner_id == self.gamers[1].user_id:
-            self.gamer2_score += 2
-            self.game_winners[self.current_game_index] = 2
-        else:
-            self.gamer1_score += 1
-            self.gamer2_score += 1
-            self.game_winners[self.current_game_index] = 0
+        winner_index = self.user_id_to_index(currnet_game_winner_id)
+        if winner_index != -1:  # prevent drow
+            self.gamer_scores[winner_index] += 1
+            self.game_winners[self.current_game_index] = winner_index + 1
         self.current_game_index += 1
-        # check one user won 2 games , then prevent third game to start
-        if self.gamer1_score >= self.gamer2_score + 4 or self.gamer2_score >= self.gamer1_score + 4:
-            self.is_game_finished = True
-        if self.current_game_index >= len(self.game_types) or self.is_game_finished:
-            self.finish_game_play()
+        is_game_finished, winner_id = self.check_is_game_finished()
+        if is_game_finished:
+            self.finish_game_play(winner_id)
         else:
             for gamer in self.gamers:
                 self.send_game_play_data(gamer.socket_id)
@@ -218,18 +214,8 @@ class BaseGamePlayClass:
                 gamer.socket_id = socket_id
                 break
 
-    def finish_game_play(self):
-        def get_winner_id():
-            if self.gamer1_score > self.gamer2_score:
-                return 1
-            elif self.gamer2_score > self.gamer1_score:
-                return 2
-            else:
-                return 0
-
+    def finish_game_play(self, winner_id):
         from Entities.Database import game_database
-        winner_id = get_winner_id()
-
         finished_game_types = []
         finished_game_winners = []
         for index, item in enumerate(self.game_types):
@@ -237,12 +223,17 @@ class BaseGamePlayClass:
                 finished_game_types.append(item)
                 finished_game_winners.append(self.game_winners[index])
         self.score_manager.finish_game(winner_id, finished_game_types, finished_game_winners)
-
         game_database.game_play_history_manager.update_game_play_history(self.game_play_id, self.game_winners,
-                                                                         self.gamer1_score, self.gamer2_score)
-        # print("game finished")
+                                                                         self.gamer_scores)
         self.is_game_finished = True
+        self.game_winner_id = winner_id
         for gamer in self.gamers:
             self.send_game_play_data(gamer.socket_id)
         from Entities.SocketIOClass.game import delete_game
         delete_game(self.game_play_id)
+
+    def user_id_to_index(self, user_id):
+        for index, gamer in enumerate(self.gamers):
+            if gamer.user_id == user_id:
+                return index
+        return -1 #-1 for draw

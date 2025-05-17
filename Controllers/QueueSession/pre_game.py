@@ -82,6 +82,7 @@ class PreGameClass:
         gamer_data = self.find_gamer_from_socket_id(socket_id)
         if data['id'] == commands.Select_Game:
             game_type = data['game_type']
+            print(game_type)
             self.pick_game(game_type, gamer_data)
             # self.send_current_turn()
             self.timer.stop()

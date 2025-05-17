@@ -1,17 +1,20 @@
 from datetime import datetime
 
 
-def create_game_play_history_json(game_play_id, user1_id, user2_id, game_types, game_score_type) -> dict:
-    return {'_id': game_play_id, 'user1_id': user1_id, 'user2_id': user2_id, "game_types": game_types,
-            "game_score_type": game_score_type, "is_finished": False, "start_date": datetime.now(), }
+def create_game_play_history_json(game_play_id, user_idis, game_types, game_score_type) -> dict:
+    create_dict = {'_id': game_play_id, "game_types": game_types, "game_score_type": game_score_type,
+                   "is_finished": False, "start_date": datetime.now(), }
+    for index, user_id in enumerate(user_idis):
+        create_dict[f'user{index + 1}_id'] = user_id
+    return create_dict
 
 
 class GamePlayHistoryCollectionManager:
     def __init__(self, collection):
         self.collection = collection
 
-    def create_game_play_history(self, game_play_id, user1_id, user2_id, game_types, game_score_type):
-        game_data = create_game_play_history_json(game_play_id, user1_id, user2_id, game_types, game_score_type)
+    def create_game_play_history(self, game_play_id, user_idis, game_types, game_score_type):
+        game_data = create_game_play_history_json(game_play_id, user_idis, game_types, game_score_type)
         self.collection.insert_one(game_data)
         return game_data
 
@@ -41,11 +44,12 @@ class GamePlayHistoryCollectionManager:
             pass
         return result
 
-    def update_game_play_history(self, game_id, winner_list, user1_score, user2_score):
+    def update_game_play_history(self, game_id, winner_list, user_scores):
         try:
             query = {'_id': game_id}
-            update_data = {"finish_data": datetime.now(), "is_finished": True, "winner_list": winner_list,
-                           "user1_score": user1_score, "user2_score": user2_score}
+            update_data = {"finish_data": datetime.now(), "is_finished": True, "winner_list": winner_list}
+            for index, user_score in enumerate(user_scores):
+                update_data[f'user{index + 1}_score'] = user_score
             self.collection.find_one_and_update(query, {'$set': update_data})
         except:
             pass
