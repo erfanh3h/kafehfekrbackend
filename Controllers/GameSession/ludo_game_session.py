@@ -18,9 +18,18 @@ class LudoGameSession(BaseGameSession):
         super().start_game_timer()
 
     async def command_received(self, data, socket_id):
-        gamer_id = await super().command_received(data, socket_id)
+        if not self.is_game_running:
+            return None
+        gamer_data = self.find_gamer_from_socket(socket_id)
+        if gamer_data is None:
+            return None
+        else:
+            gamer_id = gamer_data.gamer_id
         if gamer_id is None:
             return
+        if data['id'] == commands.Surrender:
+            await self.game_controller.surrender(gamer_id)
+            return None
         if data['id'] == commands.Roll_Dice:
             is_selection_correct = self.game_controller.check_authority(data, gamer_id)
             if not is_selection_correct:

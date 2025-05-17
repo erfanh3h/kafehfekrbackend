@@ -1,19 +1,20 @@
 from datetime import datetime
 
 
-def create_game_history_json(game_id, game_play_id, user1_id, user2_id, game_type, game_score_type, winner_id) -> dict:
-    return {'_id': game_id, 'game_play_id': game_play_id, 'user1_id': user1_id, 'user2_id': user2_id,
-            'winner_id': winner_id, "game_type": game_type, "game_score_type": game_score_type,
-            "date": datetime.now(), }
+def create_game_history_json(game_id, game_play_id, user_idis, game_type, game_score_type, winner_id) -> dict:
+    data = {'_id': game_id, 'game_play_id': game_play_id, 'winner_id': winner_id, "game_type": game_type,
+            "game_score_type": game_score_type, "date": datetime.now(), }
+    for index, user_id in enumerate(user_idis):
+        data[f'user{index + 1}_id'] = user_id
+    return data
 
 
 class GameHistoryCollectionManager:
     def __init__(self, collection):
         self.collection = collection
 
-    def create_game_history(self, game_id, game_play_id, user1_id, user2_id, game_type, game_score_type, winner_id):
-        game_data = create_game_history_json(game_id, game_play_id, user1_id, user2_id, game_type, game_score_type,
-                                             winner_id)
+    def create_game_history(self, game_id, game_play_id, user_idis, game_type, game_score_type, winner_id):
+        game_data = create_game_history_json(game_id, game_play_id, user_idis, game_type, game_score_type, winner_id)
         self.collection.insert_one(game_data)
         return game_data
 

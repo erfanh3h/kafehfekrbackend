@@ -39,9 +39,10 @@ class BaseGameSession:
         t.start()
 
     def check_all_players_joined(self):
-        # for gamer in self.gamers:
-        #     if not gamer.is_joined_game:
-        #         return False
+        # Test : comment these
+        for gamer in self.gamers:
+            if not gamer.is_joined_game:
+                return False
         return True
 
     def check_start_game(self):
@@ -131,22 +132,6 @@ class BaseGameSession:
         for gamer_id in range(0, len(self.gamers)):
             self.gamers[gamer_id].gamer_id = gamer_id + 1
             self.gamers[gamer_id].team_id = gamer_id + 1
-        # from Entities.Database import game_database
-        # # self.score_manager.set_user_data(self.gamers[0].user_id, self.gamers[1].user_id)
-        # game_database.game_history_manager.create_game_history(self.game_id, self.gamers[0].user_id,
-        #                                                        self.gamers[1].user_id,
-        #                                                        str(self.game_type.value),
-        #                                                        str(self.game_score_type.value))
-        # if self.game_score_type == GameScoreTypesEnum.NORMAL:
-        #     game_database.users_manager.update_user(self.gamers[0].user_id, open_game_id=self.game_id, )
-        #     game_database.users_manager.update_user(self.gamers[1].user_id, open_game_id=self.game_id, )
-        # else:
-        #     from Entities.RewardManagerClass.reward_data import gametype_to_rewards
-        #     reward_data = gametype_to_rewards(self.game_type.value)
-        #     game_database.users_manager.update_user(self.gamers[0].user_id, open_game_id=self.game_id,
-        #                                             coin=self.gamers[0].user_coin - reward_data[0])
-        #     game_database.users_manager.update_user(self.gamers[1].user_id, open_game_id=self.game_id,
-        #                                             coin=self.gamers[1].user_coin - reward_data[0])
 
     async def send_command(self, command_id, command_data):
         from Entities.SocketIOManagerClass import send_command
@@ -207,7 +192,7 @@ class BaseGameSession:
         # Test : remove this
         self.timer.stop()
 
-    def check_finish_game_by_not_play_turn(self, current_turn):
+    def check_finish_game_by_not_play_turn(self, current_turn):  # this used only on 2 players games
         from Entities.SocketIOManagerClass import send_command
         if current_turn == 1:
             self.gamers[0].not_played_turn()
@@ -257,15 +242,19 @@ class BaseGameSession:
         if self.is_game_finished:
             return
         self.is_game_finished = True
+        user_idis = [g.user_id for g in self.gamers],
         from Entities.Database import game_database
-        game_database.game_history_manager.create_game_history(self.game_history_id, self.game_id,
-                                                               self.gamers[0].user_id,
-                                                               self.gamers[1].user_id, str(self.game_type.value),
-                                                               self.game_score_type.value, winner_gamer_id)
+        game_database.game_history_manager.create_game_history(self.game_history_id, self.game_id, user_idis,
+                                                               str(self.game_type.value), self.game_score_type.value,
+                                                               winner_gamer_id)
         from Entities.SocketIOClass.game import finish_single_game
         user_id = "0"
         if winner_gamer_id == self.gamers[0].gamer_id:
             user_id = self.gamers[0].user_id
         elif winner_gamer_id == self.gamers[1].gamer_id:
             user_id = self.gamers[1].user_id
+        elif len(self.gamers) == 3 and winner_gamer_id == self.gamers[2].gamer_id:
+            user_id = self.gamers[2].user_id
+        elif len(self.gamers) == 4 and winner_gamer_id == self.gamers[3].gamer_id:
+            user_id = self.gamers[3].user_id
         finish_single_game(self.game_id, user_id)

@@ -249,7 +249,7 @@ class LudoGameClass(BaseGameClass):
         is_win_piece_touchable = gamer_in_win_indexes_map[gamer_id][index].keys().__contains__(self.current_dice)
         if is_win_piece_touchable:
             target_index = gamer_in_win_indexes_map[gamer_id][index][self.current_dice]
-            if self.board[target_index].count == 0 : # every target win home must be empty
+            if self.board[target_index].count == 0:  # every target win home must be empty
                 return True
         return False
 
@@ -294,6 +294,9 @@ class LudoGameClass(BaseGameClass):
         if self.players_out_pieces[gamer_id - 1] > 0:
             return True
         return False
+
+    async def surrender(self, gamer_id):
+        pass
 
     def check_authority(self, data, gamer_id: int):
         if (self.current_turn == 1 and gamer_id != 1) or (self.current_turn == 2 and gamer_id != 2) or (
