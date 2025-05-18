@@ -28,12 +28,11 @@ class MultiRankQueueSession(BaseQueueSession):
         return None
 
     async def command_received(self, data, socket_id):
-        from Entities.SocketIOManagerClass import send_global_queue_command
+        from Entities.SocketIOManagerClass import send_global_command
         if data['id'] == commands.Message:
             gamer = self.find_gamer_from_socket_id(socket_id)
-            send_data = {'name': gamer.username, 'content': data['content']}
-            asyncio.new_event_loop().run_until_complete(
-                send_global_queue_command(command=make_command_json(id=commands.Message, data=send_data), ))
+            send_data = {'name': gamer.username, 'content': data['content'], 'id': gamer.user_id}
+            await send_global_command(command=make_command_json(id=commands.Message, data=send_data))
 
     def start_new_game(self, queuers, game_type):
         from Entities.SocketIOManagerClass import send_queue_command

@@ -31,7 +31,7 @@ async def send_private_command(command, socket_id, game_id, namespace="/game"):
     await Socket_Server.emit('command', command, to=socket_id, room=game_id, namespace=namespace)
 
 
-async def send_global_queue_command(command, namespace="/multi-queue"):
+async def send_global_command(command, namespace="/multi-queue"):
     await Socket_Server.emit('command', command, namespace=namespace)
 
 
@@ -65,7 +65,6 @@ async def send_private_lobby_command(command, socket_id, namespace="/lobby"):
 
 async def send_global_lobby_command(command, namespace="/lobby"):
     await Socket_Server.emit('command', command, namespace=namespace)
-
 
 async def send_lobby_reaction(player_id, reaction_id, lobby_id, namespace="/lobby"):
     await Socket_Server.emit('reaction', {"playerId": player_id, "reactionId": reaction_id}, room=lobby_id,
