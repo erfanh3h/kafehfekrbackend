@@ -2,6 +2,7 @@ import asyncio
 
 from Commons import static_functions, commands
 from Commons.static_functions import make_command_json
+from Entities.Games.game_types import GameTypesEnum
 from Entities.RewardManagerClass import GameScoreTypesEnum
 from Models.Lobby import LobbyModel
 from Models.Queuer import QueuerModel
@@ -79,7 +80,7 @@ class LobbySession:
         # mix_game_type = []
         # mix_game_type.extend(queuers[0].game_types)
         # mix_game_type.extend(queuers[1].game_types)
-        final_game_types = lobby_data.game_types
+        final_game_types = [lobby_data.game_type]
         # game_id = 'testgame'
         game_data = {'game_id': game_id}
         await send_lobby_command(command=make_command_json(id=commands.Start_Game, data=game_data), lobby_id=lobby_id)
@@ -87,13 +88,13 @@ class LobbySession:
         add_new_game(game_id, queuers, final_game_types, self.game_score_type)
         await self.delete_lobby(lobby_id, ignores_id=queuers_idis, need_send_message=False)
 
-    async def create_lobby(self, user_id, game_types, lobby_name, lobby_password):
+    async def create_lobby(self, user_id, game_type, lobby_name, lobby_password, lobby_count):
         user_data = self.find_free_gamer_from_user_id(user_id)
         if user_data is None:
             return
         lobby_id = static_functions.create_random_game_id(length=6)
-        new_lobby = LobbyModel(lobby_id=lobby_id, creator_id=user_data.user_id, game_types=game_types,
-                               lobby_name=lobby_name, lobby_password=lobby_password)
+        new_lobby = LobbyModel(lobby_id=lobby_id, creator_id=user_data.user_id, game_type=game_type,
+                               lobby_name=lobby_name, lobby_count=lobby_count, lobby_password=lobby_password)
         self.lobbies.append(new_lobby)
         from Entities.SocketIOManagerClass import send_global_lobby_command, send_private_lobby_command
         await send_global_lobby_command(command=make_command_json(id=commands.Lobby_Created, data=new_lobby.to_json()))
@@ -135,10 +136,16 @@ class LobbySession:
         if data['id'] == commands.Lobby_Create:
             lobby_data = data['data']
             lobby_name = lobby_data['lobby_name']
+            lobby_count = lobby_data.get('lobby_count', 2)
             # lobby_password = lobby_data['lobby_password']
             lobby_password = ""
-            game_types = lobby_data['game_types']
-            await self.create_lobby(user_id, game_types, lobby_name, lobby_password)
+            game_type = lobby_data.get('game_type', None)
+            if game_type is None:
+                return
+            if lobby_count != 2 and GameTypesEnum.is_in_two_players(
+                    game_type):  # prevent more then 2 players for unmultiGames
+                lobby_count = 2
+            await self.create_lobby(user_id, game_type, lobby_name, lobby_password, lobby_count)
         if data['id'] == commands.Lobby_Request_Data:
             from Entities.SocketIOManagerClass import send_private_lobby_command
             await send_private_lobby_command(
@@ -171,7 +178,8 @@ class LobbySession:
         if data['id'] == commands.Lobby_Start_Game:
             lobby_id = self.socketid_lobbyid_pairs[socket_id]
             lobby_data = self.find_lobby_from_id(lobby_id)
-            if lobby_data is None or lobby_data.creator_id != user_id or len(lobby_data.queuers) != 2:
+            if lobby_data is None or lobby_data.creator_id != user_id or len(
+                    lobby_data.queuers) != lobby_data.lobby_count:
                 return
             await self.start_new_game(lobby_id)
         if data['id'] == commands.Lobby_Delete:
