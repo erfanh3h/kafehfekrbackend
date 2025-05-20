@@ -1,4 +1,8 @@
-from Commons import commands
+def get_opponent_id(gamer_id):
+    if gamer_id == 1:
+        return 2
+    else:
+        return 1
 
 
 class BaseGameClass:
@@ -11,6 +15,8 @@ class BaseGameClass:
         self.leaver_id = 0
         self.is_finish_message_delivered = False
         self.is_current_turn_played = False
+        self.rank1 = None
+        self.rank2 = None
 
     def get_game_data(self):
         pass
@@ -42,7 +48,7 @@ class BaseGameClass:
     def get_game_winner(self):
         winner = 0
         if self.leaver_id != 0:
-            winner = self.get_opponent_id(self.leaver_id)
+            winner = get_opponent_id(self.leaver_id)
         return winner
 
     def check_game_ended(self):
@@ -59,9 +65,3 @@ class BaseGameClass:
     def finish_reconnect_time(self, gamer_id):
         self.leaver_id = gamer_id
         self.is_game_finished = True
-
-    def get_opponent_id(self, gamer_id):
-        if gamer_id == 1:
-            return 2
-        else:
-            return 1

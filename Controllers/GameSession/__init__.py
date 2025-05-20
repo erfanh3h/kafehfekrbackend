@@ -27,6 +27,12 @@ class BaseGameSession:
         self.add_history_id()
         self.is_game_finished = False
 
+    def gamer_id_to_user_id(self, gamer_id):
+        for gamer in self.gamers:
+            if gamer.gamer_id == gamer_id:
+                return gamer.user_id
+        return None
+
     def add_history_id(self):
         self.game_history_id = static_functions.create_random_game_id(length=8)
 

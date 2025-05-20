@@ -1,14 +1,14 @@
 import asyncio
 
+from Controllers.GameSession.base_multiplayer_game_session import BaseMultiplayerGameSession
 from Entities.Games.Ludo import LudoGameClass
 from Entities.Games.game_types import GameTypesEnum
 from Entities.Games.wait_times import Ludo_Turn_Time, Ludo_Out_Of_Move_time
 from Commons.static_functions import make_command_json
 from Commons import commands
-from Controllers.GameSession import BaseGameSession
 
 
-class LudoGameSession(BaseGameSession):
+class LudoGameSession(BaseMultiplayerGameSession):
     def __init__(self, game_id: str, game_type, game_score_type):
         super().__init__(game_id, game_type, game_score_type)
 
@@ -54,17 +54,9 @@ class LudoGameSession(BaseGameSession):
                 self.timer.stop()
 
     def send_current_turn(self):
-        from Entities.SocketIOManagerClass import send_command
         print("new turn")
-        if self.game_controller.is_game_finished:
-            winner = self.game_controller.get_game_winner()
-            asyncio.new_event_loop().run_until_complete(
-                send_command(command=make_command_json(id=commands.Finish_Game,
-                                                       data={"rank1": self.game_controller.rank1,
-                                                             "rank2": self.game_controller.rank2}),
-                             game_id=self.game_id))
-            self.finish_game(winner)
-            return True
+        if self.check_finish_game():
+            return
         self.game_controller.change_turn()
         from Entities.SocketIOManagerClass import send_command
         asyncio.new_event_loop().run_until_complete(
@@ -90,23 +82,3 @@ class LudoGameSession(BaseGameSession):
                 game_id=self.game_id))
         self.game_controller.is_current_turn_played = True
         self.timer.start(Ludo_Out_Of_Move_time, self.send_current_turn)
-
-    def finish_game(self, winner_gamer_id):
-        if self.is_game_finished:
-            return
-        self.is_game_finished = True
-        user_idis = [g.user_id for g in self.gamers],
-        from Entities.Database import game_database
-        game_database.game_history_manager.create_game_history(self.game_history_id, self.game_id, user_idis,
-                                                               str(self.game_type.value), self.game_score_type.value,
-                                                               self.game_controller.rank1)
-        from Entities.SocketIOClass.game import finish_multiplayer_game
-        rank1_id = self.gamer_id_to_user_id(self.game_controller.rank1)
-        rank2_id = self.gamer_id_to_user_id(self.game_controller.rank2)
-        finish_multiplayer_game(self.game_id, rank1_id, rank2_id)
-
-    def gamer_id_to_user_id(self, gamer_id):
-        for gamer in self.gamers:
-            if gamer.gamer_id == gamer_id:
-                return gamer.user_id
-        return None

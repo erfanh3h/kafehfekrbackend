@@ -84,8 +84,6 @@ class LudoGameClass(BaseGameClass):
         self.current_turn_player_rolled = False
         self.has_more_dice = False
         self.current_available_indexes = []
-        self.rank1 = None
-        self.rank2 = None
 
     def init_board(self):
         for i in range(self.players_count):
