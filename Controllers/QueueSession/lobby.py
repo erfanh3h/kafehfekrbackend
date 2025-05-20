@@ -73,8 +73,8 @@ class LobbySession:
         lobby_data = self.find_lobby_from_id(lobby_id)
         if lobby_data is None:
             return
-        queuers_idis = [lobby_data.queuers[0].user_id, lobby_data.queuers[0].user_id]
-        queuers = [lobby_data.queuers[0], lobby_data.queuers[1]]
+        queuers_idis = [queuer.user_id for queuer in lobby_data.queuers]
+        queuers = [queuer for queuer in lobby_data.queuers]
         from Entities.SocketIOManagerClass import send_lobby_command
         game_id = static_functions.create_random_game_id()
         # mix_game_type = []
@@ -97,11 +97,11 @@ class LobbySession:
                                lobby_name=lobby_name, lobby_count=lobby_count, lobby_password=lobby_password)
         self.lobbies.append(new_lobby)
         from Entities.SocketIOManagerClass import send_global_lobby_command, send_private_lobby_command
-        await send_global_lobby_command(command=make_command_json(id=commands.Lobby_Created, data=new_lobby.to_json()))
         await send_private_lobby_command(
             command=make_command_json(id=commands.Your_Lobby_Created, data={'lobby_id': lobby_id}),
             socket_id=user_data.socket_id)
         await self.join_lobby(user_data, lobby_id)
+        await send_global_lobby_command(command=make_command_json(id=commands.Lobby_Created, data=new_lobby.to_json()))
 
     async def join_queuers_list(self, user_data: QueuerModel):
         self.free_queuers.append(user_data)
@@ -164,7 +164,7 @@ class LobbySession:
         if data['id'] == commands.Lobby_Join:
             lobby_id = data['data']['lobby_id']
             lobby_data = self.find_lobby_from_id(lobby_id)
-            from Entities.SocketIOManagerClass import send_private_lobby_command
+            from Entities.SocketIOManagerClass import send_private_lobby_command, send_global_lobby_command
             if lobby_data is None:
                 await send_private_lobby_command(
                     command=make_command_json(id=commands.Lobby_Not_Exists, data={'lobby_id': lobby_id}),
@@ -172,6 +172,9 @@ class LobbySession:
                 return
             if len(lobby_data.queuers) < lobby_data.lobby_count:
                 await self.join_lobby(gamer_data, lobby_id)
+                await send_global_lobby_command(
+                    command=make_command_json(id=commands.Lobby_Players_Update,
+                                              data={'lobby_id': lobby_id, 'count': len(lobby_data.queuers)}), )
             else:
                 await send_private_lobby_command(
                     command=make_command_json(id=commands.Lobby_Full, data={}), socket_id=socket_id)
@@ -206,10 +209,13 @@ class LobbySession:
             lobby.remove_queuer(gamer_data.user_id)
             gamer_data.is_rdy = False
             self.free_queuers.append(gamer_data)
-            from Entities.SocketIOManagerClass import send_private_lobby_command
+            from Entities.SocketIOManagerClass import send_private_lobby_command, send_global_lobby_command
             await send_private_lobby_command(
                 command=make_command_json(id=commands.Lobby_Kick, data=self.get_lobbies_data()),
                 socket_id=gamer_data.socket_id)
+            await send_global_lobby_command(
+                command=make_command_json(id=commands.Lobby_Players_Update,
+                                          data={'lobby_id': lobby_id, 'count': len(lobby.queuers)}), )
         if data['id'] == commands.Lobby_Quit:
             lobby_id = self.socketid_lobbyid_pairs[socket_id]
             lobby = self.find_lobby_from_id(lobby_id)
@@ -284,3 +290,6 @@ class LobbySession:
             self.free_queuers.append(user_data)
             await send_private_lobby_command(command=make_command_json(id=commands.Lobby_List, data=lobbies_data),
                                              socket_id=user_data.socket_id)
+        from Entities.SocketIOManagerClass import send_global_lobby_command
+        await send_global_lobby_command(
+            command=make_command_json(id=commands.Lobby_Players_Update, data={'lobby_id': lobby_id, 'count': 0}), )

@@ -59,7 +59,9 @@ class LudoGameSession(BaseGameSession):
         if self.game_controller.is_game_finished:
             winner = self.game_controller.get_game_winner()
             asyncio.new_event_loop().run_until_complete(
-                send_command(command=make_command_json(id=commands.Finish_Game, data={"Winner": winner}),
+                send_command(command=make_command_json(id=commands.Finish_Game,
+                                                       data={"rank1": self.game_controller.rank1,
+                                                             "rank2": self.game_controller.rank2}),
                              game_id=self.game_id))
             self.finish_game(winner)
             return True
