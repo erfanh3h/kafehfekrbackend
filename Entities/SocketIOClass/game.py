@@ -37,9 +37,9 @@ def add_new_game(game_id, queuers, game_types, game_score_type):
 def finish_single_game(game_id, user_id):
     games[game_id].finish_current_game(user_id)
 
-
+def finish_multiplayer_game(game_id, rank1_id , rank2_id):
+    games[game_id].finish_multiplayer_game(rank1_id , rank2_id)
 def delete_game(game_id):
-    print("here")
     # try:
     del games[game_id]
     game_idies.remove(game_id)

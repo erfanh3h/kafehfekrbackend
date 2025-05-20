@@ -55,7 +55,6 @@ class BaseGameClass:
         self.is_game_finished = True
         self.is_finish_message_delivered = True
         self.leaver_id = gamer_id
-        # await self.send_data_function(commands.Surrender, {"gamer_id": gamer_id})
 
     def finish_reconnect_time(self, gamer_id):
         self.leaver_id = gamer_id

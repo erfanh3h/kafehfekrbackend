@@ -189,8 +189,11 @@ class BaseGameSession:
             self.send_command(commands.Finish_Reconnect_Time, {"user_id": user_id}))
         gamer_id = self.find_gamer_id_from_user_id(user_id)
         self.game_controller.finish_reconnect_time(gamer_id)
-        # Test : remove this
-        self.timer.stop()
+        if len(self.gamers) <= 2:  # this timer stop will stop in 2 player games and will resume on 4 players
+            # Test : remove this
+            self.timer.stop()
+        else:
+            self.timer.resume()
 
     def check_finish_game_by_not_play_turn(self, current_turn):  # this used only on 2 players games
         from Entities.SocketIOManagerClass import send_command

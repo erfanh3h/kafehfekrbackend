@@ -11,6 +11,17 @@ rank_win_xp = 15
 rank_draw_xp = 12
 rank_lose_xp = 10
 
+multi_rank_coin_cost = 15
+multi_rank_rank1_coin = 15
+multi_rank_rank2_coin = 15
+multi_rank_rankn_coin = 15
+multi_rank_rank1_score = 10
+multi_rank_rank2_score = 5
+multi_rank_rankn_score = -5
+multi_rank_rank1_xp = 20
+multi_rank_rank2_xp = 15
+multi_rank_rankn_xp = 10
+
 
 def gametype_to_rewards(game_type):
     difficulty = gametype_to_difficulty(game_type)

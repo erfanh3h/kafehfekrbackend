@@ -1,5 +1,6 @@
 import random
 
+from Commons.static_functions import make_command_json
 from Entities.Games.Ludo.board_spot import BoardSpotClass
 from Entities.Games.base_game_class import BaseGameClass
 from Commons import commands
@@ -76,17 +77,21 @@ class LudoGameClass(BaseGameClass):
         self.start_pieces = []  # 4 start piece for each user
         self.players_count = players_count
         self.players_out_pieces = []
+        self.active_player_indexes = []
         self.init_board()
         self.current_turn = 0
         self.current_dice = 0
         self.current_turn_player_rolled = False
         self.has_more_dice = False
         self.current_available_indexes = []
+        self.rank1 = None
+        self.rank2 = None
 
     def init_board(self):
         for i in range(self.players_count):
             self.players_out_pieces.append(4)
             self.start_pieces.append(BoardSpotClass())
+            self.active_player_indexes.append(i + 1)
 
     def get_game_data(self):
         board_data = []
@@ -97,8 +102,9 @@ class LudoGameClass(BaseGameClass):
             start_board_data.append(self.start_pieces[index].to_json())
 
         data = {"board": board_data, "start_board": start_board_data, "players_out_pieces": self.players_out_pieces,
-                "current_turn": self.current_turn,
-                "current_dice": self.current_dice, "current_turn_player_rolled": self.current_turn_player_rolled, }
+                "current_turn": self.current_turn, "active_player_indexes": self.active_player_indexes,
+                'rank1': self.rank1, "current_dice": self.current_dice,
+                "current_turn_player_rolled": self.current_turn_player_rolled, }
         return data
 
     async def recieve_data(self, command_id, data, gamer_id):
@@ -115,7 +121,7 @@ class LudoGameClass(BaseGameClass):
             self.set_available_moves()
             if len(self.current_available_indexes) == 0:
                 return False
-        if command_id == commands.Select_Peace:
+        elif command_id == commands.Select_Peace:
             self.current_turn_player_rolled = False
             index = data['index']
             # gamer_id = self.current_turn
@@ -125,6 +131,11 @@ class LudoGameClass(BaseGameClass):
                                            "type": move_type})
             self.current_dice = 0
             self.current_available_indexes.clear()
+            move_result = self.check_move_became_win()
+            if move_result is not None:
+                self.active_player_indexes.remove(move_result)
+                await self.send_data_function(
+                    command=make_command_json(id=commands.Win_Happened, data={"Winner": move_result}))
             self.is_game_finished = self.check_game_ended()
         return True
 
@@ -140,7 +151,7 @@ class LudoGameClass(BaseGameClass):
             if self.players_count == 4:
                 if self.current_turn == 2:
                     self.current_turn = 3
-                if self.current_turn == 3:
+                elif self.current_turn == 3:
                     self.current_turn = 4
                 else:
                     self.current_turn = 1
@@ -151,6 +162,8 @@ class LudoGameClass(BaseGameClass):
                     self.current_turn = 1
             else:
                 self.current_turn = 1
+        if len(self.active_player_indexes) != 0 and not self.active_player_indexes.__contains__(self.current_turn):
+            self.change_turn()
 
     def get_game_winner(self):
         if (self.board[36].equipped_user == 1 and self.board[37].equipped_user == 1 and
@@ -167,23 +180,38 @@ class LudoGameClass(BaseGameClass):
             return 4
         return 0
 
-    def check_game_ended(self):
+    def check_move_became_win(self):
+        def win_happens():
+            if self.rank1 is None:
+                self.rank1 = self.current_turn
+            else:
+                self.rank2 = self.current_turn
+
         if self.current_turn == 1:
             if (self.board[36].equipped_user == 1 and self.board[37].equipped_user == 1 and
                     self.board[38].equipped_user == 1 and self.board[39].equipped_user == 1):
-                return True
-        if self.current_turn == 2:
+                win_happens()
+                return 1
+        elif self.current_turn == 2:
             if (self.board[40].equipped_user == 2 and self.board[41].equipped_user == 2 and
                     self.board[42].equipped_user == 2 and self.board[43].equipped_user == 2):
-                return True
-        if self.current_turn == 3:
+                win_happens()
+                return 2
+        elif self.current_turn == 3:
             if (self.board[44].equipped_user == 3 and self.board[45].equipped_user == 3 and
                     self.board[46].equipped_user == 3 and self.board[47].equipped_user == 3):
-                return True
-        if self.current_turn == 4:
+                win_happens()
+                return 3
+        elif self.current_turn == 4:
             if (self.board[48].equipped_user == 4 and self.board[49].equipped_user == 4 and
                     self.board[50].equipped_user == 4 and self.board[51].equipped_user == 4):
-                return True
+                win_happens()
+                return 4
+        return None
+
+    def check_game_ended(self):
+        if self.rank1 is not None and self.rank2 is not None:
+            return True
         return False
 
     def check_hit_enemy(self, target_index, gamer_id):
@@ -296,7 +324,27 @@ class LudoGameClass(BaseGameClass):
         return False
 
     async def surrender(self, gamer_id):
-        pass
+        if not self.active_player_indexes.__contains__(gamer_id):
+            return False
+        if len(self.active_player_indexes) == 2:
+            if self.rank2 is None:
+                self.rank2 = gamer_id
+        self.active_player_indexes.remove(gamer_id)
+        self.players_out_pieces[gamer_id - 1] += 4
+        for piece in self.board:
+            if piece.is_gamer_id_spot(gamer_id):
+                piece.clear()
+        if len(self.active_player_indexes) == 1:
+            self.rank1 = self.active_player_indexes[0]
+            self.is_game_finished = True
+            return True
+        if self.current_turn == gamer_id:
+            return True
+        return False
+
+    def finish_reconnect_time(self, gamer_id):
+        import asyncio
+        asyncio.new_event_loop().run_until_complete(self.surrender(gamer_id))
 
     def check_authority(self, data, gamer_id: int):
         if (self.current_turn == 1 and gamer_id != 1) or (self.current_turn == 2 and gamer_id != 2) or (

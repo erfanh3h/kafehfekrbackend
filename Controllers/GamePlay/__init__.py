@@ -208,6 +208,27 @@ class BaseGamePlayClass:
             for gamer in self.gamers:
                 self.send_timer_value(gamer.socket_id)
 
+    def finish_multiplayer_game(self, rank1_id, rank2_id):
+        self.game_winners = []
+        rank1_index = self.user_id_to_index(rank1_id)
+        if rank1_index != -1:
+            self.gamer_scores[rank1_index] = 2
+            self.game_winners.append(rank1_index + 1)
+        rank2_index = self.user_id_to_index(rank2_id)
+        if rank2_index != -1:
+            self.gamer_scores[rank2_index] = 1
+            self.game_winners.append(rank2_index + 1)
+        from Entities.Database import game_database
+        finished_game_types = [self.game_types[0]]
+        self.score_manager.finish_multiplayer_game(rank1_id, rank2_id, finished_game_types)
+        game_database.game_play_history_manager.update_game_play_history(self.game_play_id, self.game_winners,
+                                                                         self.gamer_scores)
+        self.is_game_finished = True
+        for gamer in self.gamers:
+            self.send_game_play_data(gamer.socket_id)
+        from Entities.SocketIOClass.game import delete_game
+        delete_game(self.game_play_id)
+
     def change_gamer_socket_id(self, user_id, socket_id):
         for gamer in self.gamers:
             if gamer.user_id == user_id:
@@ -236,4 +257,4 @@ class BaseGamePlayClass:
         for index, gamer in enumerate(self.gamers):
             if gamer.user_id == user_id:
                 return index
-        return -1 #-1 for draw
+        return -1  # -1 for draw

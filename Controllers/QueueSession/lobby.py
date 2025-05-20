@@ -170,7 +170,7 @@ class LobbySession:
                     command=make_command_json(id=commands.Lobby_Not_Exists, data={'lobby_id': lobby_id}),
                     socket_id=socket_id)
                 return
-            if len(lobby_data.queuers) < 2:
+            if len(lobby_data.queuers) < lobby_data.lobby_count:
                 await self.join_lobby(gamer_data, lobby_id)
             else:
                 await send_private_lobby_command(
