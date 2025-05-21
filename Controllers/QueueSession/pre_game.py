@@ -9,10 +9,11 @@ from Models.Queuer import QueuerModel
 
 
 class PreGameClass:
-    def __init__(self, pre_game_id: str, queuers, start_game_function):
+    def __init__(self, pre_game_id: str, queuers, start_game_function, delete_game_function):
         self.timer = TimerClass()
         self.dc_timer = TimerClass()
         self.start_game_function = start_game_function
+        self.delete_game_function = delete_game_function
         self.pre_game_id: str = pre_game_id
         self.active_game_types = []
         self.queuers: list[QueuerModel] = queuers
@@ -20,6 +21,7 @@ class PreGameClass:
         self.system_selected_game: GameTypesEnum = None
         self.select_turn_index = 0
         self.is_current_pick_happens = True
+        self.dced_user = None
 
     def remove_game_type_from_list(self, game_type):
         for game in self.active_game_types:
@@ -63,13 +65,9 @@ class PreGameClass:
                 'timer_value': self.timer.counter}
         return data
 
-    def start_pre_game(self):
-        self.set_pre_game_id_db(self.pre_game_id)
+    def set_system_bans(self):
         from Entities.SocketIOManagerClass import send_pre_game_command
         import asyncio
-        for index, queuer in enumerate(self.queuers):
-            queuer.set_index(index)
-            queuer.set_finish_reconnect_time_function(self.finish_dc_timer)
         self.pre_bans = random.sample(list(GameTypesEnum), 3)  # randomly ban 3 games
         self.active_game_types = [game for game in GameTypesEnum if game not in self.pre_bans]
         readable_data = [game.value for game in self.pre_bans]
@@ -77,6 +75,13 @@ class PreGameClass:
             send_pre_game_command(command=make_command_json(id=commands.System_Banned_Games,
                                                             data=readable_data), pre_game_id=self.pre_game_id))
         self.timer.start(5, self.send_current_turn)
+
+    def start_pre_game(self):
+        self.set_pre_game_id_db(self.pre_game_id)
+        for index, queuer in enumerate(self.queuers):
+            queuer.set_index(index)
+            queuer.set_finish_reconnect_time_function(self.finish_dc_timer)
+        self.timer.start(5, self.set_system_bans)
 
     async def command_received(self, data, socket_id):
         gamer_data = self.find_gamer_from_socket_id(socket_id)
@@ -136,6 +141,10 @@ class PreGameClass:
                                                                 data=current_queuer_id), pre_game_id=self.pre_game_id))
             self.timer.start(20, self.send_current_turn)
 
+        if self.dced_user is not None:
+            self.set_pre_game_id_db("")
+            self.delete_game_function(self.pre_game_id, self.dced_user, self.queuers)
+            return
         if not self.is_current_pick_happens:  # this is the situtaion that user wont picked game
             if self.select_turn_index % 2 == 1:
                 current_queuer = self.queuers[0]
@@ -150,7 +159,7 @@ class PreGameClass:
         if self.select_turn_index == 8:  # last turn
             self.set_pre_game_id_db("")
             self.start_game_function(self.queuers, [self.queuers[0].selected_game, self.queuers[1].selected_game,
-                                                    self.system_selected_game])
+                                                    self.system_selected_game], self.pre_game_id)
         elif self.select_turn_index == 7:
             from Entities.SocketIOManagerClass import send_pre_game_command
             import asyncio
@@ -162,7 +171,7 @@ class PreGameClass:
                                                                 data={'active_index': self.select_turn_index,
                                                                       'game_type': readable_data}),
                                       pre_game_id=self.pre_game_id))
-            self.timer.start(5, self.send_current_turn)
+            self.timer.start(13, self.send_current_turn)
         else:
             call_new_pick()
 
@@ -197,4 +206,5 @@ class PreGameClass:
                 pre_game_id=self.pre_game_id))
 
     def finish_dc_timer(self, user_id):
-        print(f"{user_id} finished dc time!")
+        self.dced_user = user_id
+        self.timer.stop()

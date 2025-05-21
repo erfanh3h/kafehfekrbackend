@@ -47,7 +47,15 @@ class RankQueueSession(BaseQueueSession):
         if data['id'] == commands.Reject:
             self.queuer_accept_pairs[user_id] = False
 
-    def start_new_game(self, queuers, game_types):
+    def delete_game(self, pre_game_id, dced_user, queuers):
+        from Entities.SocketIOManagerClass import send_queue_command
+        del self.active_pre_games[pre_game_id]
+        for queuer_data in queuers:
+            asyncio.new_event_loop().run_until_complete(
+                send_queue_command(command=make_command_json(id=commands.Game_Canceled, data={}),
+                                   socket_id=queuer_data.socket_id))
+
+    def start_new_game(self, queuers, game_types, pre_game_id):
         if len(queuers) != 2:
             return
         del self.socket_id_pre_games_pairs[queuers[0].socket_id]
@@ -61,6 +69,7 @@ class RankQueueSession(BaseQueueSession):
             asyncio.new_event_loop().run_until_complete(
                 send_queue_command(command=make_command_json(id=commands.Start_Game, data=game_data),
                                    socket_id=queuer_data.socket_id))
+        del self.active_pre_games[pre_game_id]
         from Entities.SocketIOClass.game import add_new_game
         add_new_game(game_id, queuers, final_game_types, self.game_score_type)
 
@@ -80,7 +89,7 @@ class RankQueueSession(BaseQueueSession):
                                    socket_id=queuer_data.socket_id))
             asyncio.new_event_loop().run_until_complete(
                 enter_pre_game(socket_id=queuer_data.socket_id, pre_game_id=pre_game_id))
-        self.active_pre_games[pre_game_id] = PreGameClass(pre_game_id, queuers, self.start_new_game)
+        self.active_pre_games[pre_game_id] = PreGameClass(pre_game_id, queuers, self.start_new_game , self.delete_game)
         self.active_pre_games[pre_game_id].start_pre_game()
 
     def start_pre_game_timer(self, queuers):
@@ -173,7 +182,8 @@ class RankQueueSession(BaseQueueSession):
                     break
             return
         game_id = self.socket_id_pre_games_pairs[socket_id]
-        self.active_pre_games[game_id].disconnect_user(socket_id)
+        if self.active_pre_games.keys().__contains__(game_id):
+            self.active_pre_games[game_id].disconnect_user(socket_id)
         for user_data in self.queuers:
             if socket_id == user_data.socket_id:
                 self.queuers.remove(user_data)
