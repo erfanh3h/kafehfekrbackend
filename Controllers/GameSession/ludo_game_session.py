@@ -6,6 +6,7 @@ from Entities.Games.game_types import GameTypesEnum
 from Entities.Games.wait_times import Ludo_Turn_Time, Ludo_Out_Of_Move_time
 from Commons.static_functions import make_command_json
 from Commons import commands
+from Entities.RewardManagerClass import GameScoreTypesEnum
 
 
 class LudoGameSession(BaseMultiplayerGameSession):
@@ -18,21 +19,9 @@ class LudoGameSession(BaseMultiplayerGameSession):
         super().start_game_timer()
 
     async def command_received(self, data, socket_id):
-        if not self.is_game_running:
-            return None
-        gamer_data = self.find_gamer_from_socket(socket_id)
-        if gamer_data is None:
-            return None
-        else:
-            gamer_id = gamer_data.gamer_id
+        gamer_id = await super().command_received(data, socket_id)
         if gamer_id is None:
             return
-        if data['id'] == commands.Surrender:
-            should_timer_stop = await self.game_controller.surrender(gamer_id)
-            await self.send_command(commands.Surrender, {"gamer_id": gamer_id})
-            if should_timer_stop:
-                self.timer.stop()
-            return None
         if data['id'] == commands.Roll_Dice:
             is_selection_correct = self.game_controller.check_authority(data, gamer_id)
             if not is_selection_correct:

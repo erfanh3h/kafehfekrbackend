@@ -77,7 +77,6 @@ class LudoGameClass(BaseGameClass):
         self.start_pieces = []  # 4 start piece for each user
         self.players_count = players_count
         self.players_out_pieces = []
-        self.active_player_indexes = []
         self.init_board()
         self.current_turn = 0
         self.current_dice = 0

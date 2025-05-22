@@ -15,6 +15,7 @@ class BaseGameClass:
         self.leaver_id = 0
         self.is_finish_message_delivered = False
         self.is_current_turn_played = False
+        self.active_player_indexes = []
         self.rank1 = None
         self.rank2 = None
 
