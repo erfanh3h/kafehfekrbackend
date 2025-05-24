@@ -33,5 +33,6 @@ FekrBekr_Round_Time = 60
 FekrBekr_Round_Wait_Time = 5
 Ludo_Turn_Time = 25
 Ludo_Out_Of_Move_time = 3
+Risk_Turn_Time = 30
 BackGammon_Turn_Time = 30
 BackGammon_Out_Of_Move_time = 4

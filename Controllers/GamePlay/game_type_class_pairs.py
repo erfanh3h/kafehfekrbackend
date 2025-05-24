@@ -1,3 +1,4 @@
+from Controllers.GameSession.risk_game_session import RiskGameSession
 from Entities.Games.game_types import GameTypesEnum
 from Controllers.GameSession.box_four_game_session import BoxFourGameSession
 from Controllers.GameSession.backgammon_game_session import BackGammonGameSession
@@ -34,4 +35,5 @@ game_type_class_pairs = {GameTypesEnum.TIC_TAC_TOE.value: TicTacToeGameSession,
                          GameTypesEnum.FEKRBEKR.value: FekrBekrGameSession,
                          GameTypesEnum.PENTAGO.value: PentagoGameSession,
                          GameTypesEnum.YINSH.value: YinshGameSession, GameTypesEnum.LUDO.value: LudoGameSession,
+                         GameTypesEnum.RISK.value: RiskGameSession,
                          GameTypesEnum.BACKGAMMON.value: BackGammonGameSession}
