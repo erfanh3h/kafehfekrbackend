@@ -32,5 +32,12 @@ class UserSpotClass:
     def remove_token(self, card: RiskContinentModel):
         self.tokens.remove(card)
 
-    def to_json(self):
-        return {"index": self.index}
+    def to_private_json(self):
+        strategies: list[str] = []
+        for strategy in self.strategies:
+            strategies.append(strategy.value)
+        return {"index": self.index, "continents": self.continents, "strategies": strategies, 'tokens': self.tokens}
+
+    def to_global_json(self):
+        return {"index": self.index, "continents": self.continents, "strategies_count": len(self.strategies),
+                'tokens': self.tokens}

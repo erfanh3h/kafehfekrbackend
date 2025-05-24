@@ -3,7 +3,7 @@ import asyncio
 from Controllers.GameSession.base_multiplayer_game_session import BaseMultiplayerGameSession
 from Entities.Games.Risk import RiskGameClass
 from Entities.Games.game_types import GameTypesEnum
-from Entities.Games.wait_times import Risk_Turn_Time, Ludo_Out_Of_Move_time
+from Entities.Games.wait_times import Risk_Turn_Time, Ludo_Out_Of_Move_time, Start_Game_Time
 from Commons.static_functions import make_command_json
 from Commons import commands
 
@@ -17,29 +17,48 @@ class RiskGameSession(BaseMultiplayerGameSession):
         self.game_type = GameTypesEnum.RISK
         super().start_game_timer()
 
+    def send_game_data(self, function):
+        print("send game data")
+        game_data = {'gamers': [], 'game_data': self.game_controller.get_game_data()}
+        for gamer in self.gamers:
+            game_data['gamers'].append(gamer.to_json())
+        from Entities.SocketIOManagerClass import send_command
+        asyncio.new_event_loop().run_until_complete(
+            send_command(command=make_command_json(id=commands.Game_Data, data=game_data), game_id=self.game_id))
+        self.timer.start(Start_Game_Time, function)
+
     async def command_received(self, data, socket_id):
         gamer_id = await super().command_received(data, socket_id)
         if gamer_id is None:
             return
-        if data['id'] == commands.Roll_Dice:
-            is_selection_correct = self.game_controller.check_authority(data, gamer_id)
-            if not is_selection_correct:
-                return
-            have_move = await self.game_controller.recieve_data(data['id'], data['data'], gamer_id)
-            if have_move:
-                self.send_dice()
-            if not have_move:
-                self.pass_turn()
-        if data['id'] == commands.Select_Peace:
+        if data['id'] == commands.Draw_Card:
             is_selection_correct = self.game_controller.check_authority(data, gamer_id)
             if not is_selection_correct:
                 return
             await self.game_controller.recieve_data(data['id'], data['data'], gamer_id)
-            if self.game_controller.is_game_finished:
-                self.timer.stop()
-                # self.send_current_turn()
-            elif not self.game_controller.has_more_dice:
-                self.timer.stop()
+            await self.send_command(commands.Draw_Card, {'gamer_id': gamer_id, 'draw_type': data['draw_type'],
+                                                         "new_data": self.game_controller.players_data[
+                                                             self.game_controller.current_turn - 1].to_global_json()})
+            await self.send_private_command(commands.User_Data, {"data": self.game_controller.players_data[
+                self.game_controller.current_turn - 1].to_private_json()}, socket_id)
+        if data['id'] == commands.Pass_Turn:
+            is_selection_correct = self.game_controller.check_authority(data, gamer_id)
+            if not is_selection_correct:
+                return
+            await self.game_controller.recieve_data(data['id'], data['data'], gamer_id)
+            await self.send_command(commands.Draw_Card, {'gamer_index': self.game_controller.current_turn - 1,
+                                                         'draw_type': data['draw_type'],
+                                                         "new_data": self.game_controller.players_data[
+                                                             self.game_controller.current_turn - 1].to_global_json()})
+            await self.send_private_command(commands.User_Data, self.game_controller.players_data[
+                self.game_controller.current_turn - 1].to_private_json(), socket_id)
+            self.send_current_turn()
+            # self.timer.stop()
+            # if self.game_controller.is_game_finished:
+            #     self.timer.stop()
+            #     # self.send_current_turn()
+            # elif not self.game_controller.has_more_dice:
+            #     self.timer.stop()
 
     def send_current_turn(self):
         print("new turn")

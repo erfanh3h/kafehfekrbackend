@@ -23,11 +23,7 @@ class RiskGameClass(BaseMultiPlayerGameClass):
         self.init_cards()
         self.players_data: list[UserSpotClass] = []
         self.init_game()
-        self.current_turn = 0
-        self.current_dice = 0
-        self.current_turn_player_rolled = False
-        self.has_more_dice = False
-        self.current_available_indexes = []
+        self.current_turn = 1
 
     def init_cards(self):
         for _ in range(18):
@@ -73,35 +69,53 @@ class RiskGameClass(BaseMultiPlayerGameClass):
                 strategy = self.strategies.pop()
                 player_data.add_strategy(strategy)
         for index, player_data in enumerate(self.players_data):
-            print(index , player_data.continents , player_data.strategies)
+            print(index, player_data.continents, player_data.strategies)
 
     def get_game_data(self):
+        players_data = []
+        for player_data in self.players_data:
+            players_data.append(player_data.to_global_json())
+
         data = {"current_turn": self.current_turn, "active_player_indexes": self.active_player_indexes,
-                'rank1': self.rank1, "current_dice": self.current_dice,
-                "current_turn_player_rolled": self.current_turn_player_rolled, }
+                'rank1': self.rank1, 'strategies': len(self.strategies), 'continents': len(self.continents),
+                'players_data': players_data, 'tokens': len(self.tokens)}
         return data
 
     async def recieve_data(self, command_id, data, gamer_id):
         # print("here",command_id, data, gamer_id)
-        if command_id == commands.Roll_Dice:
-            pass
-        elif command_id == commands.Select_Peace:
-            pass
+        if command_id == commands.Draw_Card:
+            self.draw_card(data['draw_type'])
+
+        elif command_id == commands.Pass_Turn:
+            self.draw_card(4)
         return True
 
     def change_turn(self):
-        self.current_available_indexes.clear()
         self.is_current_turn_played = False
-        self.has_more_dice = False
-        self.current_dice = 0
-        self.current_turn_player_rolled = False
         super().change_turn()
 
     def get_game_winner(self):
         return 0
 
-    def check_move_became_win(self):
-        return None
+    def draw_card(self, draw_type):
+        if draw_type == 1:
+            continent = self.continents.pop()
+            self.players_data[self.current_turn - 1].add_continent(continent)
+            continent = self.continents.pop()
+            self.players_data[self.current_turn - 1].add_continent(continent)
+        elif draw_type == 2:
+            strategy = self.strategies.pop()
+            self.players_data[self.current_turn - 1].add_strategy(strategy)
+            strategy = self.strategies.pop()
+            self.players_data[self.current_turn - 1].add_strategy(strategy)
+        elif draw_type == 3:
+            continent = self.continents.pop()
+            self.players_data[self.current_turn - 1].add_continent(continent)
+            strategy = self.strategies.pop()
+            self.players_data[self.current_turn - 1].add_strategy(strategy)
+        elif draw_type == 4:  # for pass turn
+            strategy = self.strategies.pop()
+            self.players_data[self.current_turn - 1].add_strategy(strategy)
 
     def check_authority(self, data, gamer_id: int):
         # if (self.current_turn == 1 and gamer_id != 1) or (self.current_turn == 2 and gamer_id != 2) or (
