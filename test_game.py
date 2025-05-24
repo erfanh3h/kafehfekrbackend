@@ -1,67 +1,75 @@
-import asyncio
+# import asyncio
+#
+# import socketio
+#
+# sio = socketio.AsyncClient(logger=True, engineio_logger=True)
+#
+#
+# @sio.event(namespace='/game')
+# async def connect():
+#     print('connection established')
+#
+#
+# @sio.event(namespace='/game')
+# async def message(data):
+#     print('message received :  ', data)
+#     # sio.emit('userMessage', {'response': 'my response'})
+#
+#
+# @sio.event(namespace='/game')
+# async def command(data):
+#     print('command received :  ', data)
+#
+#
+# @sio.event(namespace='/game')
+# async def disconnect():
+#     print('disconnected from server')
+#     exit(0)
+#
+#
+# async def start():
+#     token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJwaG9uZSI6IjkzMTEyMzQ1NjciLCJpZCI6ImtDOEdnSiIsImRldmljZV9pZCI6Ins1MkEyNzNBMi0yNDBELTQ1OUMtQkNGNC01MkIwNzlFODhDREJ9IiwiZXhwIjoxNzU3OTQ2ODMxfQ._QGMzgC0mL30BNZiFeUiXqUhNlzvKnr4EU8WB6_LiAk"
+#     await sio.connect('http://localhost:5000', wait_timeout=1,
+#                       auth={'user_id': "kC8GgJ", 'game_id': 'gameId', 'token': token},
+#                       namespaces="/game")
+#     await asyncio.sleep(1)
+#     while True:
+#         message = input("select piece : ")
+#         await sio.emit('user_command', {'id': 'SelectPeace', 'data': {'index': int(message), 'dice_index': 0}},
+#                        namespace="/game")
+#         await asyncio.sleep(.15)
+#
+#     # await sio.wait()
+#
+#
+# # tictactoe
+# # message = input("select peace : ")
+# # await sio.emit('userCommand', {'id': 'SelectPeace', 'data': int(message)})
+# # await asyncio.sleep(.15)
+#
+# # RPC
+# # message = input("select peace type : ")
+# # selection = "rock"
+# # if message == "0":
+# #     selection = "rock"
+# # elif message == "1":
+# #     selection = "paper"
+# # elif message == "2":
+# #     selection = "cutter"
+# # await sio.emit('userCommand', {'id': 'SelectPeace', 'data': selection})
+#
+# # MNumbers
+# # msg = input("select peace : ")
+# # await sio.emit('userCommand', {'id': 'SelectPeace', 'data': {'index1': int(msg), 'index2': 35}})
+# # await asyncio.sleep(.15)
+# if __name__ == '__main__':
+#     loop = asyncio.get_event_loop()
+#     loop.run_until_complete(start())
+from Entities.Games.Risk import RiskGameClass
 
-import socketio
 
-sio = socketio.AsyncClient(logger=True, engineio_logger=True)
-
-
-@sio.event(namespace='/game')
-async def connect():
-    print('connection established')
+def test_RiskGame():
+    pass
 
 
-@sio.event(namespace='/game')
-async def message(data):
-    print('message received :  ', data)
-    # sio.emit('userMessage', {'response': 'my response'})
-
-
-@sio.event(namespace='/game')
-async def command(data):
-    print('command received :  ', data)
-
-
-@sio.event(namespace='/game')
-async def disconnect():
-    print('disconnected from server')
-    exit(0)
-
-
-async def start():
-    token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJwaG9uZSI6IjkzMTEyMzQ1NjciLCJpZCI6ImtDOEdnSiIsImRldmljZV9pZCI6Ins1MkEyNzNBMi0yNDBELTQ1OUMtQkNGNC01MkIwNzlFODhDREJ9IiwiZXhwIjoxNzU3OTQ2ODMxfQ._QGMzgC0mL30BNZiFeUiXqUhNlzvKnr4EU8WB6_LiAk"
-    await sio.connect('http://localhost:5000', wait_timeout=1,
-                      auth={'user_id': "kC8GgJ", 'game_id': 'gameId', 'token': token},
-                      namespaces="/game")
-    await asyncio.sleep(1)
-    while True:
-        message = input("select piece : ")
-        await sio.emit('user_command', {'id': 'SelectPeace', 'data': {'index': int(message), 'dice_index': 0}},
-                       namespace="/game")
-        await asyncio.sleep(.15)
-
-    # await sio.wait()
-
-
-# tictactoe
-# message = input("select peace : ")
-# await sio.emit('userCommand', {'id': 'SelectPeace', 'data': int(message)})
-# await asyncio.sleep(.15)
-
-# RPC
-# message = input("select peace type : ")
-# selection = "rock"
-# if message == "0":
-#     selection = "rock"
-# elif message == "1":
-#     selection = "paper"
-# elif message == "2":
-#     selection = "cutter"
-# await sio.emit('userCommand', {'id': 'SelectPeace', 'data': selection})
-
-# MNumbers
-# msg = input("select peace : ")
-# await sio.emit('userCommand', {'id': 'SelectPeace', 'data': {'index1': int(msg), 'index2': 35}})
-# await asyncio.sleep(.15)
-if __name__ == '__main__':
-    loop = asyncio.get_event_loop()
-    loop.run_until_complete(start())
+game_class = RiskGameClass(test_RiskGame, 4)

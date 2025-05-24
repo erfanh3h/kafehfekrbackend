@@ -2,6 +2,8 @@ import random
 
 from Commons.static_functions import make_command_json
 from Commons import commands
+from Entities.Games.Risk.models import RiskContinentModel, RiskStrategyModel
+from Entities.Games.Risk.user_spot import UserSpotClass
 from Entities.Games.base_multiplayer_game_class import BaseMultiPlayerGameClass
 
 
@@ -15,20 +17,66 @@ def roll_dice(dice_count):
 class RiskGameClass(BaseMultiPlayerGameClass):
     def __init__(self, send_data_function, players_count=2):
         super().__init__(send_data_function, players_count)
-        self.players_out_pieces = []
-        self.init_board()
+        self.strategies: list[RiskStrategyModel] = []
+        self.continents: list[RiskContinentModel] = []
+        self.tokens: list[RiskContinentModel] = []
+        self.init_cards()
+        self.players_data: list[UserSpotClass] = []
+        self.init_game()
         self.current_turn = 0
         self.current_dice = 0
         self.current_turn_player_rolled = False
         self.has_more_dice = False
         self.current_available_indexes = []
 
-    def init_board(self):
-        pass
+    def init_cards(self):
+        for _ in range(18):
+            self.strategies.append(RiskStrategyModel.ARMY)
+        for _ in range(4):
+            self.strategies.append(RiskStrategyModel.BACKUP)
+            self.strategies.append(RiskStrategyModel.BOMB)
+            self.strategies.append(RiskStrategyModel.DESTROY)
+        for _ in range(3):
+            self.strategies.append(RiskStrategyModel.CANCEL)
+            self.strategies.append(RiskStrategyModel.CANON)
+        for _ in range(2):
+            self.strategies.append(RiskStrategyModel.EXPAND)
+            self.strategies.append(RiskStrategyModel.SPY)
+        for _ in range(12):
+            self.continents.append(RiskContinentModel.ASIA)
+        for _ in range(9):
+            self.continents.append(RiskContinentModel.ASIA)
+        for _ in range(7):
+            self.continents.append(RiskContinentModel.EUROPE)
+        for _ in range(6):
+            self.continents.append(RiskContinentModel.AFRICA)
+        for _ in range(4):
+            self.continents.append(RiskContinentModel.AUSTRALIA)
+            self.continents.append(RiskContinentModel.SOUTHAMERICA)
+        for continent in RiskContinentModel.all():
+            self.tokens.append(continent.value)
+        for _ in range(5):
+            random.shuffle(self.strategies)
+            random.shuffle(self.continents)
+
+    def init_game(self):
+        for index in range(self.players_count):
+            self.players_data.append(UserSpotClass(index + 1))
+            self.active_player_indexes.append(index + 1)
+        for index, player_data in enumerate(self.players_data):
+            for _ in range(3):
+                continent = self.continents.pop()
+                strategy = self.strategies.pop()
+                player_data.add_continent(continent)
+                player_data.add_strategy(strategy)
+            if index != 0:
+                strategy = self.strategies.pop()
+                player_data.add_strategy(strategy)
+        for index, player_data in enumerate(self.players_data):
+            print(index , player_data.continents , player_data.strategies)
 
     def get_game_data(self):
-        data = {"players_out_pieces": self.players_out_pieces,
-                "current_turn": self.current_turn, "active_player_indexes": self.active_player_indexes,
+        data = {"current_turn": self.current_turn, "active_player_indexes": self.active_player_indexes,
                 'rank1': self.rank1, "current_dice": self.current_dice,
                 "current_turn_player_rolled": self.current_turn_player_rolled, }
         return data
