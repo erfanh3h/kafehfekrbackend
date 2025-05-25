@@ -1,9 +1,8 @@
 import random
 
-from Commons.static_functions import make_command_json
 from Commons import commands
-from Entities.Games.Risk.models import RiskContinentModel, RiskStrategyModel
-from Entities.Games.Risk.user_spot import UserSpotClass
+from Entities.Games.Risk.Models.models import RiskContinentModel, RiskStrategyModel
+from Entities.Games.Risk.Models.user_spot import UserSpotClass
 from Entities.Games.base_multiplayer_game_class import BaseMultiPlayerGameClass
 
 
@@ -24,6 +23,8 @@ class RiskGameClass(BaseMultiPlayerGameClass):
         self.players_data: list[UserSpotClass] = []
         self.init_game()
         self.current_turn = 1
+        from Entities.Games.Risk.Handlers.risk_draw_handler import RiskDrawHandler
+        self.draw_handler = RiskDrawHandler(self)
 
     def init_cards(self):
         for _ in range(18):
@@ -84,10 +85,10 @@ class RiskGameClass(BaseMultiPlayerGameClass):
     async def recieve_data(self, command_id, data, gamer_id):
         # print("here",command_id, data, gamer_id)
         if command_id == commands.Draw_Card:
-            self.draw_card(data['draw_type'])
+            self.draw_handler.draw_card(data['draw_type'])
 
         elif command_id == commands.Pass_Turn:
-            self.draw_card(4)
+            self.draw_handler.draw_card(4)
         return True
 
     def change_turn(self):
@@ -96,26 +97,6 @@ class RiskGameClass(BaseMultiPlayerGameClass):
 
     def get_game_winner(self):
         return 0
-
-    def draw_card(self, draw_type):
-        if draw_type == 1:
-            continent = self.continents.pop()
-            self.players_data[self.current_turn - 1].add_continent(continent)
-            continent = self.continents.pop()
-            self.players_data[self.current_turn - 1].add_continent(continent)
-        elif draw_type == 2:
-            strategy = self.strategies.pop()
-            self.players_data[self.current_turn - 1].add_strategy(strategy)
-            strategy = self.strategies.pop()
-            self.players_data[self.current_turn - 1].add_strategy(strategy)
-        elif draw_type == 3:
-            continent = self.continents.pop()
-            self.players_data[self.current_turn - 1].add_continent(continent)
-            strategy = self.strategies.pop()
-            self.players_data[self.current_turn - 1].add_strategy(strategy)
-        elif draw_type == 4:  # for pass turn
-            strategy = self.strategies.pop()
-            self.players_data[self.current_turn - 1].add_strategy(strategy)
 
     def check_authority(self, data, gamer_id: int):
         # if (self.current_turn == 1 and gamer_id != 1) or (self.current_turn == 2 and gamer_id != 2) or (

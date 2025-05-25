@@ -35,8 +35,8 @@ class RiskGameSession(BaseMultiplayerGameSession):
             is_selection_correct = self.game_controller.check_authority(data, gamer_id)
             if not is_selection_correct:
                 return
-            await self.game_controller.recieve_data(data['id'], data['data'], gamer_id)
-            await self.send_command(commands.Draw_Card, {'gamer_id': gamer_id, 'draw_type': data['draw_type'],
+            await self.game_controller.recieve_data(data['id'], data, gamer_id)
+            await self.send_command(commands.Draw_Result, {'gamer_id': gamer_id, 'draw_type': data['draw_type'],
                                                          "new_data": self.game_controller.players_data[
                                                              self.game_controller.current_turn - 1].to_global_json()})
             await self.send_private_command(commands.User_Data, {"data": self.game_controller.players_data[
@@ -45,8 +45,8 @@ class RiskGameSession(BaseMultiplayerGameSession):
             is_selection_correct = self.game_controller.check_authority(data, gamer_id)
             if not is_selection_correct:
                 return
-            await self.game_controller.recieve_data(data['id'], data['data'], gamer_id)
-            await self.send_command(commands.Draw_Card, {'gamer_index': self.game_controller.current_turn - 1,
+            await self.game_controller.recieve_data(data['id'], data, gamer_id)
+            await self.send_command(commands.Draw_Result, {'gamer_index': self.game_controller.current_turn - 1,
                                                          'draw_type': data['draw_type'],
                                                          "new_data": self.game_controller.players_data[
                                                              self.game_controller.current_turn - 1].to_global_json()})
@@ -68,7 +68,7 @@ class RiskGameSession(BaseMultiplayerGameSession):
         from Entities.SocketIOManagerClass import send_command
         asyncio.new_event_loop().run_until_complete(
             send_command(
-                command=make_command_json(id=commands.Current_Turn, data={'turn': self.game_controller.current_turn}),
+                command=make_command_json(id=commands.Draw_Card, data={'turn': self.game_controller.current_turn}),
                 game_id=self.game_id))
         self.timer.start(Risk_Turn_Time, self.send_current_turn)
 

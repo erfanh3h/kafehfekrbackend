@@ -73,4 +73,4 @@ def test_RiskGame():
 
 
 game_class = RiskGameClass(test_RiskGame, 4)
-game_class.draw_card(3)
+game_class.draw_handler.draw_card(1)

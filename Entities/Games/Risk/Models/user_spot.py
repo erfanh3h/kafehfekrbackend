@@ -1,4 +1,4 @@
-from Entities.Games.Risk.models import RiskStrategyModel, RiskContinentModel
+from Entities.Games.Risk import RiskStrategyModel, RiskContinentModel
 
 
 class UserSpotClass:
