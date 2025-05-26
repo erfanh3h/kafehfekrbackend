@@ -82,17 +82,19 @@ class RiskGameClass(BaseMultiPlayerGameClass):
                 'players_data': players_data, 'tokens': len(self.tokens)}
         return data
 
+    def get_user_private_game_data(self, gamer_index):
+        return self.players_data[gamer_index].to_private_json()
+
     async def recieve_data(self, command_id, data, gamer_id):
         # print("here",command_id, data, gamer_id)
         if command_id == commands.Draw_Card:
-            self.draw_handler.draw_card(data['draw_type'])
+            return self.draw_handler.draw_card(data['draw_type'])
 
         elif command_id == commands.Pass_Turn:
-            self.draw_handler.draw_card(4)
+            return self.draw_handler.draw_card(4)
         return True
 
     def change_turn(self):
-        self.is_current_turn_played = False
         super().change_turn()
 
     def get_game_winner(self):

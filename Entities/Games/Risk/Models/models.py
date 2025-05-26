@@ -9,7 +9,7 @@ class RiskStrategyModel(Enum):
     DESTROY = "Destroy"
     CANCEL = "Cancel"
     CANON = "Canon"
-    EXPAND = "Expandd"
+    EXPAND = "Expand"
     SPY = "Spy"
 
 
