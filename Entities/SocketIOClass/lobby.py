@@ -11,7 +11,8 @@ class LobbySocketNameSpace(socketio.AsyncNamespace):
     async def on_connect(self, socket_id, environ, auth):
         token_data = await check_is_token_valid(auth)
         if not token_data:
-            await self.disconnect(socket_id, namespace="/lobby")
+            from Commons import commands
+            await self.emit('command', {'id': commands.Logout}, to=socket_id, namespace="/lobby")
             return
         user_id = token_data['id']
         from Entities.Database import game_database
