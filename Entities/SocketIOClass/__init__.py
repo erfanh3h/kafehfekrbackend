@@ -1,5 +1,6 @@
 import socketio
 
+from Entities.Database import game_database
 from Entities.SocketIOClass.chat import ChatSocketNameSpace
 from Entities.SocketIOClass.game import GameSocketNameSpace
 from Entities.SocketIOClass.lobby import LobbySocketNameSpace

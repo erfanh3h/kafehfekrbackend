@@ -5,6 +5,8 @@ from jose import jwt
 from passlib.context import CryptContext
 from pydantic import BaseModel
 
+from Entities.Database import game_database
+
 SECRET_KEY = "09da5e74afaa9ma2565c818195b7b9563b93xc059f6f0f4cab6cf63b88e8d3e7"
 ALGORITHM = "HS256"
 
@@ -43,5 +45,20 @@ async def extract_token(token):
         device_id: str = payload.get("device_id")
         token_data = {'phone': phone, 'id': id, 'device_id': device_id}
         return token_data
+    except:
+        return None
+
+async def check_is_token_valid(auth_data):
+    if auth_data is None:
+        return None
+    try:
+        user_token_data = await extract_token(auth_data['token'])
+        if user_token_data is None:
+            return None
+        user = game_database.users_manager.read_user(user_token_data['id'])
+        if user is None or user['device_id'] != user_token_data['device_id']:
+            return None
+        else:
+            return user_token_data
     except:
         return None

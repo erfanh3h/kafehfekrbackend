@@ -7,6 +7,7 @@ from Controllers.GameSession.ludo_game_session import LudoGameSession
 from Entities.Database import game_database
 from Entities.Games.game_types import GameTypesEnum
 from Entities.RewardManagerClass import GameScoreTypesEnum
+from Entities.Security import check_is_token_valid
 from Models.Gamer import GamerModel
 from Models.Queuer import QueuerModel
 
@@ -50,26 +51,12 @@ def delete_game(game_id):
 class GameSocketNameSpace(socketio.AsyncNamespace):
     async def on_connect(self, socket_id, environ, auth):
         print('connect ', socket_id)
-        if auth is not None:
-            try:
-                # user_id = auth['user_id']
-                user_game_id = auth['game_id']
-                from Entities.Security import extract_token
-                token_data = await extract_token(auth['token'])
-                if token_data is not None:
-                    user_id = token_data['id']
-                else:
-                    await self.disconnect(socket_id, namespace="/game")
-                    return
-            except:
-                await self.disconnect(socket_id, namespace="/game")
-                return
-        else:
-            await self.disconnect(socket_id, namespace="/game")
+        token_data = await check_is_token_valid(auth)
+        if not token_data:
+            await self.disconnect(socket_id, namespace="/lobby")
             return
-        # print(Socket_Server.namespaces)
-        #     await my_message(socket_id, {'Test': f'{socket_id}'})
-
+        user_id = token_data['id']
+        user_game_id = auth['game_id']
         if is_game_id_valid(user_game_id):
             if games[user_game_id].is_user_id_valid(user_id):
                 await self.enter_room(socket_id, user_game_id, namespace="/game")

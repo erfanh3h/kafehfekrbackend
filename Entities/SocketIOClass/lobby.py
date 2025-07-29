@@ -1,31 +1,19 @@
 import socketio
 
-from Commons import static_functions
 from Controllers.QueueSession.lobby import LobbySession
+from Entities.Security import check_is_token_valid
 from Models.Queuer import QueuerModel
-from Commons import commands
 
 lobby_session = LobbySession()
 
 
 class LobbySocketNameSpace(socketio.AsyncNamespace):
     async def on_connect(self, socket_id, environ, auth):
-        if auth is not None:
-            try:
-                from Entities.Security import extract_token
-                # user_id = auth['user_id']
-                token_data = await extract_token(auth['token'])
-                if token_data is not None:
-                    user_id = token_data['id']
-                else:
-                    await self.disconnect(socket_id, namespace="/lobby")
-                    return
-            except:
-                await self.disconnect(socket_id, namespace="/lobby")
-                return
-        else:
+        token_data = await check_is_token_valid(auth)
+        if not token_data:
             await self.disconnect(socket_id, namespace="/lobby")
             return
+        user_id = token_data['id']
         from Entities.Database import game_database
         user_data = game_database.users_manager.read_user(user_id)
         queuer_data = QueuerModel(user_id, user_data["username"], socket_id=socket_id,
