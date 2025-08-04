@@ -24,3 +24,18 @@ class RiskContinentModel(Enum):
     @classmethod
     def all(cls) -> List[Enum]:
         return list(cls)
+
+    @classmethod
+    def data_to_model(cls, data):
+        if data == "Asia":
+            return cls.ASIA
+        if data == "Africa":
+            return cls.AFRICA
+        if data == "Europe":
+            return cls.EUROPE
+        if data == "NorthAmerica":
+            return cls.NORTHAMERICA
+        if data == "SouthAmerica":
+            return cls.SOUTHAMERICA
+        else:
+            return cls.AUSTRALIA

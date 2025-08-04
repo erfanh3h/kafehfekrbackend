@@ -15,7 +15,6 @@ class ChatSocketNameSpace(socketio.AsyncNamespace):
     async def on_connect(self, socket_id, environ, auth):
         token_data = await check_is_token_valid(auth)
         if not token_data:
-            from Commons import commands
             await self.emit('command', {'id': commands.Logout}, to=socket_id, namespace="/chat")
             return
         user_id = token_data['id']

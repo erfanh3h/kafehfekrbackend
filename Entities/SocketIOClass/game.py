@@ -53,7 +53,6 @@ class GameSocketNameSpace(socketio.AsyncNamespace):
         print('connect ', socket_id)
         token_data = await check_is_token_valid(auth)
         if not token_data:
-            from Commons import commands
             await self.emit('command', {'id': commands.Logout}, to=socket_id, namespace="/game")
             return
         user_id = token_data['id']

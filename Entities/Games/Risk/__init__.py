@@ -25,6 +25,8 @@ class RiskGameClass(BaseMultiPlayerGameClass):
         self.current_turn = 1
         from Entities.Games.Risk.Handlers.risk_draw_handler import RiskDrawHandler
         self.draw_handler = RiskDrawHandler(self)
+        from Entities.Games.Risk.Handlers.risk_attack_handler import RiskAttackHandler
+        self.attack_handler = RiskAttackHandler(self)
 
     def init_cards(self):
         for _ in range(18):
@@ -66,9 +68,9 @@ class RiskGameClass(BaseMultiPlayerGameClass):
                 strategy = self.strategies.pop()
                 player_data.add_continent(continent)
                 player_data.add_strategy(strategy)
-            if index != 0:
-                strategy = self.strategies.pop()
-                player_data.add_strategy(strategy)
+            # if index != 0: #TODO : fix secondery users most get 1 more strategy card
+            #     strategy = self.strategies.pop()
+            #     player_data.add_strategy(strategy)
         for index, player_data in enumerate(self.players_data):
             print(index, player_data.continents, player_data.strategies)
 
@@ -92,6 +94,11 @@ class RiskGameClass(BaseMultiPlayerGameClass):
 
         elif command_id == commands.Pass_Turn:
             return self.draw_handler.draw_card(4)
+
+        elif command_id == commands.Declare_Attack:
+            is_attack_valid = self.attack_handler.declare_war(data['source_continent'],
+                                                              data['target_continent'], data['target_index'])
+            return is_attack_valid
         return True
 
     def change_turn(self):

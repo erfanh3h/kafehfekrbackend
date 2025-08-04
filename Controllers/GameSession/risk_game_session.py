@@ -21,11 +21,12 @@ class RiskGameSession(BaseMultiplayerGameSession):
         from Entities.SocketIOManagerClass import send_private_command
         print("send game data")
         game_data = {'gamers': [], 'game_data': self.game_controller.get_game_data()}
-        for gamer in self.gamers:
+        for index, gamer in enumerate(self.gamers):
             game_data['gamers'].append(gamer.to_json())
             asyncio.new_event_loop().run_until_complete(send_private_command(
-                command=make_command_json(id=commands.User_Data, data=self.game_controller.get_user_private_game_data(
-                    self.game_controller.current_turn - 1)), socket_id=gamer.socket_id, game_id=self.game_id))
+                command=make_command_json(id=commands.User_Data,
+                                          data=self.game_controller.get_user_private_game_data(index)),
+                socket_id=gamer.socket_id, game_id=self.game_id))
         from Entities.SocketIOManagerClass import send_command
         asyncio.new_event_loop().run_until_complete(
             send_command(command=make_command_json(id=commands.Game_Data, data=game_data), game_id=self.game_id))
@@ -63,6 +64,14 @@ class RiskGameSession(BaseMultiplayerGameSession):
             draw_result = await self.game_controller.recieve_data(data['id'], data, gamer_id)
             await self.pass_turn(draw_result, gamer_id)
 
+        if data['id'] == commands.Declare_Attack:
+            is_selection_correct = self.game_controller.check_authority(data, gamer_id)
+            if not is_selection_correct:
+                return
+            declare_result = await self.game_controller.recieve_data(data['id'], data, gamer_id)
+            print("declare_result", declare_result)
+            # continue code
+
     def send_current_turn(self):
         print("new turn")
         if self.check_finish_game():
@@ -73,7 +82,7 @@ class RiskGameSession(BaseMultiplayerGameSession):
             send_command(
                 command=make_command_json(id=commands.Draw_Card, data={'turn': self.game_controller.current_turn}),
                 game_id=self.game_id))
-        self.timer.start(Risk_Turn_Time, self.send_current_turn)
+        # self.timer.start(Risk_Turn_Time, self.send_current_turn)
 
     def send_dice(self):
         from Entities.SocketIOManagerClass import send_command
@@ -93,4 +102,5 @@ class RiskGameSession(BaseMultiplayerGameSession):
                                         {"data": draw_result, 'draw_type': 4,
                                          "new_user_data": self.game_controller.get_user_private_game_data(
                                              self.game_controller.current_turn - 1)}, gamer_id)
-        self.timer.start(Risk_Pass_Time, self.send_current_turn)
+        self.send_current_turn()
+        # self.timer.start(Risk_Pass_Time, self.send_current_turn)
