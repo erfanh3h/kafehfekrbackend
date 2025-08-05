@@ -1,7 +1,7 @@
 import random
 
 from Commons import commands
-from Entities.Games.Risk.Models.models import RiskContinentModel, RiskStrategyModel
+from Entities.Games.Risk.Models.models import RiskContinentModel, RiskStrategyModel, RiskGameState
 from Entities.Games.Risk.Models.user_spot import UserSpotClass
 from Entities.Games.base_multiplayer_game_class import BaseMultiPlayerGameClass
 
@@ -23,6 +23,7 @@ class RiskGameClass(BaseMultiPlayerGameClass):
         self.players_data: list[UserSpotClass] = []
         self.init_game()
         self.current_turn = 1
+        self.game_state = RiskGameState.STARTGAME
         from Entities.Games.Risk.Handlers.risk_draw_handler import RiskDrawHandler
         self.draw_handler = RiskDrawHandler(self)
         from Entities.Games.Risk.Handlers.risk_attack_handler import RiskAttackHandler
@@ -81,7 +82,7 @@ class RiskGameClass(BaseMultiPlayerGameClass):
 
         data = {"current_turn": self.current_turn, "active_player_indexes": self.active_player_indexes,
                 'rank1': self.rank1, 'strategies': len(self.strategies), 'continents': len(self.continents),
-                'players_data': players_data, 'tokens': len(self.tokens)}
+                'players_data': players_data, 'tokens': len(self.tokens), 'game_state': self.game_state.value}
         return data
 
     def get_user_private_game_data(self, gamer_index):

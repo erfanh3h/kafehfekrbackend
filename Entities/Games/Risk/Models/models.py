@@ -39,3 +39,13 @@ class RiskContinentModel(Enum):
             return cls.SOUTHAMERICA
         else:
             return cls.AUSTRALIA
+
+
+class RiskGameState(Enum):
+    STARTGAME = "StartGame"
+    DRAW = "Draw"
+    DRAWRESULT = "DrawResult"
+    SELECTACTION = "SelectAction"
+    DECLAREATTACK = "DeclareAttack"
+    SELECTCONTINENTS = "SelectContinents"
+    ACTIONRESULT = "ActionResult"

@@ -69,6 +69,10 @@ class RiskGameSession(BaseMultiplayerGameSession):
             if not is_selection_correct:
                 return
             declare_result = await self.game_controller.recieve_data(data['id'], data, gamer_id)
+            await self.send_command(commands.Declare_Attack,
+                                    {'gamer_id': gamer_id, 'source_continent': data['source_continent'],
+                                     'target_continent': data['target_continent'],
+                                     'target_index': data['target_index']})
             print("declare_result", declare_result)
             # continue code
 
