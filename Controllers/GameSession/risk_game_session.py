@@ -3,7 +3,7 @@ import asyncio
 from Controllers.GameSession.base_multiplayer_game_session import BaseMultiplayerGameSession
 from Entities.Games.Risk import RiskGameClass
 from Entities.Games.game_types import GameTypesEnum
-from Entities.Games.wait_times import Risk_Turn_Time, Ludo_Out_Of_Move_time, Start_Game_Time, Risk_Pass_Time
+from Entities.Games.wait_times import Risk_Turn_Time, Start_Game_Time, Risk_Pass_Time
 from Commons.static_functions import make_command_json
 from Commons import commands
 
@@ -45,10 +45,10 @@ class RiskGameSession(BaseMultiplayerGameSession):
         gamer_id = await super().command_received(data, socket_id)
         if gamer_id is None:
             return
+        is_selection_correct = self.game_controller.check_authority(data, gamer_id)
+        if not is_selection_correct:
+            return
         if data['id'] == commands.Draw_Card:
-            is_selection_correct = self.game_controller.check_authority(data, gamer_id)
-            if not is_selection_correct:
-                return
             draw_result = await self.game_controller.recieve_data(data['id'], data, gamer_id)
             await self.send_command(commands.Draw_Result, {'gamer_id': gamer_id, 'draw_type': data['draw_type'],
                                                            "new_data": self.game_controller.players_data[
@@ -57,24 +57,19 @@ class RiskGameSession(BaseMultiplayerGameSession):
                                             {"data": draw_result, 'draw_type': data['draw_type'],
                                              "new_user_data": self.game_controller.get_user_private_game_data(
                                                  self.game_controller.current_turn - 1)}, gamer_id)
-        if data['id'] == commands.Pass_Turn:
-            is_selection_correct = self.game_controller.check_authority(data, gamer_id)
-            if not is_selection_correct:
-                return
+        elif data['id'] == commands.Pass_Turn:
             draw_result = await self.game_controller.recieve_data(data['id'], data, gamer_id)
             await self.pass_turn(draw_result, gamer_id)
-
-        if data['id'] == commands.Declare_Attack:
-            is_selection_correct = self.game_controller.check_authority(data, gamer_id)
-            if not is_selection_correct:
-                return
-            declare_result = await self.game_controller.recieve_data(data['id'], data, gamer_id)
+        elif data['id'] == commands.Declare_Attack:
+            await self.game_controller.recieve_data(data['id'], data, gamer_id)
             await self.send_command(commands.Declare_Attack,
                                     {'gamer_id': gamer_id, 'source_continent': data['source_continent'],
                                      'target_continent': data['target_continent'],
                                      'target_index': data['target_index']})
-            print("declare_result", declare_result)
-            # continue code
+            # timer code
+        elif data['id'] == commands.AttackerArmy:
+            await self.game_controller.recieve_data(data['id'], data, gamer_id)
+            # timer code
 
     def send_current_turn(self):
         print("new turn")

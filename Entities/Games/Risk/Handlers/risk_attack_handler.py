@@ -10,6 +10,16 @@ class RiskAttackHandler:
         self.target_continent: RiskContinentModel = RiskContinentModel.ASIA
         self.source_id: int = 0
         self.target_id: int = 0
+        self.source_army: int = 0
+        self.target_army: int = 0
+
+    def reset(self):
+        self.source_id = 0
+        self.target_id = 0
+        self.source_continent = RiskContinentModel.ASIA
+        self.target_continent = RiskContinentModel.ASIA
+        self.source_army = 0
+        self.target_army = 0
 
     def check_declare_is_valid(self, source_continent, target_continent, target_id) -> bool:
         if self.game.players_data[self.source_id].continents[
@@ -34,3 +44,9 @@ class RiskAttackHandler:
         if not self.check_declare_is_valid(self.source_continent, self.target_continent, target_id):
             return False
         return True
+
+    def add_attacker_army(self, count):
+        self.source_army = count
+
+    def add_defender_army(self, count):
+        self.target_army = count

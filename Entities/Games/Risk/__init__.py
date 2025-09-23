@@ -91,6 +91,7 @@ class RiskGameClass(BaseMultiPlayerGameClass):
     async def recieve_data(self, command_id, data, gamer_id):
         # print("here",command_id, data, gamer_id)
         if command_id == commands.Draw_Card:
+            self.game_state = RiskGameState.DRAWRESULT
             return self.draw_handler.draw_card(data['draw_type'])
 
         elif command_id == commands.Pass_Turn:
@@ -99,10 +100,22 @@ class RiskGameClass(BaseMultiPlayerGameClass):
         elif command_id == commands.Declare_Attack:
             is_attack_valid = self.attack_handler.declare_war(data['source_continent'],
                                                               data['target_continent'], data['target_index'])
+            if is_attack_valid:
+                self.game_state = RiskGameState.DECLAREATTACK
             return is_attack_valid
+        elif command_id == commands.AttackerArmy:
+            self.attack_handler.add_attacker_army(data['count'])
+        elif command_id == commands.DefenderArmy:
+            self.attack_handler.add_defender_army(data['count'])
+        elif command_id == commands.QuestArmy:
+            if data['type'] == 'Defender':
+                self.attack_handler.add_defender_army(data['count'])
+            else:
+                self.attack_handler.add_attacker_army(data['count'])
         return True
 
     def change_turn(self):
+        self.game_state = RiskGameState.DRAW
         super().change_turn()
 
     def get_game_winner(self):

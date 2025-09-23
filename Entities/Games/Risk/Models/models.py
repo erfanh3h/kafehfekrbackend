@@ -49,3 +49,6 @@ class RiskGameState(Enum):
     DECLAREATTACK = "DeclareAttack"
     SELECTCONTINENTS = "SelectContinents"
     ACTIONRESULT = "ActionResult"
+    ATTACKERARMY = "AttackerArmy"
+    DEFENDERARMY = "DefenderArmy"
+    QUESTARMY = "QuestArmy"
