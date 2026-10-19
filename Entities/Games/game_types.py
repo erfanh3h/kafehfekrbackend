@@ -22,7 +22,7 @@ class GameTypesEnum(Enum):
     OTHELLO = "Othello"
     MILL = "Mill"
     LUDO = "Ludo"
-    RISK = "Risk"
+    # RISK = "Risk"
     BACKGAMMON = "BackGammon"
 
     @classmethod

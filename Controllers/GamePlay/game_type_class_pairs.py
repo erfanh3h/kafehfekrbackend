@@ -35,5 +35,5 @@ game_type_class_pairs = {GameTypesEnum.TIC_TAC_TOE.value: TicTacToeGameSession,
                          GameTypesEnum.FEKRBEKR.value: FekrBekrGameSession,
                          GameTypesEnum.PENTAGO.value: PentagoGameSession,
                          GameTypesEnum.YINSH.value: YinshGameSession, GameTypesEnum.LUDO.value: LudoGameSession,
-                         GameTypesEnum.RISK.value: RiskGameSession,
+                         # GameTypesEnum.RISK.value: RiskGameSession,
                          GameTypesEnum.BACKGAMMON.value: BackGammonGameSession}
