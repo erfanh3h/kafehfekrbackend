@@ -209,13 +209,17 @@ class ChessGameClass(BaseGameClass):
                 for move in piece_move_list:
                     y = position[0] + move[0]
                     x = position[1] + move[1]
-                    # check for castle move that king side must be empty
-                    if (move[0], move[1]) == (0, 2) and not self.is_target_piece_empty(y, x - 1):
+                    if not is_valid_coord(y, x):
                         continue
                     # check for castle move that king side must be empty
-                    if (move[0], move[1]) == (0, -2) and not self.is_target_piece_empty(y, x + 1):
-                        continue
-                    if is_valid_coord(y, x) and self.is_target_piece_empty(y, x):
+                    if (move[0], move[1]) == (0, 2):
+                        if not is_valid_coord(y, x - 1) or not self.is_target_piece_empty(y, x - 1):
+                            continue
+                    # check for castle move that king side must be empty
+                    if (move[0], move[1]) == (0, -2):
+                        if not is_valid_coord(y, x + 1) or not self.is_target_piece_empty(y, x + 1):
+                            continue
+                    if self.is_target_piece_empty(y, x):
                         result.append((y, x))
         return result
 
@@ -251,6 +255,8 @@ class ChessGameClass(BaseGameClass):
         return result
 
     def get_hit_list_with_changed_position(self, position, gamer_id, source_changed_position, target_changed_position):
+        if position == target_changed_position:
+            return []
         result = []
         piece = self.board[position[0]][position[1]].piece
         if piece.gamer_id != 0:
@@ -283,7 +289,9 @@ class ChessGameClass(BaseGameClass):
                     y = position[0] + move[0]
                     x = position[1] + move[1]
                     if is_valid_coord(y, x):
-                        if target_changed_position == (y, x):
+                        if source_changed_position == (y, x):
+                            continue
+                        elif target_changed_position == (y, x):
                             result.append((y, x))
                         else:
                             if self.is_target_piece_enemey(y, x, gamer_id):
@@ -298,12 +306,14 @@ class ChessGameClass(BaseGameClass):
             can_selected = True
             for check_position in enemy_positions:
                 raw_result = self.get_hit_list_with_changed_position(check_position, enemy_id, position, new_position)
-                if king_position == position and raw_result.__contains__(new_position):
-                    can_selected = False
-                    break
-                if raw_result.__contains__(king_position):
-                    can_selected = False
-                    break
+                if position == king_position:
+                    if raw_result.__contains__(new_position):
+                        can_selected = False
+                        break
+                else:
+                    if raw_result.__contains__(king_position):
+                        can_selected = False
+                        break
             if can_selected:
                 result.append(new_position)
         return result
@@ -316,15 +326,14 @@ class ChessGameClass(BaseGameClass):
             can_selected = True
             for check_position in enemy_positions:
                 raw_result = self.get_hit_list_with_changed_position(check_position, enemy_id, position, new_position)
-                if king_position == position and raw_result.__contains__(new_position):
-                    can_selected = False
-                    break
-                if raw_result.__contains__(king_position):
-                    if new_position == check_position:
-                        result.append(new_position)
+                if position == king_position:
+                    if raw_result.__contains__(new_position):
+                        can_selected = False
                         break
-                    can_selected = False
-                    break
+                else:
+                    if raw_result.__contains__(king_position):
+                        can_selected = False
+                        break
             if can_selected:
                 result.append(new_position)
         return result

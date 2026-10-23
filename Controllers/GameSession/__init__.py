@@ -163,7 +163,9 @@ class BaseGameSession:
             gamer_id = gamer_data.gamer_id
         if data['id'] == commands.Surrender:
             await self.game_controller.surrender(gamer_id)
+            await self.send_command(commands.Surrender, {"gamer_id": gamer_id})
             self.timer.stop()
+            self.check_finish_game()
             return None
         return gamer_id
 
@@ -200,6 +202,7 @@ class BaseGameSession:
             self.timer.stop()
         else:
             self.timer.resume()
+        self.check_finish_game()
 
     def check_finish_game_by_not_play_turn(self, current_turn):  # this used only on 2 players games
         from Entities.SocketIOManagerClass import send_command
