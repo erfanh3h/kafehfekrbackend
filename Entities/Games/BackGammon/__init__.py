@@ -121,7 +121,7 @@ class BackGammonGameClass(BaseGameClass):
                     self.current_dices.remove(self.current_dices[dice_index])
                     check_game_finish()
 
-            return len(self.current_dices) == 0
+            return len(self.current_dices) == 0 or not self.have_available_move(gamer_id)
 
         return False
 
