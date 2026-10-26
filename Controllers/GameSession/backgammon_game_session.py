@@ -34,9 +34,7 @@ class BackGammonGameSession(BaseGameSession):
                 is_turn_finished = await self.game_controller.recieve_data(data['id'], selection_data, gamer_id)
                 if is_turn_finished or self.game_controller.is_game_finished:
                     self.timer.stop()
-        if data['id'] == commands.Pass_Turn:
-            if not self.game_controller.have_available_move(gamer_id):
-                self.pass_turn()
+
 
     def send_current_turn(self):
         # checking player not played his turn
