@@ -66,6 +66,10 @@ class MNumbersGameClass(BaseGameClass):
 
         first_peace_index = data['index1']
         second_peace_index = data['index2']
+        if first_peace_index == second_peace_index:
+            return False
+        if not (0 <= first_peace_index < len(self.board)) or not (0 <= second_peace_index < len(self.board)):
+            return False
         if self.is_peace_have_selection(first_peace_index):
             return False
         if self.is_peace_have_selection(second_peace_index):
