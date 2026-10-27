@@ -42,19 +42,18 @@ class DotBoxGameClass(BaseGameClass):
         else:
             self.lines_board[peace_number] = self.symbol_2
         await self.send_data_function(commands.Peace_Selected, {'user': gamer_id, 'target_peace': peace_number})
+        is_win_happen, win_list = self.check_box_win_happen(peace_number)
+        if is_win_happen:
+            for index in win_list:
+                self.boxes_board[index] = gamer_id
+            if gamer_id == 1:
+                self.gamer1_score += len(win_list)
+            else:
+                self.gamer2_score += len(win_list)
         if self.check_game_ended():
             self.is_game_finished = True
             return False
-        else:
-            is_win_happen, win_list = self.check_box_win_happen(peace_number)
-            if is_win_happen:
-                for index in win_list:
-                    self.boxes_board[index] = gamer_id
-                if gamer_id == 1:
-                    self.gamer1_score += len(win_list)
-                else:
-                    self.gamer2_score += len(win_list)
-            return is_win_happen
+        return is_win_happen
 
     def check_authority(self, data, gamer_id: int):
         if (self.current_turn == 1 and gamer_id != 1) or (self.current_turn == 2 and gamer_id != 2):
