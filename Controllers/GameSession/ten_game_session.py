@@ -29,6 +29,8 @@ class TenGameSession(BaseGameSession):
                 self.timer.stop()
 
     def finish_round_time(self):
+        if not self.game_controller.is_round_finished and not self.game_controller.is_game_finished:
+            self.game_controller.round_time_finished()
         from Entities.SocketIOManagerClass import send_command
         asyncio.new_event_loop().run_until_complete(
             send_command(

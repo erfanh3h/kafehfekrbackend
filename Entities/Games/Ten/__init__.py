@@ -22,11 +22,7 @@ class TenGameClass(BaseGameClass):
         self.round_winner = 0
 
     def init_games(self):
-        indexes = []
-        for i in range(3):
-            random_number = random.randint(0, len(ten_games_list))
-            if random_number not in indexes:
-                indexes.append(random_number)
+        indexes = random.sample(range(len(ten_games_list)), 3)
         for i in range(3):
             self.rounds_list.append(ten_games_list[indexes[i]])
         self.current_round_numbers = self.rounds_list[0]
@@ -39,7 +35,8 @@ class TenGameClass(BaseGameClass):
     def change_round(self):
         self.round_winner = 0
         self.is_round_finished = False
-        self.current_round_numbers = self.rounds_list[self.current_round]
+        if self.current_round < len(self.rounds_list):
+            self.current_round_numbers = self.rounds_list[self.current_round]
         self.current_round += 1
 
     async def recieve_data(self, command_id, data, gamer_id):
