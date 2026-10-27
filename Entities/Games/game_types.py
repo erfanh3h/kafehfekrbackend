@@ -6,7 +6,6 @@ class GameTypesEnum(Enum):
     TIC_TAC_TOE = "TicTacToe"
     RPC = "RPC"
     DOTBOX = "DotBox"
-    TEN = "Ten"
     MNUMBERS = "MNumbers"
     MSweeper = "MSweeper"
     FEKRBEKR = "FekrBekr"

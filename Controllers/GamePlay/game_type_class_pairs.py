@@ -15,7 +15,6 @@ from Controllers.GameSession.othello_game_session import OthelloGameSession
 from Controllers.GameSession.pentago_game_session import PentagoGameSession
 from Controllers.GameSession.rpc_game_session import RPCGameSession
 from Controllers.GameSession.sudoku_game_session import SudokuGameSession
-from Controllers.GameSession.ten_game_session import TenGameSession
 from Controllers.GameSession.tictactoe_game_session import TicTacToeGameSession
 from Controllers.GameSession.yatzy_game_session import YatzyGameSession
 from Controllers.GameSession.ludo_game_session import LudoGameSession
@@ -26,7 +25,7 @@ game_type_class_pairs = {GameTypesEnum.TIC_TAC_TOE.value: TicTacToeGameSession,
                          GameTypesEnum.OTHELLO.value: OthelloGameSession, GameTypesEnum.MILL.value: MillGameSession,
                          GameTypesEnum.MNUMBERS.value: MNumbersGameSession,
                          GameTypesEnum.MSweeper.value: MSweeperGameSession,
-                         GameTypesEnum.RPC.value: RPCGameSession, GameTypesEnum.TEN.value: TenGameSession,
+                         GameTypesEnum.RPC.value: RPCGameSession,
                          GameTypesEnum.DOTBOX.value: DotBoxGameSession, GameTypesEnum.YATZY.value: YatzyGameSession,
                          GameTypesEnum.FOURINROW.value: FourInRowGameSession,
                          GameTypesEnum.SUDOKU.value: SudokuGameSession,

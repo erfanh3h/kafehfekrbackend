@@ -42,8 +42,6 @@ def gametype_to_difficulty(game_type):
         return GameDifficultyEnum.Easy
     if game_type == GameTypesEnum.RPC.value:
         return GameDifficultyEnum.Easy
-    if game_type == GameTypesEnum.TEN.value:
-        return GameDifficultyEnum.Easy
     if game_type == GameTypesEnum.DOTBOX.value:
         return GameDifficultyEnum.Easy
     if game_type == GameTypesEnum.LUDO.value:
