@@ -18,8 +18,8 @@ class boardSpot(object):
             return True
         return False
 
-    def to_json(self):
-        if self.is_selected:
+    def to_json(self, show_ship=False):
+        if self.is_selected or show_ship:
             return {"is_selected": self.is_selected, "number": self.number}
         else:
             return {"is_selected": False, "number": 0}

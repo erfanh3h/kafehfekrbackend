@@ -58,10 +58,10 @@ class BattleShipGameClass(BaseGameClass):
         player2_board_data = []
         for j in range(8):
             for i in range(8):
-                player1_board_data.append(self.player1_board[i][j].to_json())
+                player1_board_data.append(self.player1_board[i][j].to_json(show_ship=(gamer_id == 1)))
         for j in range(8):
             for i in range(8):
-                player2_board_data.append(self.player2_board[i][j].to_json())
+                player2_board_data.append(self.player2_board[i][j].to_json(show_ship=(gamer_id == 2)))
         if gamer_id == 1:
             is_player_rdy = self.player1_board_rdy
         else:
