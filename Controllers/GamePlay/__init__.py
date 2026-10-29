@@ -163,6 +163,8 @@ class BaseGamePlayClass:
         await self.game_session.reaction_received(data, socket_id)
 
     def start_current_game(self):
+        if self.is_game_finished or self.current_game_index >= len(self.game_types):
+            return
         game_type = self.game_types[self.current_game_index]
         self.game_session = game_type_class_pairs[game_type](game_id=self.game_play_id, game_type=game_type,
                                                              game_score_type=self.game_score_type)
@@ -185,18 +187,33 @@ class BaseGamePlayClass:
                 return True, self.gamers[index].user_id
             if len(self.game_types) == 3 and gamer_score >= 2:
                 return True, self.gamers[index].user_id
+        if self.current_game_index >= len(self.game_types):
+            if len(self.gamer_scores) >= 2:
+                if self.gamer_scores[0] > self.gamer_scores[1]:
+                    return True, self.gamers[0].user_id
+                elif self.gamer_scores[1] > self.gamer_scores[0]:
+                    return True, self.gamers[1].user_id
+            return True, 0
         return False, None
 
     def finish_current_game(self, currnet_game_winner_id):
+        if self.is_game_finished:
+            return
+
         def start_new_game_function():
+            if self.is_game_finished or self.current_game_index >= len(self.game_types):
+                return
             for gamer_data in self.gamers:
                 self.navigate_to_game(gamer_data.socket_id)
             self.start_current_game()
 
         winner_index = self.user_id_to_index(currnet_game_winner_id)
-        if winner_index != -1:  # prevent drow
-            self.gamer_scores[winner_index] += 1
-            self.game_winners[self.current_game_index] = winner_index + 1
+        if self.current_game_index < len(self.game_winners):
+            if winner_index != -1:  # prevent drow
+                self.gamer_scores[winner_index] += 1
+                self.game_winners[self.current_game_index] = winner_index + 1
+            else:
+                self.game_winners[self.current_game_index] = 0
         self.current_game_index += 1
         is_game_finished, winner_id = self.check_is_game_finished()
         if is_game_finished:
