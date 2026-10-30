@@ -87,11 +87,15 @@ class YinshGameClass(BaseGameClass):
     def get_game_winner(self):
         winner = super().get_game_winner()
         if winner == 0:
-            if self.player1_score >= 3 > self.player2_score:
+            if self.player1_score >= 3 and self.player1_score > self.player2_score:
                 winner = 1
-            elif self.player2_score >= 3 > self.player1_score:
+            elif self.player2_score >= 3 and self.player2_score > self.player1_score:
                 winner = 2
-            elif self.player1_score == 3 and self.player2_score == 3:
+            elif self.player1_score > self.player2_score:
+                winner = 1
+            elif self.player2_score > self.player1_score:
+                winner = 2
+            else:
                 winner = 0
         return winner
 
@@ -103,15 +107,40 @@ class YinshGameClass(BaseGameClass):
             return False
         if self.is_ring_setuped:
             return False
+        if gamer_id != self.current_turn:
+            return False
+        if not isinstance(data, int) or data < 0 or data >= 85:
+            return False
+        if self.board[data].ring_user is not None or self.board[data].disk_user is not None:
+            return False
         return True
 
     def check_select_piece_authority(self, data, gamer_id: int):
         if self.is_setup_ring_phase:
             return False
+        if gamer_id != self.current_turn:
+            return False
+        if self.last_selected_piece_id != -1:
+            return False
+        if not isinstance(data, int) or data < 0 or data >= 85:
+            return False
+        if self.board[data].ring_user != gamer_id:
+            return False
         return True
 
     def check_move_ring_authority(self, data, gamer_id: int):
         if self.is_setup_ring_phase:
+            return False
+        if gamer_id != self.current_turn:
+            return False
+        if self.last_selected_piece_id == -1:
+            return False
+        if not isinstance(data, dict) or 'target_id' not in data:
+            return False
+        target_id = data['target_id']
+        if not isinstance(target_id, int) or target_id < 0 or target_id >= 85:
+            return False
+        if self.board[target_id].ring_user is not None or self.board[target_id].disk_user is not None:
             return False
         return True
 
@@ -120,6 +149,12 @@ class YinshGameClass(BaseGameClass):
         for i in range(85):
             if self.board[i].ring_user == gamer_id:
                 gamer_rings.append(i)
+        if not gamer_rings:
+            if gamer_id == 1:
+                self.player1_score += 1
+            else:
+                self.player2_score += 1
+            return 0
         random_id = random.choice(gamer_rings)
         self.board[random_id].set_ring(None)
         if gamer_id == 1:
