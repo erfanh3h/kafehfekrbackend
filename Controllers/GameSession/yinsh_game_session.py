@@ -8,6 +8,16 @@ from Commons import commands
 from Controllers.GameSession import BaseGameSession
 
 
+def safe_run_async(coro):
+    try:
+        loop = asyncio.get_running_loop()
+        return loop.create_task(coro)
+    except RuntimeError:
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        return loop.run_until_complete(coro)
+
+
 class YinshGameSession(BaseGameSession):
     def __init__(self, game_id: str, game_type, game_score_type):
         super().__init__(game_id, game_type, game_score_type)
@@ -26,7 +36,8 @@ class YinshGameSession(BaseGameSession):
             is_selection_authorized = self.game_controller.check_setup_ring_authority(peace_id, gamer_id)
             if is_selection_authorized:
                 await self.game_controller.recieve_data(data["id"], peace_id, gamer_id)
-                self.timer.stop()
+                self.timer.stop(False)
+                self.send_current_turn()
         elif data["id"] == commands.Select_Remove_Peace or (
             self.game_controller.current_remover != 0
             and data["id"] in (commands.Select_Peace, commands.Remove_Peace)
@@ -35,7 +46,8 @@ class YinshGameSession(BaseGameSession):
             is_selection_authorized = self.game_controller.check_remove_ring_authority(peace_id, gamer_id)
             if is_selection_authorized:
                 await self.game_controller.recieve_data(commands.Select_Remove_Peace, peace_id, gamer_id)
-                self.timer.stop()
+                self.timer.stop(False)
+                self.send_current_turn()
         elif data["id"] == commands.Select_Peace:
             peace_id = data["data"]
             is_selection_authorized = self.game_controller.check_select_piece_authority(peace_id, gamer_id)
@@ -46,14 +58,15 @@ class YinshGameSession(BaseGameSession):
             is_selection_authorized = self.game_controller.check_move_ring_authority(peace_id, gamer_id)
             if is_selection_authorized:
                 await self.game_controller.recieve_data(data["id"], data["data"], gamer_id)
-                self.timer.stop()
+                self.timer.stop(False)
+                self.send_current_turn()
 
     def send_current_turn(self):
         from Entities.SocketIOManagerClass import send_command
 
         if self.game_controller.check_game_ended():
             winner = self.game_controller.get_game_winner()
-            asyncio.new_event_loop().run_until_complete(
+            safe_run_async(
                 send_command(
                     command=make_command_json(id=commands.Finish_Game, data={"Winner": winner}),
                     game_id=self.game_id))
@@ -68,7 +81,7 @@ class YinshGameSession(BaseGameSession):
                     self.game_controller.pending_ring_removals[0]
                     if len(self.game_controller.pending_ring_removals) > 0 else 0
                 )
-                asyncio.new_event_loop().run_until_complete(
+                safe_run_async(
                     send_command(
                         command=make_command_json(
                             id=commands.Win_Happened,
@@ -84,9 +97,11 @@ class YinshGameSession(BaseGameSession):
                 )
             self.send_current_turn()
 
-        if len(self.game_controller.pending_ring_removals) > 0:
-            self.game_controller.current_remover = self.game_controller.pending_ring_removals[0]
-            asyncio.new_event_loop().run_until_complete(
+        # If a 5-in-a-row occurred and player needs to pick a ring to remove:
+        if self.game_controller.current_remover != 0 or len(self.game_controller.pending_ring_removals) > 0:
+            if self.game_controller.current_remover == 0 and len(self.game_controller.pending_ring_removals) > 0:
+                self.game_controller.current_remover = self.game_controller.pending_ring_removals[0]
+            safe_run_async(
                 send_command(
                     command=make_command_json(
                         id=commands.Select_Remove_Peace,
@@ -104,7 +119,7 @@ class YinshGameSession(BaseGameSession):
             gamer_id = self.game_controller.current_turn
             random_id = self.game_controller.extract_random_piece_for_auto_ring()
             self.game_controller.submit_ring(gamer_id, random_id)
-            asyncio.new_event_loop().run_until_complete(
+            safe_run_async(
                 send_command(command=make_command_json(id=commands.Ring_Submited,
                                                        data={"gamer_id": gamer_id, "piece_id": random_id}),
                              game_id=self.game_id))
@@ -114,21 +129,21 @@ class YinshGameSession(BaseGameSession):
             piece_id = self.game_controller.last_selected_piece_id
             self.game_controller.remove_disk(piece_id)
             self.game_controller.last_selected_piece_id = -1
-            asyncio.new_event_loop().run_until_complete(
+            safe_run_async(
                 send_command(command=make_command_json(id=commands.Remove_Peace,
                                                        data={"piece_id": piece_id}),
                              game_id=self.game_id))
             self.game_controller.is_ring_setuped = True
         if self.game_controller.check_game_ended():
             winner = self.game_controller.get_game_winner()
-            asyncio.new_event_loop().run_until_complete(
+            safe_run_async(
                 send_command(
                     command=make_command_json(id=commands.Finish_Game, data={"Winner": winner}),
                     game_id=self.game_id))
             self.finish_game(winner)
             return
         self.game_controller.change_turn()
-        asyncio.new_event_loop().run_until_complete(
+        safe_run_async(
             send_command(command=make_command_json(id=commands.Current_Turn,
                                                    data={"turn": self.game_controller.current_turn,
                                                          "is_setup_ring_phase": self.game_controller.is_setup_ring_phase}),
