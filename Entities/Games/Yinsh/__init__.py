@@ -42,14 +42,17 @@ class YinshGameClass(BaseGameClass):
     async def recieve_data(self, command_id, data, gamer_id):
         # print(command_id, data, gamer_id)
         if command_id == commands.Submit_Ring:
-            self.submit_ring(gamer_id, data)
-            await self.send_data_function(commands.Ring_Submited, {'gamer_id': gamer_id, 'piece_id': data})
+            piece_id = int(data)
+            self.submit_ring(gamer_id, piece_id)
+            await self.send_data_function(commands.Ring_Submited, {'gamer_id': gamer_id, 'piece_id': piece_id})
         elif command_id == commands.Select_Peace:
-            self.select_piece(gamer_id, data)
-            await self.send_data_function(commands.Peace_Selected, {'gamer_id': gamer_id, 'piece_id': data})
+            piece_id = int(data)
+            self.select_piece(gamer_id, piece_id)
+            await self.send_data_function(commands.Peace_Selected, {'gamer_id': gamer_id, 'piece_id': piece_id})
         elif command_id == commands.Move_Ring:
-            rotation_list = self.get_list_of_rotations(data['target_id'])
-            self.move_ring(gamer_id, data['target_id'], rotation_list)
+            target_id = int(data['target_id']) if isinstance(data, dict) else int(data)
+            rotation_list = self.get_list_of_rotations(target_id)
+            self.move_ring(gamer_id, target_id, rotation_list)
             self.removed_rings = []
             self.win_happens_data = self.check_win_happened(rotation_list)
             if len(self.win_happens_data) > 0:
@@ -58,7 +61,7 @@ class YinshGameClass(BaseGameClass):
                     self.removed_rings.append(removed_ring)
             await self.send_data_function(commands.Ring_Moved,
                                           {'gamer_id': gamer_id, 'source_id': self.last_selected_piece_id,
-                                           'target_id': data['target_id'], 'rotations_list': rotation_list})
+                                           'target_id': target_id, 'rotations_list': rotation_list})
             self.last_selected_piece_id = -1
         return False
 
@@ -109,9 +112,12 @@ class YinshGameClass(BaseGameClass):
             return False
         if gamer_id != self.current_turn:
             return False
-        if not isinstance(data, int) or data < 0 or data >= 85:
+        if not isinstance(data, (int, float)):
             return False
-        if self.board[data].ring_user is not None or self.board[data].disk_user is not None:
+        piece_id = int(data)
+        if piece_id < 0 or piece_id >= 85:
+            return False
+        if self.board[piece_id].ring_user is not None or self.board[piece_id].disk_user is not None:
             return False
         return True
 
@@ -122,9 +128,12 @@ class YinshGameClass(BaseGameClass):
             return False
         if self.last_selected_piece_id != -1:
             return False
-        if not isinstance(data, int) or data < 0 or data >= 85:
+        if not isinstance(data, (int, float)):
             return False
-        if self.board[data].ring_user != gamer_id:
+        piece_id = int(data)
+        if piece_id < 0 or piece_id >= 85:
+            return False
+        if self.board[piece_id].ring_user != gamer_id:
             return False
         return True
 
@@ -135,8 +144,11 @@ class YinshGameClass(BaseGameClass):
             return False
         if self.last_selected_piece_id == -1:
             return False
-        target_id = data.get('target_id') if isinstance(data, dict) else data
-        if not isinstance(target_id, int) or target_id < 0 or target_id >= 85:
+        raw_target = data.get('target_id') if isinstance(data, dict) else data
+        if not isinstance(raw_target, (int, float)):
+            return False
+        target_id = int(raw_target)
+        if target_id < 0 or target_id >= 85:
             return False
         if self.board[target_id].ring_user is not None or self.board[target_id].disk_user is not None:
             return False
