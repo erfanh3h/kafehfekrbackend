@@ -76,8 +76,11 @@ class YinshGameClass(BaseGameClass):
         elif command_id == commands.Select_Remove_Peace:
             ring_id = int(data['piece_id']) if isinstance(data, dict) and 'piece_id' in data else int(data)
             self.remove_gamer_ring(gamer_id, ring_id)
-            if len(self.pending_ring_removals) > 0 and self.pending_ring_removals[0] == gamer_id:
-                self.pending_ring_removals.pop(0)
+            if len(self.pending_ring_removals) > 0:
+                if self.pending_ring_removals[0] == gamer_id:
+                    self.pending_ring_removals.pop(0)
+                elif gamer_id in self.pending_ring_removals:
+                    self.pending_ring_removals.remove(gamer_id)
             self.current_remover = self.pending_ring_removals[0] if len(self.pending_ring_removals) > 0 else 0
             await self.send_data_function(commands.Win_Happened,
                                           {'win_data': [],
@@ -178,7 +181,7 @@ class YinshGameClass(BaseGameClass):
     def check_remove_ring_authority(self, data, gamer_id: int):
         if self.is_setup_ring_phase:
             return False
-        if self.current_remover != gamer_id:
+        if self.current_remover != gamer_id and gamer_id not in self.pending_ring_removals:
             return False
         raw_id = data.get('piece_id') if isinstance(data, dict) else data
         if not isinstance(raw_id, (int, float)):

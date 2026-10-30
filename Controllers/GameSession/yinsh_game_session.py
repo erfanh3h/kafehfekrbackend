@@ -21,6 +21,7 @@ def safe_run_async(coro):
 class YinshGameSession(BaseGameSession):
     def __init__(self, game_id: str, game_type, game_score_type):
         super().__init__(game_id, game_type, game_score_type)
+        self.ring_removal_token = 0
 
     def start_game_timer(self):
         self.game_controller = YinshGameClass(send_data_function=self.send_command)
@@ -39,14 +40,17 @@ class YinshGameSession(BaseGameSession):
                 self.timer.stop(False)
                 self.send_current_turn()
         elif data["id"] == commands.Select_Remove_Peace or (
-            self.game_controller.current_remover != 0
+            (self.game_controller.current_remover != 0 or len(self.game_controller.pending_ring_removals) > 0)
             and data["id"] in (commands.Select_Peace, commands.Remove_Peace)
         ):
             peace_id = data["data"]
+            if self.game_controller.current_remover == 0 and len(self.game_controller.pending_ring_removals) > 0:
+                self.game_controller.current_remover = self.game_controller.pending_ring_removals[0]
             is_selection_authorized = self.game_controller.check_remove_ring_authority(peace_id, gamer_id)
             if is_selection_authorized:
-                await self.game_controller.recieve_data(commands.Select_Remove_Peace, peace_id, gamer_id)
+                self.ring_removal_token += 1
                 self.timer.stop(False)
+                await self.game_controller.recieve_data(commands.Select_Remove_Peace, peace_id, gamer_id)
                 self.send_current_turn()
         elif data["id"] == commands.Select_Peace:
             peace_id = data["data"]
@@ -73,34 +77,42 @@ class YinshGameSession(BaseGameSession):
             self.finish_game(winner)
             return
 
-        def auto_remove_ring_on_timeout():
-            if len(self.game_controller.pending_ring_removals) > 0:
-                remover_id = self.game_controller.pending_ring_removals.pop(0)
-                random_ring_id = self.game_controller.get_random_gamer_ring(remover_id)
-                self.game_controller.current_remover = (
-                    self.game_controller.pending_ring_removals[0]
-                    if len(self.game_controller.pending_ring_removals) > 0 else 0
-                )
-                safe_run_async(
-                    send_command(
-                        command=make_command_json(
-                            id=commands.Win_Happened,
-                            data={
-                                "win_data": [],
-                                "removed_rings": [random_ring_id],
-                                "gamer_id": remover_id,
-                                "current_remover": self.game_controller.current_remover,
-                            },
-                        ),
-                        game_id=self.game_id,
-                    )
-                )
-            self.send_current_turn()
-
         # If a 5-in-a-row occurred and player needs to pick a ring to remove:
         if self.game_controller.current_remover != 0 or len(self.game_controller.pending_ring_removals) > 0:
             if self.game_controller.current_remover == 0 and len(self.game_controller.pending_ring_removals) > 0:
                 self.game_controller.current_remover = self.game_controller.pending_ring_removals[0]
+            self.ring_removal_token += 1
+            cur_token = self.ring_removal_token
+
+            def auto_remove_ring_on_timeout():
+                if cur_token != self.ring_removal_token:
+                    return
+                if self.game_controller.current_remover == 0 and len(self.game_controller.pending_ring_removals) == 0:
+                    return
+                if len(self.game_controller.pending_ring_removals) > 0:
+                    remover_id = self.game_controller.pending_ring_removals.pop(0)
+                    random_ring_id = self.game_controller.get_random_gamer_ring(remover_id)
+                    self.game_controller.remove_gamer_ring(remover_id, random_ring_id)
+                    self.game_controller.current_remover = (
+                        self.game_controller.pending_ring_removals[0]
+                        if len(self.game_controller.pending_ring_removals) > 0 else 0
+                    )
+                    safe_run_async(
+                        send_command(
+                            command=make_command_json(
+                                id=commands.Win_Happened,
+                                data={
+                                    "win_data": [],
+                                    "removed_rings": [random_ring_id],
+                                    "gamer_id": remover_id,
+                                    "current_remover": self.game_controller.current_remover,
+                                },
+                            ),
+                            game_id=self.game_id,
+                        )
+                    )
+                self.send_current_turn()
+
             safe_run_async(
                 send_command(
                     command=make_command_json(
