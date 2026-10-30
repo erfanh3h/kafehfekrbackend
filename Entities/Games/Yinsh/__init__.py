@@ -23,6 +23,8 @@ class YinshGameClass(BaseGameClass):
         self.current_round = 0
         self.removed_rings = []
         self.win_happens_data = []
+        self.pending_ring_removals = []
+        self.current_remover = 0
         self.init_directions()
 
     def init_directions(self):
@@ -36,7 +38,8 @@ class YinshGameClass(BaseGameClass):
         data = {"board": board_data, "player1_score": self.player1_score, "player2_score": self.player2_score,
                 "player1_rings": self.player1_rings, "player2_rings": self.player2_rings,
                 "last_selected_piece_id": self.last_selected_piece_id, "current_turn": self.current_turn,
-                "is_setup_ring_phase": self.is_setup_ring_phase, 'disk_count': self.disk_count}
+                "is_setup_ring_phase": self.is_setup_ring_phase, 'disk_count': self.disk_count,
+                "current_remover": self.current_remover}
         return data
 
     async def recieve_data(self, command_id, data, gamer_id):
@@ -55,14 +58,32 @@ class YinshGameClass(BaseGameClass):
             self.move_ring(gamer_id, target_id, rotation_list)
             self.removed_rings = []
             self.win_happens_data = self.check_win_happened(rotation_list)
-            if len(self.win_happens_data) > 0:
-                for win_data in self.win_happens_data:
-                    removed_ring = self.apply_win_happen(win_data)
-                    self.removed_rings.append(removed_ring)
             await self.send_data_function(commands.Ring_Moved,
                                           {'gamer_id': gamer_id, 'source_id': self.last_selected_piece_id,
                                            'target_id': target_id, 'rotations_list': rotation_list})
             self.last_selected_piece_id = -1
+            if len(self.win_happens_data) > 0:
+                for win_data in self.win_happens_data:
+                    for piece_id in win_data['data']:
+                        self.remove_disk(piece_id)
+                    self.pending_ring_removals.append(int(win_data['gamer_id']))
+                self.current_remover = self.pending_ring_removals[0]
+                await self.send_data_function(commands.Win_Happened,
+                                              {'win_data': list(self.win_happens_data),
+                                               'removed_rings': [],
+                                               'current_remover': self.current_remover})
+                self.win_happens_data.clear()
+        elif command_id == commands.Select_Remove_Peace:
+            ring_id = int(data['piece_id']) if isinstance(data, dict) and 'piece_id' in data else int(data)
+            self.remove_gamer_ring(gamer_id, ring_id)
+            if len(self.pending_ring_removals) > 0 and self.pending_ring_removals[0] == gamer_id:
+                self.pending_ring_removals.pop(0)
+            self.current_remover = self.pending_ring_removals[0] if len(self.pending_ring_removals) > 0 else 0
+            await self.send_data_function(commands.Win_Happened,
+                                          {'win_data': [],
+                                           'removed_rings': [ring_id],
+                                           'gamer_id': gamer_id,
+                                           'current_remover': self.current_remover})
         return False
 
     def change_turn(self):
@@ -122,7 +143,7 @@ class YinshGameClass(BaseGameClass):
         return True
 
     def check_select_piece_authority(self, data, gamer_id: int):
-        if self.is_setup_ring_phase:
+        if self.is_setup_ring_phase or self.current_remover != 0:
             return False
         if gamer_id != self.current_turn:
             return False
@@ -138,7 +159,7 @@ class YinshGameClass(BaseGameClass):
         return True
 
     def check_move_ring_authority(self, data, gamer_id: int):
-        if self.is_setup_ring_phase:
+        if self.is_setup_ring_phase or self.current_remover != 0:
             return False
         if gamer_id != self.current_turn:
             return False
@@ -153,6 +174,29 @@ class YinshGameClass(BaseGameClass):
         if self.board[target_id].ring_user is not None or self.board[target_id].disk_user is not None:
             return False
         return True
+
+    def check_remove_ring_authority(self, data, gamer_id: int):
+        if self.is_setup_ring_phase:
+            return False
+        if self.current_remover != gamer_id:
+            return False
+        raw_id = data.get('piece_id') if isinstance(data, dict) else data
+        if not isinstance(raw_id, (int, float)):
+            return False
+        piece_id = int(raw_id)
+        if piece_id < 0 or piece_id >= 85:
+            return False
+        if self.board[piece_id].ring_user != gamer_id:
+            return False
+        return True
+
+    def remove_gamer_ring(self, gamer_id, ring_id):
+        if 0 <= ring_id < 85 and self.board[ring_id].ring_user == gamer_id:
+            self.board[ring_id].set_ring(None)
+        if gamer_id == 1:
+            self.player1_score += 1
+        else:
+            self.player2_score += 1
 
     def get_random_gamer_ring(self, gamer_id):
         gamer_rings = []
