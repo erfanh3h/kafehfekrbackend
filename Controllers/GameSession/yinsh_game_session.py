@@ -164,3 +164,18 @@ class YinshGameSession(BaseGameSession):
             self.timer.start(Yinsh_Ring_Time, self.send_current_turn)
         else:
             self.timer.start(Yinsh_Turn_Time, self.send_current_turn)
+
+    def send_reconnect_data(self, socket_id):
+        reconnect_data = {'gamers': [], 'game_type': 'Yinsh'}
+        for gamer in self.gamers:
+            reconnect_data['gamers'].append(gamer.to_json())
+        reconnect_data['game_data'] = self.game_controller.get_game_data()
+        reconnect_data['game_data']['game_type'] = 'Yinsh'
+        if self.timer.is_user_turn:
+            reconnect_data['timer_data'] = {'is_user_turn': True, 'time': self.timer.counter + 1}
+        else:
+            reconnect_data['timer_data'] = {'is_user_turn': False, 'time': 0}
+        from Entities.SocketIOManagerClass import send_private_command
+        safe_run_async(
+            send_private_command(command=make_command_json(id=commands.Reconnect_Data, data=reconnect_data),
+                                 socket_id=socket_id, game_id=self.game_id))
