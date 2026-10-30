@@ -135,9 +135,7 @@ class YinshGameClass(BaseGameClass):
             return False
         if self.last_selected_piece_id == -1:
             return False
-        if not isinstance(data, dict) or 'target_id' not in data:
-            return False
-        target_id = data['target_id']
+        target_id = data.get('target_id') if isinstance(data, dict) else data
         if not isinstance(target_id, int) or target_id < 0 or target_id >= 85:
             return False
         if self.board[target_id].ring_user is not None or self.board[target_id].disk_user is not None:
@@ -308,12 +306,14 @@ class YinshGameClass(BaseGameClass):
         result = {}
         for direction_id in all_directions_list:
             result[direction_id] = self.get_direction_idies(direction_id, self.last_selected_piece_id)
-        target_direction_id = 1
+        target_direction_id = None
         for direction_id in result.keys():
             for pId in result[direction_id]:
                 if pId == piece_id:
                     target_direction_id = direction_id
                     break
+        if target_direction_id is None:
+            return []
         final_result = []
         for pId in result[target_direction_id]:
             if self.board[pId].disk_user is not None:
