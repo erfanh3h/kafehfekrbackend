@@ -93,7 +93,8 @@ class BaseGamePlayClass:
         game_data = {'gamers': [], 'games': self.game_types, 'game_score_type': self.game_score_type.value,
                      'current_game_index': self.current_game_index, 'winners': self.game_winners,
                      'is_game_finished': self.is_game_finished, 'scores': self.gamer_scores,
-                     'game_winner_id': self.game_winner_id}
+                     'game_winner_id': self.game_winner_id,
+                     'xp_awarded': getattr(self.score_manager, 'last_awarded_xp', {})}
         for gamer in self.gamers:
             game_data['gamers'].append(gamer.to_json())
         from Entities.SocketIOManagerClass import send_private_command
@@ -167,7 +168,7 @@ class BaseGamePlayClass:
             return
         game_type = self.game_types[self.current_game_index]
         self.game_session = game_type_class_pairs[game_type](game_id=self.game_play_id, game_type=game_type,
-                                                             game_score_type=self.game_score_type)
+                                                              game_score_type=self.game_score_type)
         for gamer in self.gamers:
             self.game_session.add_gamer(
                 GamerModel(user_id=gamer.user_id, username=gamer.username, user_image=gamer.user_image,
@@ -265,8 +266,33 @@ class BaseGamePlayClass:
                                                                          self.gamer_scores)
         self.is_game_finished = True
         self.game_winner_id = winner_id
+
+        from Entities.SocketIOManagerClass import send_private_command
+        last_xp = getattr(self.score_manager, 'last_awarded_xp', {})
+        winner_idx = self.user_id_to_index(winner_id) + 1 if (winner_id != 0 and winner_id is not None) else 0
+
         for gamer in self.gamers:
             self.send_game_play_data(gamer.socket_id)
+            try:
+                earned = last_xp.get(gamer.user_id, 0)
+                asyncio.new_event_loop().run_until_complete(
+                    send_private_command(
+                        command=make_command_json(
+                            id=commands.Finish_Game,
+                            data={
+                                "Winner": winner_idx,
+                                "winner": winner_idx,
+                                "scores": self.gamer_scores,
+                                "xp_earned": earned,
+                            }
+                        ),
+                        socket_id=gamer.socket_id,
+                        game_id=self.game_play_id
+                    )
+                )
+            except Exception as e:
+                print(f"[BaseGamePlayClass] Error sending Finish_Game: {e}")
+
         from Entities.SocketIOClass.game import delete_game
         delete_game(self.game_play_id)
 

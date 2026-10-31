@@ -45,10 +45,12 @@ async def extract_token(token):
         phone: int = payload.get("phone")
         id: str = payload.get("id")
         device_id: str = payload.get("device_id")
-        token_data = {'phone': phone, 'id': id, 'device_id': device_id}
+        is_bot: bool = payload.get("is_bot", False)
+        token_data = {'phone': phone, 'id': id, 'device_id': device_id, 'is_bot': is_bot}
         return token_data
     except:
         return None
+
 
 async def check_is_token_valid(auth_data):
     if auth_data is None:
@@ -57,6 +59,8 @@ async def check_is_token_valid(auth_data):
         user_token_data = await extract_token(auth_data['token'])
         if user_token_data is None:
             return None
+        if user_token_data.get('is_bot'):
+            return user_token_data
         user = game_database.users_manager.read_user(user_token_data['id'])
         if user is None or user['device_id'] != user_token_data['device_id']:
             return None
