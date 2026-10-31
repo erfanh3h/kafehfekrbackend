@@ -6,7 +6,18 @@ from Controllers.GameSession import BaseGameSession
 from Entities.RewardManagerClass import GameScoreTypesEnum
 
 
+def safe_run_async(coro):
+    try:
+        loop = asyncio.get_running_loop()
+        return loop.create_task(coro)
+    except RuntimeError:
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        return loop.run_until_complete(coro)
+
+
 class BaseMultiplayerGameSession(BaseGameSession):
+
     def __init__(self, game_id: str, game_type, game_score_type):
         super().__init__(game_id, game_type, game_score_type)
 
@@ -27,8 +38,10 @@ class BaseMultiplayerGameSession(BaseGameSession):
             should_timer_stop = await self.game_controller.surrender(gamer_id)
             await self.send_command(commands.Surrender, {"gamer_id": gamer_id})
             if should_timer_stop:
-                self.timer.stop()
+                self.timer.stop(False)
+                self.send_current_turn()
             return None
+
         if data['id'] == commands.Exit_Game:
             if self.game_score_type == GameScoreTypesEnum.RANK:
                 return
@@ -38,13 +51,22 @@ class BaseMultiplayerGameSession(BaseGameSession):
 
     def check_finish_game(self):
         from Entities.SocketIOManagerClass import send_command
-        if self.game_controller.is_game_finished:
+        if self.game_controller.is_game_finished or self.game_controller.check_game_ended():
+            self.game_controller.is_game_finished = True
             winner = self.game_controller.get_game_winner()
-            asyncio.new_event_loop().run_until_complete(
-                send_command(command=make_command_json(id=commands.Finish_Game,
-                                                       data={"rank1": self.game_controller.rank1,
-                                                             "rank2": self.game_controller.rank2}),
-                             game_id=self.game_id))
+            safe_run_async(
+                send_command(
+                    command=make_command_json(
+                        id=commands.Finish_Game,
+                        data={
+                            "rank1": self.game_controller.rank1,
+                            "rank2": self.game_controller.rank2,
+                            "Winner": self.game_controller.rank1 if self.game_controller.rank1 is not None else winner,
+                        }
+                    ),
+                    game_id=self.game_id
+                )
+            )
             self.finish_game(winner)
             return True
         return False
@@ -76,16 +98,16 @@ class BaseMultiplayerGameSession(BaseGameSession):
                     return
                 user_data = self.find_gamer_from_socket(socket_id)
                 if user_data is not None:
-                    asyncio.new_event_loop().run_until_complete(
+                    safe_run_async(
                         self.send_command(commands.User_Disconnected,
                                           {"user_id": user_data.user_id, "time": user_data.timer.max_time}))
                 self.gamers[gamer_index].disconnect()
-                # Test : remove this
                 self.timer.pause()
                 break
 
     def join_gamer(self, user_id: int, socket_id):
         import time, threading
+
         def send_reconnect_data():  # used this like to give device change socket handler functions
             time.sleep(2)
             self.send_reconnect_data(socket_id)
@@ -100,11 +122,9 @@ class BaseMultiplayerGameSession(BaseGameSession):
                 if not self.game_controller.active_player_indexes.__contains__(
                         self.gamers[gamer_index].gamer_id):  # check user is one of active players
                     return
-                # Test : remove this
                 self.timer.resume()
-                asyncio.new_event_loop().run_until_complete(
+                safe_run_async(
                     self.send_command(commands.User_Reconnected,
                                       {"user_id": user_id, 'time': self.timer.max_time - self.timer.counter}))
-
             else:
                 self.gamers[gamer_index].join_game(socket_id)
