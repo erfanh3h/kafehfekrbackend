@@ -398,6 +398,8 @@ class LudoGameClass(BaseGameClass):
             return False
         if self.is_game_finished:
             return False
+        if self.is_current_turn_played:
+            return False
         if self.current_turn_player_rolled and data['id'] == commands.Roll_Dice:
             return False
         if not self.current_turn_player_rolled and data['id'] == commands.Select_Peace:
