@@ -83,5 +83,3 @@ Selected_Game = "SelectedGame"
 System_Banned_Games = "SystemBannedGames"
 Game_Finished = "GameFinished"
 Logout = "Logout"
-
-Start_Classic_Rank = "StartClassicRank"

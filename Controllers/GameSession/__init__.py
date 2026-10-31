@@ -116,8 +116,6 @@ class BaseGameSession:
         from Entities.SocketIOManagerClass import send_command
         asyncio.new_event_loop().run_until_complete(
             send_command(command=make_command_json(id=commands.Game_Data, data=game_data), game_id=self.game_id))
-        if self.bot_controller:
-            self.bot_controller.handle_event(commands.Game_Data, game_data)
         self.timer.start(Start_Game_Time, function)
 
     def send_reconnect_data(self, socket_id):
@@ -135,26 +133,15 @@ class BaseGameSession:
                                  socket_id=socket_id, game_id=self.game_id))
 
     def prepare_gamers(self):
-        if self.game_score_type != GameScoreTypesEnum.CLASSIC_RANK:
-            random.shuffle(self.gamers)
-            random.shuffle(self.gamers)
-        else:
-            self.gamers.sort(key=lambda g: 1 if str(g.user_id).startswith("bot_") else 0)
+        random.shuffle(self.gamers)
+        random.shuffle(self.gamers)
         for gamer_id in range(0, len(self.gamers)):
             self.gamers[gamer_id].gamer_id = gamer_id + 1
             self.gamers[gamer_id].team_id = gamer_id + 1
-        if self.bot_controller:
-            for g in self.gamers:
-                if str(g.user_id).startswith("bot_"):
-                    self.bot_controller.bot_gamer_id = g.gamer_id
-                    self.bot_controller.game_logic.set_player_role(g.gamer_id)
-                    break
 
     async def send_command(self, command_id, command_data):
         from Entities.SocketIOManagerClass import send_command
         await send_command(command=make_command_json(id=command_id, data=command_data), game_id=self.game_id)
-        if self.bot_controller:
-            self.bot_controller.handle_event(command_id, command_data)
 
     async def send_private_command(self, command_id, command_data, gamer_id):
         data = self.find_gamer_from_gamer_id(gamer_id)
@@ -164,8 +151,6 @@ class BaseGameSession:
             asyncio.new_event_loop().run_until_complete(
                 send_private_command(command=make_command_json(id=command_id, data=command_data),
                                      socket_id=socket_id, game_id=self.game_id))
-        if self.bot_controller and gamer_id == self.bot_controller.bot_gamer_id:
-            self.bot_controller.handle_event(command_id, command_data)
 
     async def command_received(self, data, socket_id):
         if not self.is_game_running:
@@ -190,8 +175,6 @@ class BaseGameSession:
             gamer_id = gamer_data.gamer_id
             from Entities.SocketIOManagerClass import send_reaction
             await send_reaction(reaction_id=data, player_id=gamer_id, game_id=self.game_id)
-            if self.bot_controller and gamer_id != self.bot_controller.bot_gamer_id:
-                self.bot_controller.handle_reaction_received(data, gamer_id)
 
     def send_current_turn(self):
         pass
@@ -260,19 +243,8 @@ class BaseGameSession:
         from Entities.SocketIOManagerClass import send_command
         if self.game_controller.is_game_finished:
             winner = self.game_controller.get_game_winner()
-            xp_gained = 0
-            if self.game_score_type == GameScoreTypesEnum.CLASSIC_RANK:
-                from Commons.static_functions import gametype_to_difficulty
-                from Entities.Games.game_difficulty import GameDifficultyEnum
-                diff = gametype_to_difficulty(self.game_type.value)
-                if diff == GameDifficultyEnum.Easy:
-                    xp_gained = 12 if winner == 1 else (6 if winner == 0 else 3)
-                elif diff == GameDifficultyEnum.Normal:
-                    xp_gained = 18 if winner == 1 else (9 if winner == 0 else 4)
-                else:
-                    xp_gained = 25 if winner == 1 else (12 if winner == 0 else 6)
             asyncio.new_event_loop().run_until_complete(
-                send_command(command=make_command_json(id=commands.Finish_Game, data={"Winner": winner, "xp_gained": xp_gained}),
+                send_command(command=make_command_json(id=commands.Finish_Game, data={"Winner": winner}),
                              game_id=self.game_id))
             self.finish_game(winner)
             return True
