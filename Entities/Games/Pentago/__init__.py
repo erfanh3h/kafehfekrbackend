@@ -123,7 +123,9 @@ class PentagoGameClass(BaseGameClass):
     def check_authority(self, data, gamer_id: int):
         if (self.current_turn == 1 and gamer_id != 1) or (self.current_turn == 2 and gamer_id != 2):
             return False
-        peace_number = data
+        if not isinstance(data, (int, float)):
+            return False
+        peace_number = int(data)
         if peace_number < 0 or peace_number > 35:
             return False
         if (self.board[peace_number] == self.symbol_1) or (self.board[peace_number] == self.symbol_2):
@@ -137,10 +139,14 @@ class PentagoGameClass(BaseGameClass):
     def check_rotate_authority(self, data, gamer_id: int):
         if (self.current_turn == 1 and gamer_id != 1) or (self.current_turn == 2 and gamer_id != 2):
             return False
-        rotate_id = data
+        if not isinstance(data, (int, float)):
+            return False
+        rotate_id = int(data)
         if rotate_id < 1 or rotate_id > 8:
             return False
         if self.is_game_finished:
+            return False
+        if not self.selection_played:
             return False
         if self.rotation_played:
             return False
