@@ -28,11 +28,25 @@ class RewardManagerClass:
             win_coin, lose_coin, draw_coin, win_score, lose_score, draw_score, win_xp, lose_xp, draw_xp = (
                 rank_win_coin, 0, rank_draw_coin, rank_win_score, rank_lose_score, rank_draw_score, rank_win_xp,
                 rank_lose_xp, rank_draw_xp)
+        elif self.game_score_type == GameScoreTypesEnum.CLASSIC_RANK:
+            from Commons.static_functions import gametype_to_difficulty
+            from Entities.Games.game_difficulty import GameDifficultyEnum
+            g_type = game_types[0] if game_types else "TicTacToe"
+            diff = gametype_to_difficulty(g_type)
+            if diff == GameDifficultyEnum.Easy:
+                win_xp, draw_xp, lose_xp = 12, 6, 3
+            elif diff == GameDifficultyEnum.Normal:
+                win_xp, draw_xp, lose_xp = 18, 9, 4
+            else:
+                win_xp, draw_xp, lose_xp = 25, 12, 6
+            win_coin = lose_coin = draw_coin = 0
+            win_score = lose_score = draw_score = 0
         else:
             win_coin, lose_coin, draw_coin, win_score, lose_score, draw_score, win_xp, lose_xp, draw_xp = (
                 0, 0, 0, 0, 0, 0, 0, 0, 0)
         user1_data = game_database.users_manager.read_user(self.players_idis[0])
-        user2_data = game_database.users_manager.read_user(self.players_idis[1])
+        user2_data = game_database.users_manager.read_user(self.players_idis[1]) if len(self.players_idis) > 1 and not str(self.players_idis[1]).startswith("bot_") else None
+        xp_earned_p1 = 0
         if winner_gamer_id == 0:
             user1_new_score = user1_data['score'] + draw_score
             user1_new_xp = user1_data['xp'] + draw_xp
@@ -57,13 +71,15 @@ class RewardManagerClass:
                 user1_new_coin = user1_data['coin'] + lose_coin
         game_database.users_manager.update_user(self.players_idis[0], score=user1_new_score, xp=user1_new_xp,
                                                 coin=user1_new_coin, open_game_id="", last_time_played=datetime.now())
-        game_database.users_manager.update_user(self.players_idis[1], score=user2_new_score, xp=user2_new_xp,
-                                                coin=user2_new_coin, open_game_id="", last_time_played=datetime.now())
-        is_lobby = self.game_score_type == GameScoreTypesEnum.LOBBY
-        if not is_lobby:
+        if user2_data:
+            game_database.users_manager.update_user(self.players_idis[1], score=user2_new_score, xp=user2_new_xp,
+                                                    coin=user2_new_coin, open_game_id="", last_time_played=datetime.now())
+        if self.game_score_type == GameScoreTypesEnum.RANK:
             user1_history, user2_history = self.get_history_map(winner_gamer_id)
             game_database.user_history_manager.update_user_history(self.players_idis[0], user1_history)
-            game_database.user_history_manager.update_user_history(self.players_idis[1], user2_history)
+            if user2_data:
+                game_database.user_history_manager.update_user_history(self.players_idis[1], user2_history)
+        return xp_earned_p1
 
     def finish_multiplayer_game(self, rank1_gamer_id, rank2_gamer_id, game_types):
         self.game_types = game_types
@@ -73,6 +89,20 @@ class RewardManagerClass:
                 multi_rank_rank1_coin, multi_rank_rank2_coin, multi_rank_rankn_coin,
                 multi_rank_rank1_score, multi_rank_rank2_score, multi_rank_rankn_score, multi_rank_rank1_xp,
                 multi_rank_rank2_xp, multi_rank_rankn_xp,)
+        elif self.game_score_type == GameScoreTypesEnum.CLASSIC_RANK:
+            from Commons.static_functions import gametype_to_difficulty
+            from Entities.Games.game_difficulty import GameDifficultyEnum
+            g_type = game_types[0] if game_types else "Ludo"
+            diff = gametype_to_difficulty(g_type)
+            if diff == GameDifficultyEnum.Easy:
+                win_xp, draw_xp, lose_xp = 12, 6, 3
+            elif diff == GameDifficultyEnum.Normal:
+                win_xp, draw_xp, lose_xp = 18, 9, 4
+            else:
+                win_xp, draw_xp, lose_xp = 25, 12, 6
+            rank1_xp, rank2_xp, rankn_xp = win_xp, draw_xp, lose_xp
+            rank1_coin = rank2_coin = rankn_coin = 0
+            rank1_score = rank2_score = rankn_score = 0
         else:
             rank1_coin, rank2_coin, rankn_coin, rank1_score, rank2_score, rankn_score, rank1_xp, rank2_xp, rankn_xp = (
                 0, 0, 0, 0, 0, 0, 0, 0, 0)

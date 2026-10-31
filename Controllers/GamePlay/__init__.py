@@ -74,7 +74,10 @@ class BaseGamePlayClass:
     def start_game_timer(self):
         user_idis = [g.user_id for g in self.gamers]
         for user_id in user_idis:
-            self.is_gamers_join_game[user_id] = False
+            if str(user_id).startswith("bot_"):
+                self.is_gamers_join_game[user_id] = True
+            else:
+                self.is_gamers_join_game[user_id] = False
 
         def entrypoint():
             self.check_start_game()
@@ -84,16 +87,16 @@ class BaseGamePlayClass:
         t.start()
 
     def check_all_players_joined(self):
-        for is_gamer_joined in self.is_gamers_join_game:
+        for is_gamer_joined in self.is_gamers_join_game.values():
             if not is_gamer_joined:
                 return False
         return True
 
-    def send_game_play_data(self, socket_id):
+    def send_game_play_data(self, socket_id, xp_gained: int = 0):
         game_data = {'gamers': [], 'games': self.game_types, 'game_score_type': self.game_score_type.value,
                      'current_game_index': self.current_game_index, 'winners': self.game_winners,
                      'is_game_finished': self.is_game_finished, 'scores': self.gamer_scores,
-                     'game_winner_id': self.game_winner_id}
+                     'game_winner_id': self.game_winner_id, 'xp_gained': xp_gained}
         for gamer in self.gamers:
             game_data['gamers'].append(gamer.to_json())
         from Entities.SocketIOManagerClass import send_private_command
@@ -173,6 +176,21 @@ class BaseGamePlayClass:
                 GamerModel(user_id=gamer.user_id, username=gamer.username, user_image=gamer.user_image,
                            user_score=gamer.user_score, user_coin=gamer.user_coin))
             self.game_session.join_gamer(gamer.user_id, gamer.socket_id)
+        if self.game_score_type == GameScoreTypesEnum.CLASSIC_RANK:
+            from Entities.Bots.bot_controller import BotController
+            bot_gamer = None
+            for g in self.game_session.gamers:
+                if str(g.user_id).startswith("bot_"):
+                    bot_gamer = g
+                    break
+            if bot_gamer:
+                self.game_session.bot_controller = BotController(
+                    game_session=self.game_session,
+                    bot_user_id=bot_gamer.user_id,
+                    bot_gamer_id=bot_gamer.gamer_id if hasattr(bot_gamer, "gamer_id") else 2,
+                    game_type=game_type,
+                    level=2
+                )
         self.game_session.start_game_timer()
 
     def is_user_id_valid(self, user_id):
@@ -237,12 +255,12 @@ class BaseGamePlayClass:
             self.game_winners.append(rank2_index + 1)
         from Entities.Database import game_database
         finished_game_types = [self.game_types[0]]
-        self.score_manager.finish_multiplayer_game(rank1_id, rank2_id, finished_game_types)
+        xp_gained = self.score_manager.finish_multiplayer_game(rank1_id, rank2_id, finished_game_types) or 0
         game_database.game_play_history_manager.update_game_play_history(self.game_play_id, self.game_winners,
                                                                          self.gamer_scores)
         self.is_game_finished = True
         for gamer in self.gamers:
-            self.send_game_play_data(gamer.socket_id)
+            self.send_game_play_data(gamer.socket_id, xp_gained=xp_gained)
         from Entities.SocketIOClass.game import delete_game
         delete_game(self.game_play_id)
 
@@ -260,13 +278,13 @@ class BaseGamePlayClass:
             if self.game_winners[index] != -1:
                 finished_game_types.append(item)
                 finished_game_winners.append(self.game_winners[index])
-        self.score_manager.finish_game(winner_id, finished_game_types, finished_game_winners)
+        xp_gained = self.score_manager.finish_game(winner_id, finished_game_types, finished_game_winners) or 0
         game_database.game_play_history_manager.update_game_play_history(self.game_play_id, self.game_winners,
                                                                          self.gamer_scores)
         self.is_game_finished = True
         self.game_winner_id = winner_id
         for gamer in self.gamers:
-            self.send_game_play_data(gamer.socket_id)
+            self.send_game_play_data(gamer.socket_id, xp_gained=xp_gained)
         from Entities.SocketIOClass.game import delete_game
         delete_game(self.game_play_id)
 

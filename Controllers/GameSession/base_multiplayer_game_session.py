@@ -54,6 +54,17 @@ class BaseMultiplayerGameSession(BaseGameSession):
         if self.game_controller.is_game_finished or self.game_controller.check_game_ended():
             self.game_controller.is_game_finished = True
             winner = self.game_controller.get_game_winner()
+            xp_gained = 0
+            if self.game_score_type == GameScoreTypesEnum.CLASSIC_RANK:
+                from Commons.static_functions import gametype_to_difficulty
+                from Entities.Games.game_difficulty import GameDifficultyEnum
+                diff = gametype_to_difficulty(self.game_type.value)
+                if diff == GameDifficultyEnum.Easy:
+                    xp_gained = 12 if self.game_controller.rank1 == 1 else (6 if self.game_controller.rank2 == 1 else 3)
+                elif diff == GameDifficultyEnum.Normal:
+                    xp_gained = 18 if self.game_controller.rank1 == 1 else (9 if self.game_controller.rank2 == 1 else 4)
+                else:
+                    xp_gained = 25 if self.game_controller.rank1 == 1 else (12 if self.game_controller.rank2 == 1 else 6)
             safe_run_async(
                 send_command(
                     command=make_command_json(
@@ -62,6 +73,7 @@ class BaseMultiplayerGameSession(BaseGameSession):
                             "rank1": self.game_controller.rank1,
                             "rank2": self.game_controller.rank2,
                             "Winner": self.game_controller.rank1 if self.game_controller.rank1 is not None else winner,
+                            "xp_gained": xp_gained,
                         }
                     ),
                     game_id=self.game_id

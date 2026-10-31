@@ -6,4 +6,5 @@ class GameScoreTypesEnum(Enum):
     MultiRANK = "MultiRank"
     NORMAL = "Normal"
     LOBBY = "Lobby"
+    CLASSIC_RANK = "ClassicRank"
 
