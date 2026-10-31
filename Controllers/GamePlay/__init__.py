@@ -57,8 +57,7 @@ class BaseGamePlayClass:
         game_database.game_play_history_manager.create_game_play_history(self.game_play_id, user_idis, self.game_types,
                                                                          str(self.game_score_type.value))
         for user_id in user_idis:
-            if not str(user_id).startswith("bot_"):
-                game_database.users_manager.update_user(user_id, open_game_id=self.game_play_id)
+            game_database.users_manager.update_user(user_id, open_game_id=self.game_play_id, )
         # if self.game_score_type == GameScoreTypesEnum.RANK: #TODO : return this for coin
         #     game_database.users_manager.update_user(self.gamers[0].user_id, open_game_id=self.game_play_id,
         #                                             coin=self.gamers[0].user_coin - rank_coin_cost)
@@ -94,8 +93,6 @@ class BaseGamePlayClass:
         return True
 
     def send_game_play_data(self, socket_id, xp_gained: int = 0):
-        if not socket_id:
-            return
         game_data = {'gamers': [], 'games': self.game_types, 'game_score_type': self.game_score_type.value,
                      'current_game_index': self.current_game_index, 'winners': self.game_winners,
                      'is_game_finished': self.is_game_finished, 'scores': self.gamer_scores,
@@ -108,8 +105,6 @@ class BaseGamePlayClass:
                                  game_id=self.game_play_id, socket_id=socket_id))
 
     def navigate_to_game(self, socket_id):
-        if not socket_id:
-            return
         game_data = {'current_game_index': self.current_game_index}
         from Entities.SocketIOManagerClass import send_private_command
         asyncio.new_event_loop().run_until_complete(
@@ -117,8 +112,6 @@ class BaseGamePlayClass:
                                  game_id=self.game_play_id, socket_id=socket_id))
 
     def send_timer_value(self, socket_id):
-        if not socket_id:
-            return
         data = {'time': self.timer.counter + 1}
         from Entities.SocketIOManagerClass import send_private_command
         asyncio.new_event_loop().run_until_complete(
