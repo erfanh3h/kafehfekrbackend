@@ -20,6 +20,7 @@ def safe_run_async(coro):
 
 
 class PentagoGameSession(BaseGameSession):
+
     def __init__(self, game_id: str, game_type, game_score_type):
         super().__init__(game_id, game_type, game_score_type)
 
@@ -38,7 +39,11 @@ class PentagoGameSession(BaseGameSession):
                 peace_id = peace_id.get('target_peace', peace_id.get('piece_id', -1))
             is_selection_authorized = self.game_controller.check_authority(peace_id, gamer_id)
             if is_selection_authorized:
-                await self.game_controller.recieve_data(data['id'], int(peace_id), gamer_id)
+                is_ended = await self.game_controller.recieve_data(data['id'], int(peace_id), gamer_id)
+                if is_ended:
+                    self.timer.stop(False)
+                    self.send_current_turn()
+
         elif data['id'] == commands.Rotate_Peace:
             rotate_id = data['data']
             if isinstance(rotate_id, dict):
@@ -51,8 +56,13 @@ class PentagoGameSession(BaseGameSession):
 
     def send_current_turn(self):
         from Entities.SocketIOManagerClass import send_command
-        # Auto-rotate if user timed out before rotating
-        if self.game_controller.current_round != 0 and not self.game_controller.rotation_played:
+
+        # Auto-rotate if user timed out before rotating (and game hasn't already ended on placement)
+        if (
+            self.game_controller.current_round != 0
+            and not self.game_controller.rotation_played
+            and not self.game_controller.is_game_finished
+        ):
             random_index = random.randint(1, 8)
             self.game_controller.rotate_piece(random_index)
             self.game_controller.rotation_played = True
@@ -67,13 +77,19 @@ class PentagoGameSession(BaseGameSession):
                     }
                 ),
                 game_id=self.game_id))
+
         if self.game_controller.check_game_ended():
             winner = self.game_controller.get_game_winner()
-            safe_run_async(
-                send_command(
-                    command=make_command_json(id=commands.Finish_Game, data={"Winner": winner}),
-                    game_id=self.game_id))
-            self.finish_game(winner)
+
+            def finish_game_after_win_delay():
+                safe_run_async(
+                    send_command(
+                        command=make_command_json(id=commands.Finish_Game, data={"Winner": winner}),
+                        game_id=self.game_id))
+                self.finish_game(winner)
+
+            # Wait 3 seconds so players can see the final 90° rotation and 5-in-a-row win VFX
+            self.timer.start(3, finish_game_after_win_delay)
             return
 
         self.game_controller.change_turn()
@@ -100,6 +116,7 @@ class PentagoGameSession(BaseGameSession):
             reconnect_data['timer_data'] = {'is_user_turn': True, 'time': self.timer.counter + 1}
         else:
             reconnect_data['timer_data'] = {'is_user_turn': False, 'time': 0}
+
         from Entities.SocketIOManagerClass import send_private_command
         safe_run_async(
             send_private_command(
