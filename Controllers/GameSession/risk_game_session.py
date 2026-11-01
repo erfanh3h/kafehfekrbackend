@@ -4,7 +4,7 @@ from Controllers.GameSession.base_multiplayer_game_session import BaseMultiplaye
 from Entities.Games.Risk import RiskGameClass
 from Entities.Games.game_types import GameTypesEnum
 from Entities.Games.wait_times import Risk_Turn_Time, Start_Game_Time, Risk_Pass_Time
-from Commons.static_functions import make_command_json
+from Commons.static_functions import safe_run_async, make_command_json
 from Commons import commands
 
 
@@ -23,19 +23,19 @@ class RiskGameSession(BaseMultiplayerGameSession):
         game_data = {'gamers': [], 'game_data': self.game_controller.get_game_data()}
         for index, gamer in enumerate(self.gamers):
             game_data['gamers'].append(gamer.to_json())
-            asyncio.new_event_loop().run_until_complete(send_private_command(
+            safe_run_async(send_private_command(
                 command=make_command_json(id=commands.User_Data,
                                           data=self.game_controller.get_user_private_game_data(index)),
                 socket_id=gamer.socket_id, game_id=self.game_id))
         from Entities.SocketIOManagerClass import send_command
-        asyncio.new_event_loop().run_until_complete(
+        safe_run_async(
             send_command(command=make_command_json(id=commands.Game_Data, data=game_data), game_id=self.game_id))
         self.timer.start(Start_Game_Time, function)
 
     def send_reconnect_data(self, socket_id):
         super().send_reconnect_data(socket_id)
         from Entities.SocketIOManagerClass import send_private_command
-        asyncio.new_event_loop().run_until_complete(
+        safe_run_async(
             send_private_command(
                 command=make_command_json(id=commands.User_Data, data=self.game_controller.get_user_private_game_data(
                     self.game_controller.current_turn - 1)),
@@ -77,7 +77,7 @@ class RiskGameSession(BaseMultiplayerGameSession):
             return
         self.game_controller.change_turn()
         from Entities.SocketIOManagerClass import send_command
-        asyncio.new_event_loop().run_until_complete(
+        safe_run_async(
             send_command(
                 command=make_command_json(id=commands.Draw_Card, data={'turn': self.game_controller.current_turn}),
                 game_id=self.game_id))
@@ -85,7 +85,7 @@ class RiskGameSession(BaseMultiplayerGameSession):
 
     def send_dice(self):
         from Entities.SocketIOManagerClass import send_command
-        asyncio.new_event_loop().run_until_complete(
+        safe_run_async(
             send_command(
                 command=make_command_json(id=commands.Roll_Result, data={'dice': self.game_controller.current_dice}),
                 game_id=self.game_id))

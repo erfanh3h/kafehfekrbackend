@@ -1,3 +1,4 @@
+from Commons.static_functions import safe_run_async
 from Commons import commands
 from Commons.static_functions import make_command_json
 from Models.Chat_User import ChatUserModel
@@ -34,7 +35,7 @@ class ChatSession:
         from Entities.SocketIOManagerClass import send_global_command
         import asyncio
         self.users.append(user_data)
-        asyncio.new_event_loop().run_until_complete(
+        safe_run_async(
             send_global_command(command=make_command_json(id=commands.Users_Count, data=len(self.users)),
                                 namespace='/chat'))
 
@@ -44,7 +45,7 @@ class ChatSession:
         for user_data in self.users:
             if socket_id == user_data.socket_id:
                 self.users.remove(user_data)
-                asyncio.new_event_loop().run_until_complete(
+                safe_run_async(
                     send_global_command(command=make_command_json(id=commands.Users_Count, data=len(self.users)),
                                         namespace='/chat'))
                 break

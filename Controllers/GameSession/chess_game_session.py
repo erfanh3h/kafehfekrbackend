@@ -1,3 +1,4 @@
+from Commons.static_functions import safe_run_async
 import asyncio
 
 from Entities.Games.Chess import ChessGameClass
@@ -39,7 +40,7 @@ class ChessGameSession(BaseGameSession):
         if self.check_finish_game():
             return
         else:
-            asyncio.new_event_loop().run_until_complete(
+            safe_run_async(
                 send_command(
                     command=make_command_json(id=commands.Current_Turn, data=self.game_controller.current_turn),
                     game_id=self.game_id))

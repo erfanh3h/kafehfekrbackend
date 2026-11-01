@@ -76,3 +76,30 @@ def gametype_to_difficulty(game_type):
         return GameDifficultyEnum.Hard
     if game_type == GameTypesEnum.MILL.value:
         return GameDifficultyEnum.Hard
+
+
+main_loop = None
+
+
+def set_main_loop(loop):
+    global main_loop
+    main_loop = loop
+
+
+def get_main_loop():
+    global main_loop
+    return main_loop
+
+
+def safe_run_async(coro):
+    import asyncio
+    global main_loop
+    try:
+        loop = asyncio.get_running_loop()
+        return loop.create_task(coro)
+    except RuntimeError:
+        if main_loop is not None and main_loop.is_running():
+            return asyncio.run_coroutine_threadsafe(coro, main_loop)
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        return loop.run_until_complete(coro)

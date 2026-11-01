@@ -4,7 +4,7 @@ import threading
 import time
 
 from Commons import commands
-from Commons.static_functions import make_command_json
+from Commons.static_functions import make_command_json, safe_run_async
 from Controllers.GamePlay.game_type_class_pairs import game_type_class_pairs
 from Entities.Games.wait_times import Join_Game_Limit_Time, Start_Game_Time, Game_Play_Round_Time
 from Entities.RewardManagerClass import RewardManagerClass, GameScoreTypesEnum
@@ -98,21 +98,21 @@ class BaseGamePlayClass:
         for gamer in self.gamers:
             game_data['gamers'].append(gamer.to_json())
         from Entities.SocketIOManagerClass import send_private_command
-        asyncio.new_event_loop().run_until_complete(
+        safe_run_async(
             send_private_command(command=make_command_json(id=commands.Game_Play_Data, data=game_data),
                                  game_id=self.game_play_id, socket_id=socket_id))
 
-    def navigate_to_game(self, socket_id):
-        game_data = {'current_game_index': self.current_game_index}
+    def navigate_to_game(self, socket_id, is_reconnect=False):
+        game_data = {'current_game_index': self.current_game_index, 'is_reconnect': is_reconnect}
         from Entities.SocketIOManagerClass import send_private_command
-        asyncio.new_event_loop().run_until_complete(
+        safe_run_async(
             send_private_command(command=make_command_json(id=commands.Game_Play_Navigate, data=game_data),
                                  game_id=self.game_play_id, socket_id=socket_id))
 
     def send_timer_value(self, socket_id):
         data = {'time': self.timer.counter + 1}
         from Entities.SocketIOManagerClass import send_private_command
-        asyncio.new_event_loop().run_until_complete(
+        safe_run_async(
             send_private_command(command=make_command_json(id=commands.Game_Play_Time, data=data),
                                  game_id=self.game_play_id, socket_id=socket_id))
 
@@ -147,12 +147,16 @@ class BaseGamePlayClass:
         if self.is_game_started:
             self.send_game_play_data(socket_id)
             if self.game_session is not None:
-                self.navigate_to_game(socket_id)
+                self.navigate_to_game(socket_id, is_reconnect=True)
                 self.game_session.join_gamer(user_id, socket_id)
         else:
             self.is_gamers_join_game[user_id] = True
 
     async def command_received(self, data, socket_id):
+        if isinstance(data, dict) and data.get('id') in [commands.Reconnect_Data, "RequestReconnectData", "reconnect_data"]:
+            if self.game_session is not None:
+                self.game_session.send_reconnect_data(socket_id)
+            return
         if self.game_session is not None:
             await self.game_session.command_received(data, socket_id)
 
@@ -178,7 +182,7 @@ class BaseGamePlayClass:
 
     def is_user_id_valid(self, user_id):
         for user_data in self.gamers:
-            if user_data.user_id == user_id:
+            if str(user_data.user_id) == str(user_id):
                 return True
         return False
 
@@ -249,7 +253,7 @@ class BaseGamePlayClass:
 
     def change_gamer_socket_id(self, user_id, socket_id):
         for gamer in self.gamers:
-            if gamer.user_id == user_id:
+            if str(gamer.user_id) == str(user_id):
                 gamer.socket_id = socket_id
                 break
 
@@ -275,7 +279,7 @@ class BaseGamePlayClass:
             self.send_game_play_data(gamer.socket_id)
             try:
                 earned = last_xp.get(gamer.user_id, 0)
-                asyncio.new_event_loop().run_until_complete(
+                safe_run_async(
                     send_private_command(
                         command=make_command_json(
                             id=commands.Finish_Game,
@@ -298,6 +302,6 @@ class BaseGamePlayClass:
 
     def user_id_to_index(self, user_id):
         for index, gamer in enumerate(self.gamers):
-            if gamer.user_id == user_id:
+            if str(gamer.user_id) == str(user_id):
                 return index
         return -1  # -1 for draw

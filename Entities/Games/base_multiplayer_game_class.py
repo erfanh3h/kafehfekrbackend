@@ -1,3 +1,4 @@
+from Commons.static_functions import safe_run_async
 from Entities.Games.base_game_class import BaseGameClass
 
 
@@ -52,4 +53,4 @@ class BaseMultiPlayerGameClass(BaseGameClass):
 
     def finish_reconnect_time(self, gamer_id):
         import asyncio
-        asyncio.new_event_loop().run_until_complete(self.surrender(gamer_id))
+        safe_run_async(self.surrender(gamer_id))

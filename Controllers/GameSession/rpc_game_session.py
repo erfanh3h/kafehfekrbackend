@@ -1,3 +1,4 @@
+from Commons.static_functions import safe_run_async
 import asyncio
 import threading
 import time
@@ -52,7 +53,7 @@ class RPCGameSession(BaseGameSession):
         if self.game_controller.is_game_finished:
             def function2():
                 winner_id = self.game_controller.get_game_winner()
-                asyncio.new_event_loop().run_until_complete(
+                safe_run_async(
                     send_command(command=make_command_json(id=commands.Finish_Game, data={"Winner": winner_id}),
                                  game_id=self.game_id))
                 self.finish_game(winner_id)
@@ -86,13 +87,13 @@ class RPCGameSession(BaseGameSession):
         #print("start turn round ", self.game_controller.current_turn_round)
         from Entities.SocketIOManagerClass import send_command
         self.timer.start(RPC_Turn_Round_Time, self.send_current_turn)
-        asyncio.new_event_loop().run_until_complete(
+        safe_run_async(
             send_command(command=make_command_json(id=commands.New_Turn_Round, data=None), game_id=self.game_id))
 
     def check_and_send_turn_round_winner(self):
         from Entities.SocketIOManagerClass import send_command
         turn_round_winner = self.game_controller.turn_round_winner
-        asyncio.new_event_loop().run_until_complete(
+        safe_run_async(
             send_command(command=make_command_json(id=commands.Finish_Turn_Round, data={
                 "Winner": turn_round_winner,
                 "P1_selection": self.game_controller.gamer1_round_selection.value,
@@ -103,6 +104,6 @@ class RPCGameSession(BaseGameSession):
         if self.game_controller.is_round_finished:
             from Entities.SocketIOManagerClass import send_command
             round_winner = self.game_controller.get_round_winner()
-            asyncio.new_event_loop().run_until_complete(
+            safe_run_async(
                 send_command(command=make_command_json(id=commands.Finish_Round, data={"Winner": round_winner}),
                              game_id=self.game_id))

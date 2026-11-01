@@ -1,3 +1,4 @@
+from Commons.static_functions import safe_run_async
 import asyncio
 import time
 
@@ -37,7 +38,7 @@ class TicTacToeGameSession(BaseGameSession):
             self.change_round()
             return
         self.game_controller.change_turn()
-        asyncio.new_event_loop().run_until_complete(
+        safe_run_async(
             send_command(command=make_command_json(id=commands.Current_Turn, data=self.game_controller.current_turn),
                          game_id=self.game_id))
         self.timer.start(TicTacToe_Turn_Time, self.send_current_turn)
@@ -45,13 +46,13 @@ class TicTacToeGameSession(BaseGameSession):
     def change_round(self):
         from Entities.SocketIOManagerClass import send_command
         winner = self.game_controller.round_winner
-        asyncio.new_event_loop().run_until_complete(
+        safe_run_async(
             send_command(command=make_command_json(id=commands.Finish_Round, data={"Winner": winner}),
                          game_id=self.game_id))
 
         def function():
             self.game_controller.change_round()
-            asyncio.new_event_loop().run_until_complete(
+            safe_run_async(
                 send_command(command=make_command_json(id=commands.New_Round, data=self.game_controller.current_round),
                              game_id=self.game_id))
             self.send_current_turn()

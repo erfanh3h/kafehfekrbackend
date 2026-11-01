@@ -26,6 +26,7 @@ class ClassicRankSocketNameSpace(socketio.AsyncNamespace):
 
             user_id = token_data["id"]
             game_type = auth.get("game_type", "TicTacToe")
+            await self.enter_room(socket_id, socket_id, namespace="/classic-rank")
         except Exception as e:
             print(f"[ClassicRankSocket] Auth error: {e}")
             await self.disconnect(socket_id, namespace="/classic-rank")

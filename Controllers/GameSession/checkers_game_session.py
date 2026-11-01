@@ -1,3 +1,4 @@
+from Commons.static_functions import safe_run_async
 import asyncio
 import time
 
@@ -38,7 +39,7 @@ class CheckersGameSession(BaseGameSession):
         from Entities.SocketIOManagerClass import send_command
         if self.game_controller.is_game_finished:
             winner_id = self.game_controller.get_game_winner()
-            asyncio.new_event_loop().run_until_complete(
+            safe_run_async(
                 send_command(command=make_command_json(id=commands.Finish_Game, data={"Winner": winner_id}),
                              game_id=self.game_id))
             self.finish_game(winner_id)
@@ -46,7 +47,7 @@ class CheckersGameSession(BaseGameSession):
         if self.game_controller.is_round_finished:
             return
         self.game_controller.change_turn()
-        asyncio.new_event_loop().run_until_complete(
+        safe_run_async(
             send_command(command=make_command_json(id=commands.Current_Turn, data=self.game_controller.current_turn),
                          game_id=self.game_id))
         self.timer.start(Checkers_Turn_Time, self.send_current_turn)

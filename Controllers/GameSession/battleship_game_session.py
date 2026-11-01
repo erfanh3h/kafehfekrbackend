@@ -6,7 +6,7 @@ from Entities.Games.BattleShip import BattleShipGameClass
 from Entities.Games.game_types import GameTypesEnum
 from Entities.Games.wait_times import BattleShip_Turn_Time, BattleShip_Board_Time, BattleShip_Wait_Time, \
     Join_Game_Limit_Time
-from Commons.static_functions import make_command_json
+from Commons.static_functions import safe_run_async, make_command_json
 from Commons import commands
 from Controllers.GameSession import BaseGameSession
 
@@ -47,7 +47,7 @@ class BattleShipGameSession(BaseGameSession):
             reconnect_data['game_data'] = self.game_controller.get_game_data_battleship(gamer_id)
         reconnect_data['timer_data'] = {'is_user_turn': True, 'time': self.timer.counter + 1}
         from Entities.SocketIOManagerClass import send_private_command
-        asyncio.new_event_loop().run_until_complete(
+        safe_run_async(
             send_private_command(command=make_command_json(id=commands.Reconnect_Data, data=reconnect_data),
                                  socket_id=socket_id, game_id=self.game_id))
 
@@ -71,7 +71,7 @@ class BattleShipGameSession(BaseGameSession):
 
     def send_start_game(self):
         from Entities.SocketIOManagerClass import send_command
-        asyncio.new_event_loop().run_until_complete(
+        safe_run_async(
             send_command(command=make_command_json(id=commands.Start_Game, data=None), game_id=self.game_id))
         self.timer.start(BattleShip_Board_Time, self.send_current_turn)
 
@@ -81,13 +81,13 @@ class BattleShipGameSession(BaseGameSession):
         def function():
             if self.game_controller.is_game_finished:
                 winner_id = self.game_controller.get_game_winner()
-                asyncio.new_event_loop().run_until_complete(
+                safe_run_async(
                     send_command(command=make_command_json(id=commands.Finish_Game, data={"Winner": winner_id}),
                                  game_id=self.game_id))
                 self.finish_game(winner_id)
                 return
             self.game_controller.change_turn()
-            asyncio.new_event_loop().run_until_complete(
+            safe_run_async(
                 send_command(
                     command=make_command_json(id=commands.Current_Turn, data=self.game_controller.current_turn),
                     game_id=self.game_id))
@@ -97,7 +97,7 @@ class BattleShipGameSession(BaseGameSession):
             self.game_controller.is_current_turn_played = False
             self.timer.start(BattleShip_Turn_Time, self.send_current_turn)
         else:
-            asyncio.new_event_loop().run_until_complete(
+            safe_run_async(
                 send_command(
                     command=make_command_json(id=commands.Wait_Time, data=BattleShip_Wait_Time), game_id=self.game_id))
             self.timer.start(BattleShip_Wait_Time, function)

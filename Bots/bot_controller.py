@@ -9,8 +9,17 @@ and Persian social reactions & chat responses.
 
 import asyncio
 import random
+import sys
 from typing import Callable, Optional
 import socketio
+
+try:
+    if hasattr(sys.stdout, 'reconfigure'):
+        sys.stdout.reconfigure(encoding='utf-8', errors='replace')
+    if hasattr(sys.stderr, 'reconfigure'):
+        sys.stderr.reconfigure(encoding='utf-8', errors='replace')
+except Exception:
+    pass
 
 from .behavior.human_behavior import HumanBehavior
 from .games import get_game_logic

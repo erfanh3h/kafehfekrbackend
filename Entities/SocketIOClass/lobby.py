@@ -15,6 +15,7 @@ class LobbySocketNameSpace(socketio.AsyncNamespace):
             await self.emit('command', {'id': commands.Logout}, to=socket_id, namespace="/lobby")
             return
         user_id = token_data['id']
+        await self.enter_room(socket_id, socket_id, namespace="/lobby")
         from Entities.Database import game_database
         user_data = game_database.users_manager.read_user(user_id)
         queuer_data = QueuerModel(user_id, user_data["username"], socket_id=socket_id,

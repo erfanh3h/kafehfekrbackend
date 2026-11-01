@@ -50,6 +50,9 @@ def delete_game(game_id):
 
 class GameSocketNameSpace(socketio.AsyncNamespace):
     async def on_connect(self, socket_id, environ, auth):
+        import asyncio
+        from Commons.static_functions import set_main_loop
+        set_main_loop(asyncio.get_running_loop())
         print('connect ', socket_id)
         token_data = await check_is_token_valid(auth)
         if not token_data:
@@ -60,8 +63,16 @@ class GameSocketNameSpace(socketio.AsyncNamespace):
         if is_game_id_valid(user_game_id):
             if games[user_game_id].is_user_id_valid(user_id):
                 await self.enter_room(socket_id, user_game_id, namespace="/game")
-                games[user_game_id].join_gamer(user_id, socket_id)
+                await self.enter_room(socket_id, socket_id, namespace="/game")
                 socketid_gameid_pairs[socket_id] = user_game_id
+                
+                async def _delayed_join():
+                    await asyncio.sleep(0.05)
+                    try:
+                        games[user_game_id].join_gamer(user_id, socket_id)
+                    except Exception as e:
+                        print(f"[GameSocket] Error in join_gamer: {e}")
+                asyncio.create_task(_delayed_join())
             else:
                 await self.disconnect(socket_id, namespace="/game")
                 return
@@ -84,10 +95,15 @@ class GameSocketNameSpace(socketio.AsyncNamespace):
     async def on_user_command(self, socket_id, data):
         game_id = return_gameid_from_socketid(socket_id)
         if game_id is not None:
-            # try:
+            cmd_id = data.get('id') if isinstance(data, dict) else ""
+            if cmd_id in ["RequestReconnectData", commands.Reconnect_Data, "reconnect_data"]:
+                print(f"[GameSocket] Explicit RequestReconnectData from {socket_id} for game {game_id}")
+                if hasattr(games[game_id], 'game_session') and games[game_id].game_session is not None:
+                    games[game_id].game_session.send_reconnect_data(socket_id)
+                elif hasattr(games[game_id], 'send_reconnect_data'):
+                    games[game_id].send_reconnect_data(socket_id)
+                return
             await games[game_id].command_received(data, socket_id)
-            # except:
-            #     pass
             print('User Sended command ', data)
 
     async def on_user_reaction(self, socket_id, data):

@@ -1,3 +1,4 @@
+from Commons.static_functions import safe_run_async
 import asyncio
 import time
 
@@ -34,7 +35,7 @@ class FourInRowGameSession(BaseGameSession):
             return
         self.game_controller.change_turn()
         from Entities.SocketIOManagerClass import send_command
-        asyncio.new_event_loop().run_until_complete(
+        safe_run_async(
             send_command(command=make_command_json(id=commands.Current_Turn, data=self.game_controller.current_turn),
                          game_id=self.game_id))
         self.timer.start(Four_In_Row_Turn_Time, self.send_current_turn)

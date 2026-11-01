@@ -1,3 +1,4 @@
+from Commons.static_functions import safe_run_async
 import asyncio
 
 from Entities.Games.BackGammon import BackGammonGameClass
@@ -45,7 +46,7 @@ class BackGammonGameSession(BaseGameSession):
             return
         self.game_controller.change_turn()
         from Entities.SocketIOManagerClass import send_command
-        asyncio.new_event_loop().run_until_complete(
+        safe_run_async(
             send_command(
                 command=make_command_json(id=commands.Current_Turn, data={'turn': self.game_controller.current_turn}),
                 game_id=self.game_id))
@@ -53,7 +54,7 @@ class BackGammonGameSession(BaseGameSession):
 
     def send_dices(self):
         from Entities.SocketIOManagerClass import send_command
-        asyncio.new_event_loop().run_until_complete(
+        safe_run_async(
             send_command(
                 command=make_command_json(id=commands.Roll_Result, data={'dices': self.game_controller.current_dices}),
                 game_id=self.game_id))
@@ -61,7 +62,7 @@ class BackGammonGameSession(BaseGameSession):
     def pass_turn(self):
         from Entities.SocketIOManagerClass import send_command
         self.timer.stop(False)
-        asyncio.new_event_loop().run_until_complete(
+        safe_run_async(
             send_command(
                 command=make_command_json(id=commands.Out_Of_Move, data={'turn': self.game_controller.current_turn,
                                                                          'dices': self.game_controller.current_dices}),

@@ -4,7 +4,7 @@ import time
 from Entities.Games.FekrBekr import FekrBekrGameClass
 from Entities.Games.game_types import GameTypesEnum
 from Entities.Games.wait_times import FekrBekr_Round_Time, FekrBekr_Board_Time, FekrBekr_Round_Wait_Time
-from Commons.static_functions import make_command_json
+from Commons.static_functions import safe_run_async, make_command_json
 from Commons import commands
 from Controllers.GameSession import BaseGameSession
 
@@ -39,7 +39,7 @@ class FekrBekrGameSession(BaseGameSession):
             reconnect_data['game_data'] = self.game_controller.get_game_data_fekrbekr(gamer_id)
         reconnect_data['timer_data'] = {'is_user_turn': True, 'time': self.timer.counter + 1}
         from Entities.SocketIOManagerClass import send_private_command
-        asyncio.new_event_loop().run_until_complete(
+        safe_run_async(
             send_private_command(command=make_command_json(id=commands.Reconnect_Data, data=reconnect_data),
                                  socket_id=socket_id, game_id=self.game_id))
 
@@ -64,7 +64,7 @@ class FekrBekrGameSession(BaseGameSession):
 
     def send_start_game(self):
         from Entities.SocketIOManagerClass import send_command
-        asyncio.new_event_loop().run_until_complete(
+        safe_run_async(
             send_command(command=make_command_json(id=commands.Start_Game, data=None), game_id=self.game_id))
         self.timer.start(FekrBekr_Board_Time, self.send_current_turn)
 
@@ -76,14 +76,14 @@ class FekrBekrGameSession(BaseGameSession):
             if not self.game_controller.player1_played_turn:
                 self.game_controller.player1_choices.append(empty_data)
                 self.game_controller.player1_results.append(empty_data)
-                asyncio.new_event_loop().run_until_complete(send_command(
+                safe_run_async(send_command(
                     command=make_command_json(id=commands.Peace_Selected,
                                               data={'gamer_id': 1, 'data': empty_data, "result": empty_data}),
                     game_id=self.game_id, ))
             if not self.game_controller.player2_played_turn:
                 self.game_controller.player2_choices.append(empty_data)
                 self.game_controller.player2_results.append(empty_data)
-                asyncio.new_event_loop().run_until_complete(send_command(
+                safe_run_async(send_command(
                     command=make_command_json(id=commands.Peace_Selected,
                                               data={'gamer_id': 2, 'data': empty_data, "result": empty_data}),
                     game_id=self.game_id, ))
@@ -103,20 +103,20 @@ class FekrBekrGameSession(BaseGameSession):
         self.game_controller.change_round()
         if self.game_controller.check_game_ended():
             winner = self.game_controller.get_game_winner()
-            asyncio.new_event_loop().run_until_complete(
+            safe_run_async(
                 send_command(command=make_command_json(id=commands.Finish_Game, data={"Winner": winner}),
                              game_id=self.game_id))
             self.finish_game(winner)
             return
 
         def function():
-            asyncio.new_event_loop().run_until_complete(
+            safe_run_async(
                 send_command(command=make_command_json(id=commands.Current_Turn,
                                                        data={"current_round": self.game_controller.current_round}),
                              game_id=self.game_id))
             self.timer.start(FekrBekr_Round_Time, self.send_current_turn)
 
-        asyncio.new_event_loop().run_until_complete(
+        safe_run_async(
             send_command(
                 command=make_command_json(id=commands.Wait_Time, data=FekrBekr_Round_Wait_Time),
                 game_id=self.game_id))

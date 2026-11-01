@@ -3,19 +3,12 @@ import asyncio
 from Entities.Games.Yinsh import YinshGameClass
 from Entities.Games.game_types import GameTypesEnum
 from Entities.Games.wait_times import Yinsh_Turn_Time, Yinsh_Ring_Time
-from Commons.static_functions import make_command_json
+from Commons.static_functions import make_command_json, safe_run_async
 from Commons import commands
 from Controllers.GameSession import BaseGameSession
 
 
-def safe_run_async(coro):
-    try:
-        loop = asyncio.get_running_loop()
-        return loop.create_task(coro)
-    except RuntimeError:
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        return loop.run_until_complete(coro)
+
 
 
 class YinshGameSession(BaseGameSession):

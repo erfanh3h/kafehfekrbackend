@@ -1,19 +1,9 @@
 import asyncio
 
 from Commons import commands
-from Commons.static_functions import make_command_json
+from Commons.static_functions import make_command_json, safe_run_async
 from Controllers.GameSession import BaseGameSession
 from Entities.RewardManagerClass import GameScoreTypesEnum
-
-
-def safe_run_async(coro):
-    try:
-        loop = asyncio.get_running_loop()
-        return loop.create_task(coro)
-    except RuntimeError:
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        return loop.run_until_complete(coro)
 
 
 class BaseMultiplayerGameSession(BaseGameSession):
@@ -106,25 +96,20 @@ class BaseMultiplayerGameSession(BaseGameSession):
                 break
 
     def join_gamer(self, user_id: int, socket_id):
-        import time, threading
-
-        def send_reconnect_data():  # used this like to give device change socket handler functions
-            time.sleep(2)
-            self.send_reconnect_data(socket_id)
-
         gamer_index = self.find_gamer_index_from_id(user_id)
         if gamer_index is not None:
             self.gamers[gamer_index].set_finish_reconnect_time_function(self.finish_reconnect_time)
             if self.gamers[gamer_index].is_joined_game:
-                t = threading.Thread(target=send_reconnect_data, daemon=True)
-                t.start()
                 self.gamers[gamer_index].reconnect(socket_id)
+                self.send_reconnect_data(socket_id)
                 if not self.game_controller.active_player_indexes.__contains__(
                         self.gamers[gamer_index].gamer_id):  # check user is one of active players
                     return
                 self.timer.resume()
                 safe_run_async(
                     self.send_command(commands.User_Reconnected,
-                                      {"user_id": user_id, 'time': self.timer.max_time - self.timer.counter}))
+                                      {"user_id": user_id, 'time': max(0, self.timer.max_time - self.timer.counter)}))
             else:
                 self.gamers[gamer_index].join_game(socket_id)
+                if self.is_game_running:
+                    self.send_reconnect_data(socket_id)

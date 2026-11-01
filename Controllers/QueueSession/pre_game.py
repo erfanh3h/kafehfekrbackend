@@ -1,3 +1,4 @@
+from Commons.static_functions import safe_run_async
 import random
 
 from Commons import commands
@@ -24,7 +25,7 @@ class PreGameClass:
         self.dced_user = None
 
     def remove_game_type_from_list(self, game_type):
-        for game in self.active_game_types:
+        for game in list(self.active_game_types):
             if game.value == game_type:
                 self.active_game_types.remove(game)
                 return
@@ -49,9 +50,9 @@ class PreGameClass:
 
     def get_reconnect_data(self):
         queuers_data = []
-        pre_bans = [game.value for game in self.pre_bans]
+        pre_bans = [game.value if hasattr(game, 'value') else str(game) for game in self.pre_bans]
         if self.system_selected_game is not None:
-            system_selected_game = self.system_selected_game.value
+            system_selected_game = self.system_selected_game.value if hasattr(self.system_selected_game, 'value') else str(self.system_selected_game)
         else:
             system_selected_game = None
         for queuer in self.queuers:
@@ -60,18 +61,46 @@ class PreGameClass:
             current_queuer_id = self.queuers[0].user_id
         else:
             current_queuer_id = self.queuers[1].user_id
-        data = {'pre_bans': pre_bans, 'queuers': queuers_data, 'system_selected_game': system_selected_game,
-                'active_index': self.select_turn_index, 'active_user_id': current_queuer_id,
-                'timer_value': self.timer.counter}
+
+        # Compile turn history so far for the selection timeline
+        turn_history = {}
+        if len(self.queuers) > 0 and len(self.queuers[0].banned_games) > 0:
+            turn_history[1] = self.queuers[0].banned_games[0]
+        if len(self.queuers) > 1 and len(self.queuers[1].banned_games) > 0:
+            turn_history[2] = self.queuers[1].banned_games[0]
+        if len(self.queuers) > 0 and self.queuers[0].selected_game is not None:
+            turn_history[3] = self.queuers[0].selected_game
+        if len(self.queuers) > 1 and self.queuers[1].selected_game is not None:
+            turn_history[4] = self.queuers[1].selected_game
+        if len(self.queuers) > 0 and len(self.queuers[0].banned_games) > 1:
+            turn_history[5] = self.queuers[0].banned_games[1]
+        if len(self.queuers) > 1 and len(self.queuers[1].banned_games) > 1:
+            turn_history[6] = self.queuers[1].banned_games[1]
+        if system_selected_game is not None:
+            turn_history[7] = system_selected_game
+
+        remaining_time = max(0, self.timer.max_time - self.timer.counter)
+        data = {
+            'pre_game_id': self.pre_game_id,
+            'pre_bans': pre_bans,
+            'queuers': queuers_data,
+            'system_selected_game': system_selected_game,
+            'active_index': self.select_turn_index,
+            'active_user_id': current_queuer_id,
+            'timer_value': remaining_time,
+            'counter': self.timer.counter,
+            'max_time': self.timer.max_time,
+            'turn_history': turn_history,
+        }
         return data
 
     def set_system_bans(self):
         from Entities.SocketIOManagerClass import send_pre_game_command
         import asyncio
-        self.pre_bans = random.sample(list(GameTypesEnum), 3)  # randomly ban 3 games
-        self.active_game_types = [game for game in GameTypesEnum if game not in self.pre_bans]
+        self.pre_bans = random.sample(list(GameTypesEnum.two_players_games()), 3)  # randomly ban 3 games
+        self.active_game_types = [game for game in GameTypesEnum.two_players_games() if game not in self.pre_bans]
         readable_data = [game.value for game in self.pre_bans]
-        asyncio.new_event_loop().run_until_complete(
+        safe_run_async(
             send_pre_game_command(command=make_command_json(id=commands.System_Banned_Games,
                                                             data=readable_data), pre_game_id=self.pre_game_id))
         self.timer.start(5, self.send_current_turn)
@@ -85,16 +114,24 @@ class PreGameClass:
 
     async def command_received(self, data, socket_id):
         gamer_data = self.find_gamer_from_socket_id(socket_id)
-        if data['id'] == commands.Select_Game:
-            game_type = data['game_type']
-            print(game_type)
+        if gamer_data is None:
+            return
+        if data.get('id') == commands.Select_Game:
+            game_type = data.get('game_type')
+            print(f"[PreGameClass] Player {gamer_data.queuer_index + 1} chosen: {game_type}")
             self.pick_game(game_type, gamer_data)
-            # self.send_current_turn()
             self.timer.stop()
 
     def pick_game(self, game_type, gamer_data):
         from Entities.SocketIOManagerClass import send_pre_game_command
         import asyncio
+        if gamer_data is None:
+            return
+        # Ensure chosen game is available
+        if not any(g.value == game_type for g in self.active_game_types):
+            print(f"[PreGameClass] Warning: {game_type} not in active game types.")
+            return
+
         if self.select_turn_index == 1:
             if len(self.queuers[0].banned_games) != 0 or gamer_data.queuer_index != 0:
                 return
@@ -119,9 +156,10 @@ class PreGameClass:
             if len(self.queuers[1].banned_games) != 1 or gamer_data.queuer_index != 1:
                 return
             self.queuers[1].banned_games.append(game_type)
+
         self.is_current_pick_happens = True
         self.remove_game_type_from_list(game_type)
-        asyncio.new_event_loop().run_until_complete(
+        safe_run_async(
             send_pre_game_command(command=make_command_json(id=commands.Selected_Game,
                                                             data={'active_index': self.select_turn_index,
                                                                   'game_type': game_type}),
@@ -136,7 +174,7 @@ class PreGameClass:
                 current_queuer_id = self.queuers[0].user_id
             else:
                 current_queuer_id = self.queuers[1].user_id
-            asyncio.new_event_loop().run_until_complete(
+            safe_run_async(
                 send_pre_game_command(command=make_command_json(id=commands.Select_Game,
                                                                 data=current_queuer_id), pre_game_id=self.pre_game_id))
             self.timer.start(20, self.send_current_turn)
@@ -145,16 +183,16 @@ class PreGameClass:
             self.set_pre_game_id_db("")
             self.delete_game_function(self.pre_game_id, self.dced_user, self.queuers)
             return
-        if not self.is_current_pick_happens:  # this is the situtaion that user wont picked game
+
+        if not self.is_current_pick_happens:  # Fallback if player did not pick in time
             if self.select_turn_index % 2 == 1:
                 current_queuer = self.queuers[0]
             else:
                 current_queuer = self.queuers[1]
-            random_game = random.choice(self.active_game_types)
-            self.pick_game(random_game.value, current_queuer)
-            # self.select_turn_index += 1
-            # call_new_pick()
-            # return
+            if self.active_game_types:
+                random_game = random.choice(self.active_game_types)
+                self.pick_game(random_game.value, current_queuer)
+
         self.select_turn_index += 1
         if self.select_turn_index == 8:  # last turn
             self.set_pre_game_id_db("")
@@ -163,10 +201,13 @@ class PreGameClass:
         elif self.select_turn_index == 7:
             from Entities.SocketIOManagerClass import send_pre_game_command
             import asyncio
-            selected_game = random.choice(self.active_game_types)
-            readable_data = selected_game.value
+            if self.active_game_types:
+                selected_game = random.choice(self.active_game_types)
+                readable_data = selected_game.value
+            else:
+                readable_data = "TicTacToe"
             self.system_selected_game = readable_data
-            asyncio.new_event_loop().run_until_complete(
+            safe_run_async(
                 send_pre_game_command(command=make_command_json(id=commands.Selected_Game,
                                                                 data={'active_index': self.select_turn_index,
                                                                       'game_type': readable_data}),
@@ -176,8 +217,13 @@ class PreGameClass:
             call_new_pick()
 
     def set_pre_game_id_db(self, pre_game_id):
-        game_database.users_manager.update_user(self.queuers[0].user_id, open_pre_game_id=pre_game_id)
-        game_database.users_manager.update_user(self.queuers[1].user_id, open_pre_game_id=pre_game_id)
+        try:
+            if len(self.queuers) > 0:
+                game_database.users_manager.update_user(self.queuers[0].user_id, open_pre_game_id=pre_game_id)
+            if len(self.queuers) > 1:
+                game_database.users_manager.update_user(self.queuers[1].user_id, open_pre_game_id=pre_game_id)
+        except Exception as e:
+            print(f"[PreGameClass] set_pre_game_id_db note: {e}")
 
     def disconnect_user(self, socket_id):
         from Entities.SocketIOManagerClass import send_pre_game_command
@@ -186,7 +232,7 @@ class PreGameClass:
         if user_data is not None:
             self.timer.pause()
             user_data.disconnect()
-            asyncio.new_event_loop().run_until_complete(
+            safe_run_async(
                 send_pre_game_command(command=make_command_json(id=commands.User_Disconnected,
                                                                 data={"user_id": user_data.user_id,
                                                                       "time": user_data.timer.max_time}),
@@ -197,12 +243,12 @@ class PreGameClass:
         import asyncio
         user_data = self.find_gamer_from_user_id(user_id)
         if user_data is not None:
+            user_data.reconnect(socket_id)
             if not self.is_some_one_offline():
                 self.timer.resume()
-            user_data.reconnect(socket_id)
-            asyncio.new_event_loop().run_until_complete(send_pre_game_command(
+            safe_run_async(send_pre_game_command(
                 command=make_command_json(id=commands.User_Reconnected,
-                                          data={"user_id": user_data.user_id, "time": self.timer.counter}),
+                                          data={"user_id": user_data.user_id, "time": max(0, self.timer.max_time - self.timer.counter)}),
                 pre_game_id=self.pre_game_id))
 
     def finish_dc_timer(self, user_id):

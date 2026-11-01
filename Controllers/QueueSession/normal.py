@@ -1,3 +1,4 @@
+from Commons.static_functions import safe_run_async
 import asyncio
 import threading
 import time
@@ -38,7 +39,7 @@ class NormalQueueSession(BaseQueueSession):
         game_data = {'game_id': game_id}
         if len(queuers) == 2:
             for queuer_data in queuers:
-                asyncio.new_event_loop().run_until_complete(
+                safe_run_async(
                     send_queue_command(command=make_command_json(id=commands.Start_Game, data=game_data),
                                        socket_id=queuer_data.socket_id))
                 self.queuers.remove(queuer_data)
