@@ -40,4 +40,5 @@ class GamerModel(UserModel):
     def to_json(self):
         return {'gamer_id': self.gamer_id, 'name': self.username, 'user_id': self.user_id,
                 'remain_dc_time': self.timer.max_time, 'is_disconnected': self.is_disconnected,
-                'not_played_turns': self.not_played_turns, 'user_image': self.user_image, }
+                'not_played_turns': self.not_played_turns, 'user_image': self.user_image,
+                'score': self.user_score, 'user_score': self.user_score}

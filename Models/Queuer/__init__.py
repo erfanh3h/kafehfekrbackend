@@ -35,11 +35,14 @@ class QueuerModel(UserModel):
         self.timer.start()
 
     def to_json(self):
-        return {'name': self.username, 'user_id': self.user_id, 'image': self.user_image}
+        return {'name': self.username, 'user_id': self.user_id, 'image': self.user_image,
+                'score': self.user_score, 'user_score': self.user_score}
 
     def to_lobby_json(self):
-        return {'name': self.username, 'user_id': self.user_id, 'image': self.user_image, 'is_rdy': self.is_rdy}
+        return {'name': self.username, 'user_id': self.user_id, 'image': self.user_image, 'is_rdy': self.is_rdy,
+                'score': self.user_score, 'user_score': self.user_score}
 
     def to_queue_json(self):
         return {'name': self.username, 'user_id': self.user_id, 'image': self.user_image,
-                'selected_game': self.selected_game, 'banned_games': self.banned_games}
+                'selected_game': self.selected_game, 'banned_games': self.banned_games,
+                'score': self.user_score, 'user_score': self.user_score}

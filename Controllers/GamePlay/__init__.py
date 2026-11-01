@@ -247,12 +247,18 @@ class BaseGamePlayClass:
     def finish_current_game(self, currnet_game_winner_id):
         if self.is_game_finished:
             return
+        if self.game_session is not None:
+            self.game_session.is_game_finished = True
+            try:
+                self.game_session.timer.stop(False)
+            except Exception:
+                pass
 
         def start_new_game_function():
             if self.is_game_finished or self.current_game_index >= len(self.game_types):
                 return
             for gamer_data in self.gamers:
-                self.navigate_to_game(gamer_data.socket_id)
+                self.navigate_to_game(gamer_data.socket_id, is_reconnect=False)
             self.start_current_game()
 
         winner_index = self.user_id_to_index(currnet_game_winner_id)
