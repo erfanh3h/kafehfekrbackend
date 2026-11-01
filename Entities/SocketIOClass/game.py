@@ -14,6 +14,7 @@ from Models.Queuer import QueuerModel
 games = {}
 game_idies = []
 socketid_gameid_pairs = {}
+socketid_userid_pairs = {}
 
 def start_new_test_game():
     user1 = QueuerModel("NHD6bL", username="Windows", user_image=60,
@@ -65,11 +66,14 @@ class GameSocketNameSpace(socketio.AsyncNamespace):
                 await self.enter_room(socket_id, user_game_id, namespace="/game")
                 await self.enter_room(socket_id, socket_id, namespace="/game")
                 socketid_gameid_pairs[socket_id] = user_game_id
+                socketid_userid_pairs[socket_id] = user_id
+                games[user_game_id].change_gamer_socket_id(user_id, socket_id)
                 
                 async def _delayed_join():
                     await asyncio.sleep(0.05)
                     try:
-                        games[user_game_id].join_gamer(user_id, socket_id)
+                        if user_game_id in games:
+                            games[user_game_id].join_gamer(user_id, socket_id)
                     except Exception as e:
                         print(f"[GameSocket] Error in join_gamer: {e}")
                 asyncio.create_task(_delayed_join())
@@ -90,16 +94,23 @@ class GameSocketNameSpace(socketio.AsyncNamespace):
             except KeyError:
                 pass
             del socketid_gameid_pairs[socket_id]
+        socketid_userid_pairs.pop(socket_id, None)
         print('disconnect ', socket_id)
 
     async def on_user_command(self, socket_id, data):
         game_id = return_gameid_from_socketid(socket_id)
-        if game_id is not None:
+        if game_id is not None and game_id in games:
             cmd_id = data.get('id') if isinstance(data, dict) else ""
             if cmd_id in ["RequestReconnectData", commands.Reconnect_Data, "reconnect_data"]:
                 print(f"[GameSocket] Explicit RequestReconnectData from {socket_id} for game {game_id}")
+                uid = socketid_userid_pairs.get(socket_id)
+                if uid is not None and hasattr(games[game_id], 'change_gamer_socket_id'):
+                    games[game_id].change_gamer_socket_id(uid, socket_id)
+                if hasattr(games[game_id], 'send_game_play_data') and getattr(games[game_id], 'is_game_started', False):
+                    games[game_id].send_game_play_data(socket_id)
                 if hasattr(games[game_id], 'game_session') and games[game_id].game_session is not None:
-                    games[game_id].game_session.send_reconnect_data(socket_id)
+                    if getattr(games[game_id].game_session, 'is_game_running', False):
+                        games[game_id].game_session.send_reconnect_data(socket_id)
                 elif hasattr(games[game_id], 'send_reconnect_data'):
                     games[game_id].send_reconnect_data(socket_id)
                 return

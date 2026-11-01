@@ -159,6 +159,8 @@ class YinshGameSession(BaseGameSession):
             self.timer.start(Yinsh_Turn_Time, self.send_current_turn)
 
     def send_reconnect_data(self, socket_id):
+        if not self.is_game_running:
+            return
         reconnect_data = {'gamers': [], 'game_type': 'Yinsh'}
         for gamer in self.gamers:
             reconnect_data['gamers'].append(gamer.to_json())

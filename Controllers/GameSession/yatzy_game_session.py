@@ -19,13 +19,18 @@ class YatzyGameSession(BaseGameSession):
         super().start_game_timer()
 
     def send_reconnect_data(self, socket_id):
-        reconnect_data = {'gamers': []}
+        if not self.is_game_running:
+            return
+        game_type_val = self.game_type.value if hasattr(self.game_type, "value") else str(self.game_type)
+        reconnect_data = {'gamers': [], 'game_type': game_type_val}
         for gamer in self.gamers:
             reconnect_data['gamers'].append(gamer.to_json())
         gamer_data = self.find_gamer_from_socket(socket_id)
         if gamer_data is not None:
             gamer_id = gamer_data.gamer_id
             reconnect_data['game_data'] = self.game_controller.get_game_data_yatzy(gamer_id)
+            if isinstance(reconnect_data.get('game_data'), dict):
+                reconnect_data['game_data']['game_type'] = game_type_val
         reconnect_data['timer_data'] = {'is_user_turn': True, 'time': self.timer.counter + 1}
         from Entities.SocketIOManagerClass import send_private_command
         safe_run_async(

@@ -29,13 +29,13 @@ class RPCGameSession(BaseGameSession):
     def check_start_game(self):
         while True:
             if self.check_all_players_joined():
-                time.sleep(3)
+                time.sleep(0.8)
                 self.is_game_running = True
                 self.timer.stop()
                 self.prepare_gamers()
                 self.send_game_data(self.start_new_turn_round)
                 break
-            time.sleep(2)
+            time.sleep(0.3)
 
     async def command_received(self, data, socket_id):
         gamer_id = await super().command_received(data, socket_id)

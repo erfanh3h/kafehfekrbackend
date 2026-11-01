@@ -110,7 +110,7 @@ class BaseGameSession:
 
             if self.check_all_players_joined():
 
-                time.sleep(3)
+                time.sleep(0.8)
 
                 self.is_game_running = True
 
@@ -120,7 +120,7 @@ class BaseGameSession:
 
                 break
 
-            time.sleep(2)
+            time.sleep(0.3)
 
 
 
@@ -131,6 +131,26 @@ class BaseGameSession:
             if gamer.socket_id == socket_id:
 
                 return gamer
+
+        try:
+
+            from Entities.SocketIOClass.game import socketid_userid_pairs
+
+            uid = socketid_userid_pairs.get(socket_id)
+
+            if uid is not None:
+
+                for gamer in self.gamers:
+
+                    if str(gamer.user_id) == str(uid):
+
+                        gamer.socket_id = socket_id
+
+                        return gamer
+
+        except Exception:
+
+            pass
 
         return None
 
@@ -216,7 +236,8 @@ class BaseGameSession:
 
 
     def send_reconnect_data(self, socket_id):
-
+        if not self.is_game_running:
+            return
         reconnect_data = {'gamers': []}
 
         for gamer in self.gamers:
@@ -226,6 +247,8 @@ class BaseGameSession:
         reconnect_data['game_data'] = self.game_controller.get_game_data()
         game_type_val = self.game_type.value if hasattr(self.game_type, "value") else str(self.game_type)
         reconnect_data['game_type'] = game_type_val
+        if isinstance(reconnect_data.get('game_data'), dict):
+            reconnect_data['game_data']['game_type'] = game_type_val
 
         if self.timer.is_user_turn:
 

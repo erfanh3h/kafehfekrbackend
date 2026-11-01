@@ -33,12 +33,15 @@ class RiskGameSession(BaseMultiplayerGameSession):
         self.timer.start(Start_Game_Time, function)
 
     def send_reconnect_data(self, socket_id):
+        if not self.is_game_running:
+            return
         super().send_reconnect_data(socket_id)
+        gamer_data = self.find_gamer_from_socket(socket_id)
+        p_idx = (gamer_data.gamer_id - 1) if (gamer_data is not None and gamer_data.gamer_id > 0) else max(0, self.game_controller.current_turn - 1)
         from Entities.SocketIOManagerClass import send_private_command
         safe_run_async(
             send_private_command(
-                command=make_command_json(id=commands.User_Data, data=self.game_controller.get_user_private_game_data(
-                    self.game_controller.current_turn - 1)),
+                command=make_command_json(id=commands.User_Data, data=self.game_controller.get_user_private_game_data(p_idx)),
                 socket_id=socket_id, game_id=self.game_id))
 
     async def command_received(self, data, socket_id):

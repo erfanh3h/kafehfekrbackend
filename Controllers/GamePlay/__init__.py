@@ -41,8 +41,11 @@ class BaseGamePlayClass:
         else:
             games_length = 1
             self.game_winners = [-1]
+        if len(self.game_types) == games_length:
+            self.game_types = list(self.game_types)
+            return
         games_types = []
-        for i in range(games_length):
+        for i in range(min(games_length, len(self.game_types))):
             random_type = random.choice(self.game_types)
             games_types.append(random_type)
             self.game_types.remove(random_type)
@@ -84,26 +87,39 @@ class BaseGamePlayClass:
         t.start()
 
     def check_all_players_joined(self):
-        for is_gamer_joined in self.is_gamers_join_game:
+        if not self.is_gamers_join_game:
+            return False
+        for is_gamer_joined in self.is_gamers_join_game.values():
             if not is_gamer_joined:
                 return False
         return True
 
     def send_game_play_data(self, socket_id):
+        is_between = (self.game_session is None or self.game_session.is_game_finished) and not self.is_game_finished
         game_data = {'gamers': [], 'games': self.game_types, 'game_score_type': self.game_score_type.value,
                      'current_game_index': self.current_game_index, 'winners': self.game_winners,
-                     'is_game_finished': self.is_game_finished, 'scores': self.gamer_scores,
+                     'is_game_finished': self.is_game_finished, 'is_between_games': is_between,
+                     'scores': self.gamer_scores,
                      'game_winner_id': self.game_winner_id,
                      'xp_awarded': getattr(self.score_manager, 'last_awarded_xp', {})}
+        session_gamer_map = {}
+        if self.game_session is not None and not self.game_session.is_game_finished:
+            for sg in getattr(self.game_session, 'gamers', []):
+                if getattr(sg, 'gamer_id', 0) > 0:
+                    session_gamer_map[str(sg.user_id)] = sg.gamer_id
         for gamer in self.gamers:
-            game_data['gamers'].append(gamer.to_json())
+            g_json = gamer.to_json()
+            if str(gamer.user_id) in session_gamer_map:
+                g_json['gamer_id'] = session_gamer_map[str(gamer.user_id)]
+                g_json['team_id'] = session_gamer_map[str(gamer.user_id)]
+            game_data['gamers'].append(g_json)
         from Entities.SocketIOManagerClass import send_private_command
         safe_run_async(
             send_private_command(command=make_command_json(id=commands.Game_Play_Data, data=game_data),
                                  game_id=self.game_play_id, socket_id=socket_id))
 
     def navigate_to_game(self, socket_id, is_reconnect=False):
-        game_data = {'current_game_index': self.current_game_index, 'is_reconnect': is_reconnect}
+        game_data = {'current_game_index': self.current_game_index, 'games': self.game_types, 'is_reconnect': is_reconnect}
         from Entities.SocketIOManagerClass import send_private_command
         safe_run_async(
             send_private_command(command=make_command_json(id=commands.Game_Play_Navigate, data=game_data),
@@ -119,7 +135,7 @@ class BaseGamePlayClass:
     def check_start_game(self):
         def start_new_game_function():
             for gamer_data in self.gamers:
-                self.navigate_to_game(gamer_data.socket_id)
+                self.navigate_to_game(gamer_data.socket_id, is_reconnect=False)
             self.start_current_game()
 
         while True:
@@ -129,26 +145,27 @@ class BaseGamePlayClass:
                 delete_game(self.game_play_id)
                 break
             if self.check_all_players_joined():
-                time.sleep(3)
+                time.sleep(0.3)
                 self.is_game_started = True
                 self.timer.stop()
                 self.select_random_games()
                 self.prepare_database()
                 for gamer in self.gamers:
                     self.send_game_play_data(gamer.socket_id)
-                self.timer.start(Start_Game_Time, start_new_game_function)
-                for gamer in self.gamers:
-                    self.send_timer_value(gamer.socket_id)
+                start_new_game_function()
                 break
-            time.sleep(2)
+            time.sleep(0.3)
 
     def join_gamer(self, user_id, socket_id):
         self.change_gamer_socket_id(user_id, socket_id)
         if self.is_game_started:
             self.send_game_play_data(socket_id)
-            if self.game_session is not None:
-                self.navigate_to_game(socket_id, is_reconnect=True)
+            if self.game_session is not None and not self.game_session.is_game_finished:
+                if self.game_session.is_game_running:
+                    self.navigate_to_game(socket_id, is_reconnect=True)
                 self.game_session.join_gamer(user_id, socket_id)
+            elif not self.is_game_finished:
+                self.send_timer_value(socket_id)
         else:
             self.is_gamers_join_game[user_id] = True
 
@@ -256,6 +273,11 @@ class BaseGamePlayClass:
             if str(gamer.user_id) == str(user_id):
                 gamer.socket_id = socket_id
                 break
+        if self.game_session is not None:
+            for sg in getattr(self.game_session, 'gamers', []):
+                if str(sg.user_id) == str(user_id):
+                    sg.socket_id = socket_id
+                    break
 
     def finish_game_play(self, winner_id):
         from Entities.Database import game_database
