@@ -101,7 +101,9 @@ class BaseGamePlayClass:
                      'is_game_finished': self.is_game_finished, 'is_between_games': is_between,
                      'scores': self.gamer_scores,
                      'game_winner_id': self.game_winner_id,
-                     'xp_awarded': getattr(self.score_manager, 'last_awarded_xp', {})}
+                     'xp_awarded': getattr(self.score_manager, 'last_awarded_xp', {}),
+                     'score_awarded': getattr(self.score_manager, 'last_awarded_score', {}),
+                     'coin_awarded': getattr(self.score_manager, 'last_awarded_coin', {})}
         session_gamer_map = {}
         if self.game_session is not None and not self.game_session.is_game_finished:
             for sg in getattr(self.game_session, 'gamers', []):
@@ -126,7 +128,9 @@ class BaseGamePlayClass:
                                  game_id=self.game_play_id, socket_id=socket_id))
 
     def send_timer_value(self, socket_id):
-        data = {'time': self.timer.counter + 1}
+        max_t = self.timer.max_time if self.timer.max_time > 0 else Game_Play_Round_Time
+        rem_t = max(1, max_t - self.timer.counter)
+        data = {'time': rem_t, 'max_time': max_t}
         from Entities.SocketIOManagerClass import send_private_command
         safe_run_async(
             send_private_command(command=make_command_json(id=commands.Game_Play_Time, data=data),
@@ -147,7 +151,7 @@ class BaseGamePlayClass:
             if self.check_all_players_joined():
                 time.sleep(0.3)
                 self.is_game_started = True
-                self.timer.stop()
+                self.timer.stop(False)
                 self.select_random_games()
                 self.prepare_database()
                 for gamer in self.gamers:
@@ -287,7 +291,9 @@ class BaseGamePlayClass:
             if self.game_winners[index] != -1:
                 finished_game_types.append(item)
                 finished_game_winners.append(self.game_winners[index])
-        self.score_manager.finish_game(winner_id, finished_game_types, finished_game_winners)
+        w_idx_lookup = self.user_id_to_index(winner_id) if (winner_id != 0 and winner_id is not None) else -1
+        winner_idx = (w_idx_lookup + 1) if w_idx_lookup != -1 else 0
+        self.score_manager.finish_game(winner_idx, finished_game_types, finished_game_winners)
         game_database.game_play_history_manager.update_game_play_history(self.game_play_id, self.game_winners,
                                                                          self.gamer_scores)
         self.is_game_finished = True
@@ -295,12 +301,15 @@ class BaseGamePlayClass:
 
         from Entities.SocketIOManagerClass import send_private_command
         last_xp = getattr(self.score_manager, 'last_awarded_xp', {})
-        winner_idx = self.user_id_to_index(winner_id) + 1 if (winner_id != 0 and winner_id is not None) else 0
+        last_score = getattr(self.score_manager, 'last_awarded_score', {})
+        last_coin = getattr(self.score_manager, 'last_awarded_coin', {})
 
         for gamer in self.gamers:
             self.send_game_play_data(gamer.socket_id)
             try:
                 earned = last_xp.get(gamer.user_id, 0)
+                s_earned = last_score.get(gamer.user_id, 0)
+                c_earned = last_coin.get(gamer.user_id, 0)
                 safe_run_async(
                     send_private_command(
                         command=make_command_json(
@@ -310,6 +319,8 @@ class BaseGamePlayClass:
                                 "winner": winner_idx,
                                 "scores": self.gamer_scores,
                                 "xp_earned": earned,
+                                "score_earned": s_earned,
+                                "coin_earned": c_earned,
                             }
                         ),
                         socket_id=gamer.socket_id,

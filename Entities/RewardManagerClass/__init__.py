@@ -14,6 +14,8 @@ class RewardManagerClass:
         self.game_types = []
         self.game_winners = []
         self.last_awarded_xp = {}
+        self.last_awarded_score = {}
+        self.last_awarded_coin = {}
 
     def set_user_data(self, idis):
         self.players_idis = idis
@@ -22,9 +24,18 @@ class RewardManagerClass:
         # -1 is when game terminated by not joining users
         if winner_gamer_id == -1:
             return
+        if winner_gamer_id not in [0, 1, 2]:
+            if len(self.players_idis) > 0 and str(winner_gamer_id) == str(self.players_idis[0]):
+                winner_gamer_id = 1
+            elif len(self.players_idis) > 1 and str(winner_gamer_id) == str(self.players_idis[1]):
+                winner_gamer_id = 2
+            else:
+                winner_gamer_id = 0
         self.game_types = game_types
         self.game_winners = game_winners
         self.last_awarded_xp = {}
+        self.last_awarded_score = {}
+        self.last_awarded_coin = {}
         from Entities.Database import game_database
         if self.game_score_type == GameScoreTypesEnum.RANK:
             win_coin, lose_coin, draw_coin, win_score, lose_score, draw_score, win_xp, lose_xp, draw_xp = (
@@ -61,6 +72,8 @@ class RewardManagerClass:
                 p1_score = lose_score
                 p1_coin = lose_coin
             self.last_awarded_xp[self.players_idis[0]] = p1_xp
+            self.last_awarded_score[self.players_idis[0]] = p1_score
+            self.last_awarded_coin[self.players_idis[0]] = p1_coin
             try:
                 user1_data = game_database.users_manager.read_user(self.players_idis[0])
             except Exception:
@@ -89,6 +102,8 @@ class RewardManagerClass:
                 p2_score = lose_score
                 p2_coin = lose_coin
             self.last_awarded_xp[self.players_idis[1]] = p2_xp
+            self.last_awarded_score[self.players_idis[1]] = p2_score
+            self.last_awarded_coin[self.players_idis[1]] = p2_coin
             try:
                 user2_data = game_database.users_manager.read_user(self.players_idis[1])
             except Exception:

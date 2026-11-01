@@ -119,42 +119,44 @@ class PreGameClass:
         if data.get('id') == commands.Select_Game:
             game_type = data.get('game_type')
             print(f"[PreGameClass] Player {gamer_data.queuer_index + 1} chosen: {game_type}")
-            self.pick_game(game_type, gamer_data)
-            self.timer.stop()
+            if self.pick_game(game_type, gamer_data):
+                self.timer.stop()
 
     def pick_game(self, game_type, gamer_data):
         from Entities.SocketIOManagerClass import send_pre_game_command
         import asyncio
         if gamer_data is None:
-            return
+            return False
+        if self.select_turn_index not in [1, 2, 3, 4, 5, 6]:
+            return False
         # Ensure chosen game is available
         if not any(g.value == game_type for g in self.active_game_types):
             print(f"[PreGameClass] Warning: {game_type} not in active game types.")
-            return
+            return False
 
         if self.select_turn_index == 1:
             if len(self.queuers[0].banned_games) != 0 or gamer_data.queuer_index != 0:
-                return
+                return False
             self.queuers[0].banned_games.append(game_type)
         elif self.select_turn_index == 2:
             if len(self.queuers[1].banned_games) != 0 or gamer_data.queuer_index != 1:
-                return
+                return False
             self.queuers[1].banned_games.append(game_type)
         elif self.select_turn_index == 3:
             if self.queuers[0].selected_game is not None or gamer_data.queuer_index != 0:
-                return
+                return False
             self.queuers[0].selected_game = game_type
         elif self.select_turn_index == 4:
             if self.queuers[1].selected_game is not None or gamer_data.queuer_index != 1:
-                return
+                return False
             self.queuers[1].selected_game = game_type
         elif self.select_turn_index == 5:
             if len(self.queuers[0].banned_games) != 1 or gamer_data.queuer_index != 0:
-                return
+                return False
             self.queuers[0].banned_games.append(game_type)
         elif self.select_turn_index == 6:
             if len(self.queuers[1].banned_games) != 1 or gamer_data.queuer_index != 1:
-                return
+                return False
             self.queuers[1].banned_games.append(game_type)
 
         self.is_current_pick_happens = True
@@ -164,6 +166,7 @@ class PreGameClass:
                                                             data={'active_index': self.select_turn_index,
                                                                   'game_type': game_type}),
                                   pre_game_id=self.pre_game_id))
+        return True
 
     def send_current_turn(self):
         def call_new_pick():
@@ -212,7 +215,7 @@ class PreGameClass:
                                                                 data={'active_index': self.select_turn_index,
                                                                       'game_type': readable_data}),
                                       pre_game_id=self.pre_game_id))
-            self.timer.start(13, self.send_current_turn)
+            self.timer.start(4, self.send_current_turn)
         else:
             call_new_pick()
 

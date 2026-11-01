@@ -336,7 +336,7 @@ class BaseGameSession:
 
             await self.send_command(commands.Surrender, {"gamer_id": gamer_id})
 
-            self.timer.stop()
+            self.timer.stop(False)
 
             self.check_finish_game()
 
@@ -406,7 +406,7 @@ class BaseGameSession:
 
             # Test : remove this
 
-            self.timer.stop()
+            self.timer.stop(False)
 
         else:
 
@@ -419,6 +419,7 @@ class BaseGameSession:
     def check_finish_game_by_not_play_turn(self, current_turn):  # this used only on 2 players games
 
         from Entities.SocketIOManagerClass import send_command
+        from Entities.RewardManagerClass import GameScoreTypesEnum
 
         if current_turn == 1:
 
@@ -428,11 +429,10 @@ class BaseGameSession:
 
                 winner = 2
 
-                safe_run_async(
-
-                    send_command(command=make_command_json(id=commands.Finish_Game, data={"Winner": winner}),
-
-                                 game_id=self.game_id))
+                if self.game_score_type != GameScoreTypesEnum.RANK:
+                    safe_run_async(
+                        send_command(command=make_command_json(id=commands.Finish_Game, data={"Winner": winner}),
+                                     game_id=self.game_id))
 
                 self.finish_game(winner)
 
@@ -460,11 +460,10 @@ class BaseGameSession:
 
                 winner = 1
 
-                safe_run_async(
-
-                    send_command(command=make_command_json(id=commands.Finish_Game, data={"Winner": winner}),
-
-                                 game_id=self.game_id))
+                if self.game_score_type != GameScoreTypesEnum.RANK:
+                    safe_run_async(
+                        send_command(command=make_command_json(id=commands.Finish_Game, data={"Winner": winner}),
+                                     game_id=self.game_id))
 
                 self.finish_game(winner)
 

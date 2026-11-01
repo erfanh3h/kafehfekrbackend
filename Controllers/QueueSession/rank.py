@@ -158,15 +158,26 @@ class RankQueueSession(BaseQueueSession):
                 print(f"{self.game_score_type} queuer len : ", len(self.queuers))
             if len(self.queuers) >= 2:
                 q1 = self.queuers.pop(0)
-                q2 = self.queuers.pop(0)
-                self.start_pre_game_timer([q1, q2])
-                time.sleep(1.5)
+                q2 = None
+                for idx, candidate in enumerate(self.queuers):
+                    if str(candidate.user_id) != str(q1.user_id):
+                        q2 = self.queuers.pop(idx)
+                        break
+                if q2 is not None:
+                    self.start_pre_game_timer([q1, q2])
+                    time.sleep(1.0)
+                else:
+                    self.queuers.insert(0, q1)
+                    time.sleep(1.0)
             else:
-                time.sleep(3)
+                time.sleep(1.0)
 
     def join_queuer(self, user_data: QueuerModel):
         if user_data.user_id in self.queuer_accept_pairs:  # prevent join when waiting for user accept
             return
+        for existing in list(self.queuers):
+            if str(existing.user_id) == str(user_data.user_id):
+                self.queuers.remove(existing)
         self.queuers.append(user_data)
 
     def reconnect_queuer(self, pre_game_id, user_data: QueuerModel):
