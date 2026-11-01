@@ -272,6 +272,12 @@ class ClassicRankBot:
         elif cmd_id == "NewRound":
             self.game_logic.on_new_round(payload)
 
+        elif cmd_id == "Surrender":
+            print(f"[ClassicRankBot:{self.bot_name}] Opponent surrendered! Stopping bot.")
+            self.is_active = False
+            await asyncio.sleep(1.0)
+            await self.disconnect()
+
         elif cmd_id in ("FinishGame", "GameFinished"):
             winner = payload.get("Winner", 0) if isinstance(payload, dict) else payload
             print(f"[ClassicRankBot:{self.bot_name}] Match Concluded! Final Winner: Player {winner}")

@@ -37,16 +37,36 @@ def add_new_game(game_id, queuers, game_types, game_score_type):
 # start_new_test_game()
 # print(games)
 def finish_single_game(game_id, user_id):
-    games[game_id].finish_current_game(user_id)
+    if game_id in games:
+        games[game_id].finish_current_game(user_id)
 
 def finish_multiplayer_game(game_id, rank1_id , rank2_id):
-    games[game_id].finish_multiplayer_game(rank1_id , rank2_id)
+    if game_id in games:
+        games[game_id].finish_multiplayer_game(rank1_id , rank2_id)
+
 def delete_game(game_id):
-    # try:
-    del games[game_id]
-    game_idies.remove(game_id)
-    # except:
-    #     pass
+    try:
+        game_obj = games.get(game_id)
+        if game_obj is not None:
+            for gamer in getattr(game_obj, 'gamers', []):
+                uid = getattr(gamer, 'user_id', None)
+                if uid and not str(uid).startswith("bot_"):
+                    try:
+                        game_database.users_manager.update_user(uid, open_game_id="")
+                    except Exception as e:
+                        print(f"[delete_game] Error clearing open_game_id for {uid}: {e}")
+    except Exception as e:
+        print(f"[delete_game] Error inspecting game {game_id}: {e}")
+    try:
+        if game_id in games:
+            del games[game_id]
+    except Exception:
+        pass
+    try:
+        while game_id in game_idies:
+            game_idies.remove(game_id)
+    except Exception:
+        pass
 
 
 class GameSocketNameSpace(socketio.AsyncNamespace):

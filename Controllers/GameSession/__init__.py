@@ -314,25 +314,34 @@ class BaseGameSession:
             self.send_reconnect_data(socket_id)
             return None
 
-        if not self.is_game_running:
+        cmd_id = data.get('id') if isinstance(data, dict) else None
 
-            # print("game not started yet")
-
+        if not self.is_game_running and cmd_id not in [commands.Surrender, commands.Exit_Game]:
             return None
 
         gamer_data = self.find_gamer_from_socket(socket_id)
 
         if gamer_data is None:
-
             return None
 
-        else:
+        if any(g.gamer_id == 0 for g in self.gamers):
+            self.prepare_gamers()
+        self.is_game_running = True
 
-            gamer_id = gamer_data.gamer_id
+        gamer_id = gamer_data.gamer_id
 
-        if data['id'] == commands.Surrender:
+        if cmd_id == commands.Surrender:
+            from Entities.RewardManagerClass import GameScoreTypesEnum
+            from Entities.Database import game_database
+            if self.game_score_type != GameScoreTypesEnum.RANK and not str(gamer_data.user_id).startswith("bot_"):
+                try:
+                    game_database.users_manager.update_user(gamer_data.user_id, open_game_id="")
+                except Exception as e:
+                    print(f"[BaseGameSession] Error clearing open_game_id on surrender: {e}")
 
             await self.game_controller.surrender(gamer_id)
+            self.game_controller.is_game_finished = True
+            self.game_controller.leaver_id = gamer_id
 
             await self.send_command(commands.Surrender, {"gamer_id": gamer_id})
 
@@ -340,6 +349,16 @@ class BaseGameSession:
 
             self.check_finish_game()
 
+            return None
+
+        if cmd_id == commands.Exit_Game:
+            from Entities.RewardManagerClass import GameScoreTypesEnum
+            from Entities.Database import game_database
+            if self.game_score_type != GameScoreTypesEnum.RANK and not str(gamer_data.user_id).startswith("bot_"):
+                try:
+                    game_database.users_manager.update_user(gamer_data.user_id, open_game_id="")
+                except Exception as e:
+                    print(f"[BaseGameSession] Error clearing open_game_id on exit_game: {e}")
             return None
 
         return gamer_id
@@ -526,32 +545,22 @@ class BaseGameSession:
         user_idis = [g.user_id for g in self.gamers],
 
         from Entities.Database import game_database
-
-        game_database.game_history_manager.create_game_history(self.game_history_id, self.game_id, user_idis,
-
-                                                               str(self.game_type.value), self.game_score_type.value,
-
-                                                               winner_gamer_id)
+        try:
+            game_type_val = self.game_type.value if hasattr(self.game_type, "value") else str(self.game_type)
+            game_score_val = self.game_score_type.value if hasattr(self.game_score_type, "value") else str(self.game_score_type)
+            game_database.game_history_manager.create_game_history(self.game_history_id, self.game_id, user_idis,
+                                                                   str(game_type_val), game_score_val,
+                                                                   winner_gamer_id)
+        except Exception as e:
+            print(f"[BaseGameSession] Error creating game history: {e}")
 
         from Entities.SocketIOClass.game import finish_single_game
 
         user_id = "0"
-
-        if winner_gamer_id == self.gamers[0].gamer_id:
-
-            user_id = self.gamers[0].user_id
-
-        elif winner_gamer_id == self.gamers[1].gamer_id:
-
-            user_id = self.gamers[1].user_id
-
-        elif len(self.gamers) == 3 and winner_gamer_id == self.gamers[2].gamer_id:
-
-            user_id = self.gamers[2].user_id
-
-        elif len(self.gamers) == 4 and winner_gamer_id == self.gamers[3].gamer_id:
-
-            user_id = self.gamers[3].user_id
+        for g in self.gamers:
+            if g.gamer_id == winner_gamer_id:
+                user_id = g.user_id
+                break
 
         finish_single_game(self.game_id, user_id)
 
