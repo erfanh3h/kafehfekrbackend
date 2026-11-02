@@ -53,6 +53,8 @@ class BaseGameSession:
         self.add_history_id()
 
         self.is_game_finished = False
+        self.dc_timeout_user_id = None
+        self.afk_user_id = None
 
 
 
@@ -401,6 +403,7 @@ class BaseGameSession:
 
 
     def finish_reconnect_time(self, user_id):
+        self.dc_timeout_user_id = user_id
 
         safe_run_async(
 
@@ -434,6 +437,7 @@ class BaseGameSession:
             self.gamers[0].not_played_turn()
 
             if self.gamers[0].not_played_turns == 4:
+                self.afk_user_id = self.gamers[0].user_id
 
                 winner = 2
 
@@ -465,6 +469,7 @@ class BaseGameSession:
             self.gamers[1].not_played_turn()
 
             if self.gamers[1].not_played_turns == 4:
+                self.afk_user_id = self.gamers[1].user_id
 
                 winner = 1
 

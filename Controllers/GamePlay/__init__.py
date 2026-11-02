@@ -38,6 +38,7 @@ class BaseGamePlayClass:
         self.is_game_finished = False
         self.active_game_id = ""
         self.game_winner_id = None
+        self.afk_or_dc_penalty_user_id = None
         self.score_manager = RewardManagerClass(game_score_type)
 
     def select_random_games(self):
@@ -67,14 +68,6 @@ class BaseGamePlayClass:
                                                                          str(self.game_score_type.value))
         for user_id in user_idis:
             game_database.users_manager.update_user(user_id, open_game_id=self.game_play_id, )
-        # if self.game_score_type == GameScoreTypesEnum.RANK: #TODO : return this for coin
-        #     game_database.users_manager.update_user(self.gamers[0].user_id, open_game_id=self.game_play_id,
-        #                                             coin=self.gamers[0].user_coin - rank_coin_cost)
-        #     game_database.users_manager.update_user(self.gamers[1].user_id, open_game_id=self.game_play_id,
-        #                                             coin=self.gamers[1].user_coin - rank_coin_cost)
-        # else:
-        #     game_database.users_manager.update_user(self.gamers[0].user_id, open_game_id=self.game_play_id, )
-        #     game_database.users_manager.update_user(self.gamers[1].user_id, open_game_id=self.game_play_id, )
 
     def join_game_limit_time(self):
         if not self.is_game_started:
@@ -259,6 +252,7 @@ class BaseGamePlayClass:
                     if str(gamer.user_id) != str(surrender_user_id):
                         winner_user_id = gamer.user_id
                         break
+                # Surrender is a normal loss - NO AFK/DC penalty!
                 self.timer.stop(False)
                 self.finish_game_play(winner_user_id)
                 return
@@ -335,6 +329,18 @@ class BaseGamePlayClass:
                 self.game_session.timer.stop(False)
             except Exception:
                 pass
+            # ONLY penalize if full disconnect timeout occurred (1 min expired) or detected as AFK (4 missed turns)
+            afk_uid = getattr(self.game_session, 'afk_user_id', None)
+            dc_uid = getattr(self.game_session, 'dc_timeout_user_id', None)
+            if afk_uid is not None:
+                self.afk_or_dc_penalty_user_id = afk_uid
+            elif dc_uid is not None:
+                self.afk_or_dc_penalty_user_id = dc_uid
+            else:
+                for sg in getattr(self.game_session, 'gamers', []):
+                    if getattr(sg, 'not_played_turns', 0) >= 4:
+                        self.afk_or_dc_penalty_user_id = sg.user_id
+                        break
 
         def start_new_game_function():
             if self.is_game_finished or self.current_game_index >= len(self.game_types):
@@ -408,7 +414,7 @@ class BaseGamePlayClass:
                     sg.socket_id = socket_id
                     break
 
-    def finish_game_play(self, winner_id):
+    def finish_game_play(self, winner_id, afk_or_dc_user_id=None):
         from Entities.Database import game_database
         finished_game_types = []
         finished_game_winners = []
@@ -418,8 +424,15 @@ class BaseGamePlayClass:
                 finished_game_winners.append(self.game_winners[index])
         w_idx_lookup = self.user_id_to_index(winner_id) if (winner_id != 0 and winner_id is not None) else -1
         winner_idx = (w_idx_lookup + 1) if w_idx_lookup != -1 else 0
+        penalty_user = afk_or_dc_user_id or self.afk_or_dc_penalty_user_id
         try:
-            self.score_manager.finish_game(winner_idx, finished_game_types, finished_game_winners)
+            self.score_manager.finish_game(
+                winner_idx,
+                finished_game_types,
+                finished_game_winners,
+                gamer_scores=self.gamer_scores,
+                afk_or_dc_user_id=penalty_user
+            )
         except Exception as e:
             print(f"[BaseGamePlayClass] Error in score_manager.finish_game: {e}")
         for gamer in self.gamers:
