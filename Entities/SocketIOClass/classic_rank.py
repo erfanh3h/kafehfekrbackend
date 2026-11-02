@@ -3,9 +3,9 @@ Socket.IO Namespace for Classic Rank Matchmaking (/classic-rank).
 """
 
 import socketio
-
+from Commons import commands
 from Controllers.QueueSession.classic_rank import ClassicRankSession
-from Entities.Security import extract_token
+from Entities.Security import check_is_token_valid
 from Models.Queuer import QueuerModel
 
 classic_rank_session = ClassicRankSession()
@@ -13,24 +13,32 @@ classic_rank_session = ClassicRankSession()
 
 class ClassicRankSocketNameSpace(socketio.AsyncNamespace):
     async def on_connect(self, socket_id, environ, auth):
-        if auth is None:
+        if not isinstance(auth, dict):
             await self.disconnect(socket_id, namespace="/classic-rank")
             return
-
         try:
-            token = auth.get("token", "")
-            token_data = await extract_token(token)
+            token_data = await check_is_token_valid(auth)
             if token_data is None:
+                await self.emit("command", {"id": commands.Logout}, to=socket_id, namespace="/classic-rank")
                 await self.disconnect(socket_id, namespace="/classic-rank")
                 return
-
             user_id = token_data["id"]
             game_type = auth.get("game_type", "TicTacToe")
-            await self.enter_room(socket_id, socket_id, namespace="/classic-rank")
         except Exception as e:
             print(f"[ClassicRankSocket] Auth error: {e}")
             await self.disconnect(socket_id, namespace="/classic-rank")
             return
+
+        # Reject if user already has an active ongoing game in memory
+        from Entities.SocketIOClass.game import games
+        for g_id, game_play in list(games.items()):
+            if not getattr(game_play, "is_game_finished", False) and not getattr(game_play, "is_game_terminated", False):
+                if game_play.is_user_id_valid(user_id):
+                    print(f"[ClassicRankSocket] User {user_id} already in active game {g_id}. Rejecting duplicate classic-rank start.")
+                    await self.disconnect(socket_id, namespace="/classic-rank")
+                    return
+
+        await self.enter_room(socket_id, socket_id, namespace="/classic-rank")
 
         from Entities.Database import game_database
         user_data = game_database.users_manager.read_user(user_id)
@@ -54,7 +62,6 @@ class ClassicRankSocketNameSpace(socketio.AsyncNamespace):
             user_score=user_score,
             is_rdy=True,
         )
-
         await classic_rank_session.start_classic_rank_match(queuer_data, game_type, socket_id)
 
     async def on_disconnect(self, socket_id):

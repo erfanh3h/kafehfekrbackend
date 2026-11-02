@@ -27,36 +27,90 @@ class RankQueueSession(BaseQueueSession):
         super().__init__(GameScoreTypesEnum.RANK)
         self.queuers: list[QueuerModel] = []
         self.queuer_accept_pairs: dict[str, bool | None] = {}
+        self.accept_phase_sockets: dict[str, str] = {}
         self.active_pre_games: dict[str, PreGameClass] = {}
         self.socket_id_pre_games_pairs: dict[str, str] = {}
 
     def find_gamer_from_user_id(self, user_id):
         for queuer in self.queuers:
-            if queuer.user_id == user_id:
+            if str(queuer.user_id) == str(user_id):
                 return queuer
         return None
 
     def find_gamer_from_socket_id(self, socket_id):
+        if not socket_id:
+            return None
         for queuer in self.queuers:
             if queuer.socket_id == socket_id:
                 return queuer
         return None
 
+    def find_active_pre_game_for_user(self, user_id):
+        for pg_id, pg in list(self.active_pre_games.items()):
+            q = pg.find_gamer_from_user_id(user_id)
+            if q is not None:
+                return pg_id, pg, q
+        return None, None, None
+
+    def is_user_in_accept_phase(self, user_id) -> bool:
+        return any(str(uid) == str(user_id) for uid in self.queuer_accept_pairs.keys())
+
+    def has_active_ongoing_game(self, user_id) -> bool:
+        try:
+            from Entities.SocketIOClass.game import games
+            for g_id, game_play in list(games.items()):
+                if not getattr(game_play, "is_game_finished", False) and not getattr(game_play, "is_game_terminated", False):
+                    if game_play.is_user_id_valid(user_id):
+                        return True
+        except Exception:
+            pass
+        return False
+
+    def can_user_join_queue(self, user_id) -> bool:
+        # Reject if already in queue
+        if self.find_gamer_from_user_id(user_id) is not None:
+            return False
+        # Reject if waiting for match accept
+        if self.is_user_in_accept_phase(user_id):
+            return False
+        # Reject if in an active pre-game draft
+        pg_id, pg, q = self.find_active_pre_game_for_user(user_id)
+        if pg is not None:
+            return False
+        # Reject if in an active ongoing game
+        if self.has_active_ongoing_game(user_id):
+            return False
+        return True
+
+    def can_user_reconnect_pre_game(self, pre_game_id, user_id, socket_id) -> bool:
+        if not pre_game_id or pre_game_id not in self.active_pre_games:
+            return False
+        pg = self.active_pre_games[pre_game_id]
+        return pg.can_user_reconnect(user_id, socket_id)
+
     async def command_received(self, data, socket_id):
+        if not isinstance(data, dict):
+            return
         pre_game_id = data.get('pre_game_id', None)
         if pre_game_id is not None:  # commands received from pre game phase
             if pre_game_id not in self.active_pre_games.keys():
                 return
+            if self.socket_id_pre_games_pairs.get(socket_id) != pre_game_id:
+                return
             await self.active_pre_games[pre_game_id].command_received(data, socket_id)
             return
-        # accept command
-        user_id = data.get('user_id')
-        if not user_id or user_id not in self.queuer_accept_pairs:
+        # accept command: verify that socket_id matches the player in the accept phase
+        matched_uid = None
+        for uid_key, expected_sid in list(self.accept_phase_sockets.items()):
+            if expected_sid == socket_id:
+                matched_uid = uid_key
+                break
+        if matched_uid is None or matched_uid not in self.queuer_accept_pairs:
             return
-        if data['id'] == commands.Accept:
-            self.queuer_accept_pairs[user_id] = True
-        if data['id'] == commands.Reject:
-            self.queuer_accept_pairs[user_id] = False
+        if data.get('id') == commands.Accept:
+            self.queuer_accept_pairs[matched_uid] = True
+        if data.get('id') == commands.Reject:
+            self.queuer_accept_pairs[matched_uid] = False
 
     def delete_game(self, pre_game_id, dced_user, queuers):
         from Entities.SocketIOManagerClass import send_queue_command
@@ -109,6 +163,8 @@ class RankQueueSession(BaseQueueSession):
         queuer2_id = queuers[1].user_id
         self.queuer_accept_pairs[queuer1_id] = None
         self.queuer_accept_pairs[queuer2_id] = None
+        self.accept_phase_sockets[queuer1_id] = queuers[0].socket_id
+        self.accept_phase_sockets[queuer2_id] = queuers[1].socket_id
         from Entities.SocketIOManagerClass import send_queue_command
         for user_data in queuers:
             safe_run_async(
@@ -119,6 +175,7 @@ class RankQueueSession(BaseQueueSession):
             time.sleep(1)
             for queuer_data in queuers:
                 self.queuer_accept_pairs.pop(queuer_data.user_id, None)
+                self.accept_phase_sockets.pop(queuer_data.user_id, None)
             threading.Thread(target=self.start_new_pre_game, args=(queuers,), daemon=True).start()
 
         def cancel_game():
@@ -128,6 +185,7 @@ class RankQueueSession(BaseQueueSession):
                     send_queue_command(command=make_command_json(id=commands.Game_Canceled, data={}),
                                        socket_id=queuer_data.socket_id))
                 self.queuer_accept_pairs.pop(queuer_data.user_id, None)
+                self.accept_phase_sockets.pop(queuer_data.user_id, None)
 
         def let_game_start():
             if self.queuer_accept_pairs.get(queuer1_id) and self.queuer_accept_pairs.get(queuer2_id):
@@ -172,39 +230,51 @@ class RankQueueSession(BaseQueueSession):
             else:
                 time.sleep(1.0)
 
-    def join_queuer(self, user_data: QueuerModel):
-        if user_data.user_id in self.queuer_accept_pairs:  # prevent join when waiting for user accept
-            return
-        for existing in list(self.queuers):
-            if str(existing.user_id) == str(user_data.user_id):
-                self.queuers.remove(existing)
+    def join_queuer(self, user_data: QueuerModel) -> bool:
+        if not self.can_user_join_queue(user_data.user_id):
+            return False
         self.queuers.append(user_data)
+        return True
 
-    def reconnect_queuer(self, pre_game_id, user_data: QueuerModel):
+    def reconnect_queuer(self, pre_game_id, user_data: QueuerModel) -> bool:
         from Entities.SocketIOManagerClass import send_queue_command, enter_pre_game
         if pre_game_id not in self.active_pre_games.keys():
             safe_run_async(
                 send_queue_command(command=make_command_json(id=commands.Game_Finished, data={}),
                                    socket_id=user_data.socket_id))
             game_database.users_manager.update_user(user_data.user_id, open_pre_game_id="")
-            return
+            return False
+        pg = self.active_pre_games[pre_game_id]
+        if not pg.can_user_reconnect(user_data.user_id, user_data.socket_id):
+            return False
+        # Remove any stale socket mapping for this user in this pre-game
+        existing_q = pg.find_gamer_from_user_id(user_data.user_id)
+        if existing_q is not None and existing_q.socket_id and existing_q.socket_id != user_data.socket_id:
+            self.socket_id_pre_games_pairs.pop(existing_q.socket_id, None)
         self.socket_id_pre_games_pairs[user_data.socket_id] = pre_game_id
-        self.active_pre_games[pre_game_id].reconnect_user(user_data.socket_id, user_data.user_id)
+        pg.reconnect_user(user_data.socket_id, user_data.user_id)
         safe_run_async(
             enter_pre_game(socket_id=user_data.socket_id, pre_game_id=pre_game_id))
-        data = self.active_pre_games[pre_game_id].get_reconnect_data()
+        data = pg.get_reconnect_data()
         safe_run_async(
             send_queue_command(command=make_command_json(id=commands.Reconnect_Data, data=data),
                                socket_id=user_data.socket_id))
+        return True
 
     async def disconnect_user(self, socket_id):
+        # If disconnecting during accept phase, mark as rejected so opponent does not hang
+        for uid_key, expected_sid in list(self.accept_phase_sockets.items()):
+            if expected_sid == socket_id:
+                if uid_key in self.queuer_accept_pairs:
+                    self.queuer_accept_pairs[uid_key] = False
+                self.accept_phase_sockets.pop(uid_key, None)
         if socket_id not in self.socket_id_pre_games_pairs:
             for user_data in list(self.queuers):
                 if socket_id == user_data.socket_id:
                     self.queuers.remove(user_data)
                     break
             return
-        game_id = self.socket_id_pre_games_pairs[socket_id]
+        game_id = self.socket_id_pre_games_pairs.pop(socket_id, None)
         if game_id in self.active_pre_games:
             self.active_pre_games[game_id].disconnect_user(socket_id)
         for user_data in list(self.queuers):

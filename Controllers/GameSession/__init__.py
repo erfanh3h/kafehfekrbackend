@@ -125,36 +125,23 @@ class BaseGameSession:
 
 
     def find_gamer_from_socket(self, socket_id):
-
+        if not socket_id:
+            return None
         for gamer in self.gamers:
-
             if gamer.socket_id == socket_id:
-
                 return gamer
-
         try:
-
-            from Entities.SocketIOClass.game import socketid_userid_pairs
-
+            from Entities.SocketIOClass.game import socketid_userid_pairs, games
             uid = socketid_userid_pairs.get(socket_id)
-
-            if uid is not None:
-
+            game_play = games.get(self.game_id)
+            if uid is not None and game_play is not None and game_play.is_active_socket_for_user(uid, socket_id):
                 for gamer in self.gamers:
-
                     if str(gamer.user_id) == str(uid):
-
                         gamer.socket_id = socket_id
-
                         return gamer
-
         except Exception:
-
             pass
-
         return None
-
-
 
     def find_gamer_from_gamer_id(self, gamer_id):
 
@@ -203,19 +190,21 @@ class BaseGameSession:
     def join_gamer(self, user_id: int, socket_id):
         gamer_index = self.find_gamer_index_from_id(user_id)
         if gamer_index is not None:
-            self.gamers[gamer_index].set_finish_reconnect_time_function(self.finish_reconnect_time)
-            if self.gamers[gamer_index].is_joined_game:
+            gamer = self.gamers[gamer_index]
+            gamer.set_finish_reconnect_time_function(self.finish_reconnect_time)
+            if gamer.is_joined_game:
+                if not gamer.is_disconnected and gamer.socket_id not in ("", socket_id):
+                    return
                 self.timer.resume()
-                self.gamers[gamer_index].reconnect(socket_id)
+                gamer.reconnect(socket_id)
                 safe_run_async(
                     self.send_command(commands.User_Reconnected,
                                       {"user_id": user_id, 'time': max(0, self.timer.max_time - self.timer.counter)}))
                 self.send_reconnect_data(socket_id)
             else:
-                self.gamers[gamer_index].join_game(socket_id)
+                gamer.join_game(socket_id)
                 if self.is_game_running:
                     self.send_reconnect_data(socket_id)
-
 
     def send_game_data(self, function):
 

@@ -78,71 +78,94 @@ class GameSocketNameSpace(socketio.AsyncNamespace):
         token_data = await check_is_token_valid(auth)
         if not token_data:
             await self.emit('command', {'id': commands.Logout}, to=socket_id, namespace="/game")
+            await self.disconnect(socket_id, namespace="/game")
             return
         user_id = token_data['id']
-        user_game_id = auth['game_id']
-        if is_game_id_valid(user_game_id):
-            if games[user_game_id].is_user_id_valid(user_id):
-                await self.enter_room(socket_id, user_game_id, namespace="/game")
-                await self.enter_room(socket_id, socket_id, namespace="/game")
-                socketid_gameid_pairs[socket_id] = user_game_id
-                socketid_userid_pairs[socket_id] = user_id
-                games[user_game_id].change_gamer_socket_id(user_id, socket_id)
-                
-                async def _delayed_join():
-                    await asyncio.sleep(0.05)
-                    try:
-                        if user_game_id in games:
-                            games[user_game_id].join_gamer(user_id, socket_id)
-                    except Exception as e:
-                        print(f"[GameSocket] Error in join_gamer: {e}")
-                asyncio.create_task(_delayed_join())
-            else:
+        user_game_id = auth.get('game_id', '') if isinstance(auth, dict) else ''
+        if not user_game_id:
+            user_data = game_database.users_manager.read_user(user_id)
+            if user_data:
+                user_game_id = user_data.get("open_game_id", "")
+        if is_game_id_valid(user_game_id) and user_game_id in games:
+            game_obj = games[user_game_id]
+            if not game_obj.is_user_id_valid(user_id):
                 await self.disconnect(socket_id, namespace="/game")
                 return
+            if not game_obj.can_user_join_or_reconnect(user_id, socket_id):
+                print(f"[GameSocket] Duplicate connection rejected for user {user_id} (socket {socket_id}) in game {user_game_id}")
+                await self.emit('command', {'id': getattr(commands, 'Invalid_Game_Error', 'Invalid_Game_Error'), 'message': 'Already connected to active game session'}, to=socket_id, namespace="/game")
+                await self.disconnect(socket_id, namespace="/game")
+                return
+            # Remove any stale socket mappings for this user in this game
+            for old_sid, uid in list(socketid_userid_pairs.items()):
+                if str(uid) == str(user_id) and old_sid != socket_id and socketid_gameid_pairs.get(old_sid) == user_game_id:
+                    socketid_userid_pairs.pop(old_sid, None)
+                    socketid_gameid_pairs.pop(old_sid, None)
+            socketid_gameid_pairs[socket_id] = user_game_id
+            socketid_userid_pairs[socket_id] = user_id
+            game_obj.register_user_connection(user_id, socket_id)
+            await self.enter_room(socket_id, user_game_id, namespace="/game")
+            await self.enter_room(socket_id, socket_id, namespace="/game")
+
+            async def _delayed_join():
+                await asyncio.sleep(0.05)
+                try:
+                    if user_game_id in games and games[user_game_id].is_active_socket_for_user(user_id, socket_id):
+                        games[user_game_id].join_gamer(user_id, socket_id)
+                except Exception as e:
+                    print(f"[GameSocket] Error in join_gamer: {e}")
+
+            asyncio.create_task(_delayed_join())
         else:
             await self.emit('command', {'id': commands.Game_Finished}, to=socket_id, namespace="/game")
-            game_database.users_manager.update_user(user_id, open_game_id="")
-            # await self.disconnect(socket_id, namespace="/game")
+            if not str(user_id).startswith("bot_"):
+                game_database.users_manager.update_user(user_id, open_game_id="")
+            await self.disconnect(socket_id, namespace="/game")
 
     async def on_disconnect(self, socket_id):
-        game_id = return_gameid_from_socketid(socket_id)
+        game_id = socketid_gameid_pairs.pop(socket_id, None)
+        user_id = socketid_userid_pairs.pop(socket_id, None)
         if game_id is not None:
             await self.leave_room(socket_id, game_id, namespace="/game")
-            try:
-                games[game_id].disconnect_user(socket_id)
-            except KeyError:
-                pass
-            del socketid_gameid_pairs[socket_id]
-        socketid_userid_pairs.pop(socket_id, None)
+            game_obj = games.get(game_id)
+            if game_obj is not None and user_id is not None and game_obj.is_active_socket_for_user(user_id, socket_id):
+                try:
+                    game_obj.disconnect_user(socket_id)
+                except KeyError:
+                    pass
         print('disconnect ', socket_id)
 
     async def on_user_command(self, socket_id, data):
         game_id = return_gameid_from_socketid(socket_id)
-        if game_id is not None and game_id in games:
+        user_id = socketid_userid_pairs.get(socket_id)
+        if game_id is not None and game_id in games and user_id is not None:
+            game_obj = games[game_id]
+            if not game_obj.is_active_socket_for_user(user_id, socket_id):
+                return
             cmd_id = data.get('id') if isinstance(data, dict) else ""
             if cmd_id in ["RequestReconnectData", commands.Reconnect_Data, "reconnect_data"]:
                 print(f"[GameSocket] Explicit RequestReconnectData from {socket_id} for game {game_id}")
-                uid = socketid_userid_pairs.get(socket_id)
-                if uid is not None and hasattr(games[game_id], 'change_gamer_socket_id'):
-                    games[game_id].change_gamer_socket_id(uid, socket_id)
-                if hasattr(games[game_id], 'send_game_play_data') and getattr(games[game_id], 'is_game_started', False):
-                    games[game_id].send_game_play_data(socket_id)
-                if hasattr(games[game_id], 'game_session') and games[game_id].game_session is not None:
-                    if getattr(games[game_id].game_session, 'is_game_running', False):
-                        games[game_id].game_session.send_reconnect_data(socket_id)
-                elif hasattr(games[game_id], 'send_reconnect_data'):
-                    games[game_id].send_reconnect_data(socket_id)
+                if hasattr(game_obj, 'send_game_play_data') and getattr(game_obj, 'is_game_started', False):
+                    game_obj.send_game_play_data(socket_id)
+                if hasattr(game_obj, 'game_session') and game_obj.game_session is not None:
+                    if getattr(game_obj.game_session, 'is_game_running', False):
+                        game_obj.game_session.send_reconnect_data(socket_id)
+                elif hasattr(game_obj, 'send_reconnect_data'):
+                    game_obj.send_reconnect_data(socket_id)
                 return
-            await games[game_id].command_received(data, socket_id)
+            await game_obj.command_received(data, socket_id)
             print('User Sended command ', data)
 
     async def on_user_reaction(self, socket_id, data):
         game_id = return_gameid_from_socketid(socket_id)
-        if game_id is not None:
+        user_id = socketid_userid_pairs.get(socket_id)
+        if game_id is not None and game_id in games and user_id is not None:
+            game_obj = games[game_id]
+            if not game_obj.is_active_socket_for_user(user_id, socket_id):
+                return
             try:
-                await games[game_id].reaction_received(data, socket_id)
-            except:
+                await game_obj.reaction_received(data, socket_id)
+            except Exception:
                 pass
             print('User Sended command ', data)
 

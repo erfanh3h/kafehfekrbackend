@@ -44,9 +44,18 @@ class LobbySession:
 
     def find_free_gamer_from_user_id(self, user_id):
         for queuer in self.free_queuers:
-            if queuer.user_id == user_id:
+            if str(queuer.user_id) == str(user_id):
                 return queuer
         return None
+
+    def is_user_connected_in_lobby_namespace(self, user_id) -> bool:
+        if self.find_free_gamer_from_user_id(user_id) is not None:
+            return True
+        for lobby in self.lobbies:
+            for queuer in lobby.queuers:
+                if str(queuer.user_id) == str(user_id):
+                    return True
+        return False
 
     def find_free_gamer_from_socket_id(self, socket_id):
         for queuer in self.free_queuers:
@@ -99,18 +108,23 @@ class LobbySession:
         await self.join_lobby(user_data, lobby_id)
         await send_global_lobby_command(command=make_command_json(id=commands.Lobby_Created, data=new_lobby.to_json()))
 
-    async def join_queuers_list(self, user_data: QueuerModel):
+    async def join_queuers_list(self, user_data: QueuerModel) -> bool:
+        if self.is_user_connected_in_lobby_namespace(user_data.user_id):
+            return False
         self.free_queuers.append(user_data)
         from Entities.SocketIOManagerClass import send_private_lobby_command
         await send_private_lobby_command(
             command=make_command_json(id=commands.Lobby_List, data=self.get_lobbies_data()),
             socket_id=user_data.socket_id)
+        return True
 
     async def join_lobby(self, user_data: QueuerModel, lobby_id):
-        self.socketid_lobbyid_pairs[user_data.socket_id] = lobby_id
         lobby = self.find_lobby_from_id(lobby_id)
         if lobby is None:
             return
+        if any(str(q.user_id) == str(user_data.user_id) for q in lobby.queuers):
+            return
+        self.socketid_lobbyid_pairs[user_data.socket_id] = lobby_id
         lobby.add_queuer(user_data)
         from Entities.SocketIOManagerClass import send_lobby_command, enter_lobby
         await enter_lobby(socket_id=user_data.socket_id, lobby_id=lobby_id)

@@ -53,18 +53,25 @@ async def extract_token(token):
 
 
 async def check_is_token_valid(auth_data):
-    if auth_data is None:
+    if not isinstance(auth_data, dict):
         return None
     try:
-        user_token_data = await extract_token(auth_data['token'])
-        if user_token_data is None:
+        token = auth_data.get('token')
+        if not token:
+            return None
+        user_token_data = await extract_token(token)
+        if user_token_data is None or not user_token_data.get('id'):
             return None
         if user_token_data.get('is_bot'):
             return user_token_data
         user = game_database.users_manager.read_user(user_token_data['id'])
-        if user is None or user['device_id'] != user_token_data['device_id']:
+        if user is None:
             return None
-        else:
-            return user_token_data
-    except:
+        if user.get('device_id') != user_token_data.get('device_id'):
+            return None
+        if user.get('phone') is not None and user_token_data.get('phone') is not None:
+            if str(user.get('phone')) != str(user_token_data.get('phone')):
+                return None
+        return user_token_data
+    except Exception:
         return None

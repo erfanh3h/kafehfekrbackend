@@ -1,7 +1,7 @@
 import socketio
-
 from Commons import static_functions
 from Controllers.QueueSession.multi_rank import MultiRankQueueSession
+from Entities.Security import check_is_token_valid
 from Models.Queuer import QueuerModel
 from Commons import commands
 
@@ -11,36 +11,35 @@ multi_rank_queue_session.init_session()
 
 class MultiQueueSocketNameSpace(socketio.AsyncNamespace):
     async def on_connect(self, socket_id, environ, auth):
-        if auth is not None:
-            try:
-                from Entities.Security import extract_token
-                # user_id = auth['user_id']
-                token_data = await extract_token(auth['token'])
-                if token_data is not None:
-                    user_id = token_data['id']
-                    # game_score_type = auth['game_score_type']
-                else:
-                    await self.disconnect(socket_id, namespace="/queue")
-                    return
-                game_type = auth['game_type']
-                if game_type is None:
-                    await self.disconnect(socket_id, namespace="/queue")
-                    return
-            except:
-                await self.disconnect(socket_id, namespace="/queue")
-                return
-        else:
-            await self.disconnect(socket_id, namespace="/queue")
+        if not isinstance(auth, dict):
+            await self.disconnect(socket_id, namespace="/multi-queue")
+            return
+        token_data = await check_is_token_valid(auth)
+        if not token_data:
+            await self.emit('command', {'id': commands.Logout}, to=socket_id, namespace="/multi-queue")
+            await self.disconnect(socket_id, namespace="/multi-queue")
+            return
+        user_id = token_data['id']
+        game_type = auth.get('game_type')
+        if game_type is None:
+            await self.disconnect(socket_id, namespace="/multi-queue")
+            return
+        if not multi_rank_queue_session.can_user_join_queue(user_id):
+            print(f"[MultiQueue] Duplicate queue join rejected for user {user_id} (socket {socket_id})")
+            await self.disconnect(socket_id, namespace="/multi-queue")
             return
         from Entities.Database import game_database
         user_data = game_database.users_manager.read_user(user_id)
+        if not user_data:
+            await self.disconnect(socket_id, namespace="/multi-queue")
+            return
         queuer_data = QueuerModel(user_id, user_data["username"], socket_id=socket_id,
                                   user_image=user_data['image'], user_coin=user_data['coin'],
                                   user_score=user_data['score'])
-        # if user_data['coin'] < 15:  # check user coin
-        #     await self.emit('command', {'id': commands.Not_Enough_Coin}, to=socket_id, namespace="/queue")
-        # else:
-        multi_rank_queue_session.join_user(queuer_data, game_type)
+        if not multi_rank_queue_session.join_user(queuer_data, game_type):
+            await self.disconnect(socket_id, namespace="/multi-queue")
+            return
+        await self.enter_room(socket_id, socket_id, namespace="/multi-queue")
 
     async def on_disconnect(self, socket_id):
         await multi_rank_queue_session.disconnect_user(socket_id)

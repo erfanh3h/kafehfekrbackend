@@ -17,6 +17,12 @@ class BaseGamePlayClass:
         self.timer = TimerClass()
         self.game_play_id = game_play_id
         self.gamers = gamers
+        for g in self.gamers:
+            g.socket_id = ""
+            g.is_disconnected = False
+        self.has_connected_once: set[str] = set()
+        self.active_user_sockets: dict[str, str] = {}
+        self.disconnected_user_ids: set[str] = set()
         self.game_types = game_types
         self.game_score_type = game_score_type
         self.game_session = None
@@ -160,8 +166,60 @@ class BaseGamePlayClass:
                 break
             time.sleep(0.3)
 
-    def join_gamer(self, user_id, socket_id):
+    def can_user_join_or_reconnect(self, user_id, socket_id) -> bool:
+        if self.is_game_finished or self.is_game_terminated:
+            return False
+        if not self.is_user_id_valid(user_id):
+            return False
+        uid_str = str(user_id)
+        # First time joining this game session
+        if uid_str not in self.has_connected_once:
+            return True
+        # Same socket that was already registered
+        active_sid = self.active_user_sockets.get(uid_str, "")
+        if active_sid == socket_id and uid_str not in self.disconnected_user_ids:
+            return True
+        # Already joined before: ONLY allow reconnect if the user was disconnected
+        session_gamer = None
+        if self.game_session is not None and hasattr(self.game_session, "gamers"):
+            for sg in self.game_session.gamers:
+                if str(sg.user_id) == uid_str:
+                    session_gamer = sg
+                    break
+        is_marked_disconnected = (
+            uid_str in self.disconnected_user_ids
+            or not active_sid
+            or (session_gamer is not None and getattr(session_gamer, "is_disconnected", False))
+        )
+        if not is_marked_disconnected:
+            return False
+        return True
+
+    def register_user_connection(self, user_id, socket_id):
+        uid_str = str(user_id)
+        self.has_connected_once.add(uid_str)
+        self.active_user_sockets[uid_str] = socket_id
+        self.disconnected_user_ids.discard(uid_str)
         self.change_gamer_socket_id(user_id, socket_id)
+        for gamer in self.gamers:
+            if str(gamer.user_id) == uid_str:
+                gamer.is_disconnected = False
+                break
+
+    def is_active_socket_for_user(self, user_id, socket_id) -> bool:
+        if not socket_id:
+            return False
+        return self.active_user_sockets.get(str(user_id)) == socket_id
+
+    def is_active_socket(self, socket_id) -> bool:
+        if not socket_id:
+            return False
+        return socket_id in self.active_user_sockets.values()
+
+    def join_gamer(self, user_id, socket_id):
+        if not self.can_user_join_or_reconnect(user_id, socket_id):
+            return False
+        self.register_user_connection(user_id, socket_id)
         if self.is_game_started:
             self.send_game_play_data(socket_id)
             if self.game_session is not None and not self.game_session.is_game_finished:
@@ -171,9 +229,17 @@ class BaseGamePlayClass:
             elif not self.is_game_finished:
                 self.send_timer_value(socket_id)
         else:
-            self.is_gamers_join_game[user_id] = True
+            for g in self.gamers:
+                if str(g.user_id) == str(user_id):
+                    self.is_gamers_join_game[g.user_id] = True
+                    break
+            else:
+                self.is_gamers_join_game[user_id] = True
+        return True
 
     async def command_received(self, data, socket_id):
+        if not self.is_active_socket(socket_id):
+            return
         if isinstance(data, dict) and data.get('id') in [commands.Reconnect_Data, "RequestReconnectData", "reconnect_data"]:
             if self.game_session is not None:
                 self.game_session.send_reconnect_data(socket_id)
@@ -187,11 +253,7 @@ class BaseGamePlayClass:
                         surrender_user_id = gamer.user_id
                         break
                 if surrender_user_id is None:
-                    try:
-                        from Entities.SocketIOClass.game import socketid_userid_pairs
-                        surrender_user_id = socketid_userid_pairs.get(socket_id)
-                    except Exception:
-                        pass
+                    return
                 winner_user_id = 0
                 for gamer in self.gamers:
                     if str(gamer.user_id) != str(surrender_user_id):
@@ -204,11 +266,31 @@ class BaseGamePlayClass:
             await self.game_session.command_received(data, socket_id)
 
     def disconnect_user(self, socket_id):
+        disconnected_uid = None
+        for uid_str, active_sid in list(self.active_user_sockets.items()):
+            if active_sid == socket_id:
+                disconnected_uid = uid_str
+                self.active_user_sockets[uid_str] = ""
+                self.disconnected_user_ids.add(uid_str)
+                break
+        if disconnected_uid is None:
+            # Ignore disconnect from duplicate/rejected socket
+            return
+        for gamer in self.gamers:
+            if str(gamer.user_id) == disconnected_uid:
+                gamer.is_disconnected = True
+                gamer.socket_id = ""
+                if not self.is_game_started:
+                    self.is_gamers_join_game[gamer.user_id] = False
+                break
         if self.game_session is not None:
             self.game_session.disconnect_user(socket_id)
 
     async def reaction_received(self, data, socket_id):
-        await self.game_session.reaction_received(data, socket_id)
+        if not self.is_active_socket(socket_id):
+            return
+        if self.game_session is not None:
+            await self.game_session.reaction_received(data, socket_id)
 
     def start_current_game(self):
         if self.is_game_finished or self.current_game_index >= len(self.game_types):

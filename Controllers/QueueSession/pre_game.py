@@ -32,7 +32,7 @@ class PreGameClass:
 
     def find_gamer_from_user_id(self, user_id):
         for queuer in self.queuers:
-            if queuer.user_id == user_id:
+            if str(queuer.user_id) == str(user_id):
                 return queuer
         return None
 
@@ -43,10 +43,22 @@ class PreGameClass:
         return False
 
     def find_gamer_from_socket_id(self, socket_id):
+        if not socket_id:
+            return None
         for queuer in self.queuers:
-            if queuer.socket_id == socket_id:
+            if queuer.socket_id == socket_id and not queuer.is_disconnected:
                 return queuer
         return None
+
+    def can_user_reconnect(self, user_id, socket_id) -> bool:
+        if self.dced_user is not None:
+            return False
+        user_data = self.find_gamer_from_user_id(user_id)
+        if user_data is None:
+            return False
+        if not user_data.is_disconnected and user_data.socket_id and user_data.socket_id != socket_id:
+            return False
+        return True
 
     def get_reconnect_data(self):
         queuers_data = []
@@ -243,7 +255,8 @@ class PreGameClass:
 
     def reconnect_user(self, socket_id, user_id):
         from Entities.SocketIOManagerClass import send_pre_game_command
-        import asyncio
+        if not self.can_user_reconnect(user_id, socket_id):
+            return False
         user_data = self.find_gamer_from_user_id(user_id)
         if user_data is not None:
             user_data.reconnect(socket_id)
@@ -253,6 +266,8 @@ class PreGameClass:
                 command=make_command_json(id=commands.User_Reconnected,
                                           data={"user_id": user_data.user_id, "time": max(0, self.timer.max_time - self.timer.counter)}),
                 pre_game_id=self.pre_game_id))
+            return True
+        return False
 
     def finish_dc_timer(self, user_id):
         self.dced_user = user_id

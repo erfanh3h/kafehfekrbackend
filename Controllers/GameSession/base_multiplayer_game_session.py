@@ -144,18 +144,21 @@ class BaseMultiplayerGameSession(BaseGameSession):
     def join_gamer(self, user_id: int, socket_id):
         gamer_index = self.find_gamer_index_from_id(user_id)
         if gamer_index is not None:
-            self.gamers[gamer_index].set_finish_reconnect_time_function(self.finish_reconnect_time)
-            if self.gamers[gamer_index].is_joined_game:
-                self.gamers[gamer_index].reconnect(socket_id)
+            gamer = self.gamers[gamer_index]
+            gamer.set_finish_reconnect_time_function(self.finish_reconnect_time)
+            if gamer.is_joined_game:
+                if not gamer.is_disconnected and gamer.socket_id not in ("", socket_id):
+                    return
+                gamer.reconnect(socket_id)
                 self.send_reconnect_data(socket_id)
                 if not self.game_controller.active_player_indexes.__contains__(
-                        self.gamers[gamer_index].gamer_id):  # check user is one of active players
+                        gamer.gamer_id):  # check user is one of active players
                     return
                 self.timer.resume()
                 safe_run_async(
                     self.send_command(commands.User_Reconnected,
                                       {"user_id": user_id, 'time': max(0, self.timer.max_time - self.timer.counter)}))
             else:
-                self.gamers[gamer_index].join_game(socket_id)
+                gamer.join_game(socket_id)
                 if self.is_game_running:
                     self.send_reconnect_data(socket_id)
