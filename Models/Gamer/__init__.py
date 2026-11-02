@@ -19,6 +19,9 @@ class GamerModel(UserModel):
         if not self.is_disconnected:
             self.not_played_turns += 1
 
+    def reset_not_played_turns(self):
+        self.not_played_turns = 0
+
     def set_finish_reconnect_time_function(self, finish_reconnect_time_function):
         self.finish_reconnect_time_function = finish_reconnect_time_function
         self.timer.set_finish_timer_function(finish_reconnect_time_function)
@@ -31,6 +34,8 @@ class GamerModel(UserModel):
         self.is_disconnected = False
         self.socket_id = socket_id
         self.timer.stop()
+        if hasattr(self.timer, 'max_time'):
+            self.timer.max_time = max(self.timer.max_time, 30)
 
     def disconnect(self):
         self.is_disconnected = True

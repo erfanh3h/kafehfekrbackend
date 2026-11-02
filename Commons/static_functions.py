@@ -38,44 +38,20 @@ async def get_current_user(token: str):
 
 
 def gametype_to_difficulty(game_type):
-    if game_type == GameTypesEnum.TIC_TAC_TOE.value:
-        return GameDifficultyEnum.Easy
-    if game_type == GameTypesEnum.RPC.value:
-        return GameDifficultyEnum.Easy
-    if game_type == GameTypesEnum.DOTBOX.value:
-        return GameDifficultyEnum.Easy
-    if game_type == GameTypesEnum.LUDO.value:
-        return GameDifficultyEnum.Easy
-    if game_type == GameTypesEnum.FEKRBEKR.value:
-        return GameDifficultyEnum.Normal
-    if game_type == GameTypesEnum.PENTAGO.value:
-        return GameDifficultyEnum.Normal
-    if game_type == GameTypesEnum.MSweeper.value:
-        return GameDifficultyEnum.Normal
-    if game_type == GameTypesEnum.MNUMBERS.value:
-        return GameDifficultyEnum.Easy
-    if game_type == GameTypesEnum.BATTLESHIP.value:
-        return GameDifficultyEnum.Normal
-    if game_type == GameTypesEnum.FOURINROW.value:
-        return GameDifficultyEnum.Normal
-    if game_type == GameTypesEnum.BOXFOUR.value:
-        return GameDifficultyEnum.Normal
-    if game_type == GameTypesEnum.SUDOKU.value:
-        return GameDifficultyEnum.Normal
-    if game_type == GameTypesEnum.YATZY.value:
-        return GameDifficultyEnum.Normal
-    if game_type == GameTypesEnum.CHESS.value:
-        return GameDifficultyEnum.Hard
-    if game_type == GameTypesEnum.CHECKERS.value:
-        return GameDifficultyEnum.Hard
-    if game_type == GameTypesEnum.OTHELLO.value:
-        return GameDifficultyEnum.Hard
-    if game_type == GameTypesEnum.BACKGAMMON.value:
-        return GameDifficultyEnum.Hard
-    if game_type == GameTypesEnum.YINSH.value:
-        return GameDifficultyEnum.Hard
-    if game_type == GameTypesEnum.MILL.value:
-        return GameDifficultyEnum.Hard
+    val = game_type.value if hasattr(game_type, "value") else str(game_type)
+    val_norm = val.lower().replace("_", "").replace("-", "")
+
+    easy_types = (GameTypesEnum.TIC_TAC_TOE, GameTypesEnum.RPC, GameTypesEnum.DOTBOX, GameTypesEnum.LUDO, GameTypesEnum.MNUMBERS)
+    for gt in easy_types:
+        if val_norm == gt.value.lower().replace("_", "").replace("-", ""):
+            return GameDifficultyEnum.Easy
+
+    hard_types = (GameTypesEnum.CHESS, GameTypesEnum.CHECKERS, GameTypesEnum.OTHELLO, GameTypesEnum.BACKGAMMON, GameTypesEnum.YINSH, GameTypesEnum.MILL)
+    for gt in hard_types:
+        if val_norm == gt.value.lower().replace("_", "").replace("-", ""):
+            return GameDifficultyEnum.Hard
+
+    return GameDifficultyEnum.Normal
 
 
 main_loop = None

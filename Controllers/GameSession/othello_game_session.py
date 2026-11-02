@@ -31,6 +31,8 @@ class OthelloGameSession(BaseGameSession):
 
     def send_current_turn(self):
         from Entities.SocketIOManagerClass import send_command
+        if self.check_afk_turn():
+            return
         if self.game_controller.check_game_ended():
             winner = self.game_controller.get_game_winner()
             safe_run_async(

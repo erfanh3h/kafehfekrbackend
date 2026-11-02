@@ -31,6 +31,8 @@ class FourInRowGameSession(BaseGameSession):
                 self.timer.stop()
 
     def send_current_turn(self):
+        if self.check_afk_turn():
+            return
         if self.check_finish_game():
             return
         self.game_controller.change_turn()

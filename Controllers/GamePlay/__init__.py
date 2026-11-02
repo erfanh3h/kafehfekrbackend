@@ -329,7 +329,7 @@ class BaseGamePlayClass:
                 self.game_session.timer.stop(False)
             except Exception:
                 pass
-            # ONLY penalize if full disconnect timeout occurred (1 min expired) or detected as AFK (4 missed turns)
+            # ONLY penalize if full disconnect timeout occurred (1 min expired) or detected as AFK (2 consecutive missed turns)
             afk_uid = getattr(self.game_session, 'afk_user_id', None)
             dc_uid = getattr(self.game_session, 'dc_timeout_user_id', None)
             if afk_uid is not None:
@@ -338,7 +338,7 @@ class BaseGamePlayClass:
                 self.afk_or_dc_penalty_user_id = dc_uid
             else:
                 for sg in getattr(self.game_session, 'gamers', []):
-                    if getattr(sg, 'not_played_turns', 0) >= 4:
+                    if getattr(sg, 'not_played_turns', 0) >= 2:
                         self.afk_or_dc_penalty_user_id = sg.user_id
                         break
 

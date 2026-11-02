@@ -32,6 +32,8 @@ class TicTacToeGameSession(BaseGameSession):
 
     def send_current_turn(self):
         from Entities.SocketIOManagerClass import send_command
+        if self.check_afk_turn():
+            return
         if self.check_finish_game():
             return
         if self.game_controller.is_round_finished:

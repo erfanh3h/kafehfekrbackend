@@ -55,6 +55,7 @@ class BaseGameSession:
         self.is_game_finished = False
         self.dc_timeout_user_id = None
         self.afk_user_id = None
+        self.is_first_turn = True
 
 
 
@@ -315,6 +316,11 @@ class BaseGameSession:
         if gamer_data is None:
             return None
 
+        if hasattr(gamer_data, "reset_not_played_turns"):
+            gamer_data.reset_not_played_turns()
+        if hasattr(self, "game_controller") and hasattr(self.game_controller, "is_current_turn_played"):
+            self.game_controller.is_current_turn_played = True
+
         if any(g.gamer_id == 0 for g in self.gamers):
             self.prepare_gamers()
         self.is_game_running = True
@@ -427,76 +433,54 @@ class BaseGameSession:
 
 
 
+    def check_afk_turn(self):
+        """Universal AFK check for 2-player turn-based games called in send_current_turn()."""
+        if len(self.gamers) < 2:
+            return False
+        if getattr(self, 'is_first_turn', True):
+            self.is_first_turn = False
+            return False
+        if not getattr(self.game_controller, 'is_current_turn_played', False):
+            if self.check_finish_game_by_not_play_turn(self.game_controller.current_turn):
+                return True
+        if hasattr(self, 'game_controller'):
+            self.game_controller.is_current_turn_played = False
+        return False
+
     def check_finish_game_by_not_play_turn(self, current_turn):  # this used only on 2 players games
 
         from Entities.SocketIOManagerClass import send_command
         from Entities.RewardManagerClass import GameScoreTypesEnum
 
+        if len(self.gamers) < 2:
+            return False
+
         if current_turn == 1:
-
-            self.gamers[0].not_played_turn()
-
-            if self.gamers[0].not_played_turns == 4:
-                self.afk_user_id = self.gamers[0].user_id
-
-                winner = 2
-
-                if self.game_score_type != GameScoreTypesEnum.RANK:
-                    safe_run_async(
-                        send_command(command=make_command_json(id=commands.Finish_Game, data={"Winner": winner}),
-                                     game_id=self.game_id))
-
-                self.finish_game(winner)
-
-                return True
-
-            else:
-
-                safe_run_async(
-
-                    send_command(command=make_command_json(id=commands.Not_played_Turns,
-
-                                                           data={"gamer_id": self.gamers[0].gamer_id,
-
-                                                                 "count": self.gamers[0].not_played_turns}),
-
-                                 game_id=self.game_id))
-
-                return False
-
+            gamer = self.gamers[0]
+            winner = 2
         else:
+            gamer = self.gamers[1]
+            winner = 1
 
-            self.gamers[1].not_played_turn()
+        gamer.not_played_turn()
 
-            if self.gamers[1].not_played_turns == 4:
-                self.afk_user_id = self.gamers[1].user_id
+        if gamer.not_played_turns >= 2:
+            self.afk_user_id = gamer.user_id
 
-                winner = 1
-
-                if self.game_score_type != GameScoreTypesEnum.RANK:
-                    safe_run_async(
-                        send_command(command=make_command_json(id=commands.Finish_Game, data={"Winner": winner}),
-                                     game_id=self.game_id))
-
-                self.finish_game(winner)
-
-                return True
-
-            else:
-
+            if self.game_score_type != GameScoreTypesEnum.RANK:
                 safe_run_async(
-
-                    send_command(command=make_command_json(id=commands.Not_played_Turns,
-
-                                                           data={"gamer_id": self.gamers[1].gamer_id,
-
-                                                                 "count": self.gamers[1].not_played_turns}),
-
+                    send_command(command=make_command_json(id=commands.Finish_Game, data={"Winner": winner}),
                                  game_id=self.game_id))
 
-                return False
-
-
+            self.finish_game(winner)
+            return True
+        else:
+            safe_run_async(
+                send_command(command=make_command_json(id=commands.Not_played_Turns,
+                                                       data={"gamer_id": gamer.gamer_id,
+                                                             "count": gamer.not_played_turns}),
+                             game_id=self.game_id))
+            return False
 
     def check_finish_game(self):
 
