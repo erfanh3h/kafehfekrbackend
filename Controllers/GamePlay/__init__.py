@@ -67,7 +67,8 @@ class BaseGamePlayClass:
         game_database.game_play_history_manager.create_game_play_history(self.game_play_id, user_idis, self.game_types,
                                                                          str(self.game_score_type.value))
         for user_id in user_idis:
-            game_database.users_manager.update_user(user_id, open_game_id=self.game_play_id, )
+            if not str(user_id).startswith("bot_"):
+                game_database.users_manager.update_user(user_id, open_game_id=self.game_play_id)
 
     def join_game_limit_time(self):
         if not self.is_game_started:

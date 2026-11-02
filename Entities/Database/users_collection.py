@@ -35,6 +35,8 @@ class UsersCollectionManager:
         return self.collection.find_one(query)
 
     def create_user(self, phone, name="", device_id="0"):
+        if str(phone).startswith("bot_") or str(name).startswith("bot_") or str(phone).startswith("test_bot") or str(device_id).startswith("bot_device"):
+            return None, False
         data = self.is_phone_avaialble(phone)
         if data is None:
             user_data = create_user_json(phone=phone, name=name, device_id=device_id)
@@ -60,13 +62,14 @@ class UsersCollectionManager:
         return result
 
     def read_ranking_users_by_score(self):
-        query = {'score': {'$gt': 0}}
+        query = {'score': {'$gt': 0}, '_id': {'$not': {'$regex': '^bot_'}}}
         selection_items = {"username": 1, "image": 1, "score": 1, "join_date": 1}
         data = self.collection.find(query, selection_items).sort([('score', pymongo.DESCENDING)]).limit(25)
         return data
 
     def read_ranking_users_by_win(self, users_id: list):
-        query = {'_id': {'$in': users_id}}
+        clean_ids = [uid for uid in users_id if not (str(uid).startswith("bot_") or str(uid).startswith("test_bot"))]
+        query = {'_id': {'$in': clean_ids}}
         selection_items = {"username": 1, "image": 1, "join_date": 1}
         data = list(self.collection.find(query, selection_items))
         return data
@@ -80,6 +83,8 @@ class UsersCollectionManager:
     def update_user(self, user_id, username=None, score=None, xp=None, coin=None, image=None, token=None,
                     open_game_id=None, open_pre_game_id=None, device_id=None, last_time_played=None,
                     last_time_chance=None, is_active=None, win_streak=None, last_daily_win=None):
+        if str(user_id).startswith("bot_") or str(user_id).startswith("test_bot"):
+            return None
         query = {'_id': user_id}
         update_data = {}
         if username is not None:

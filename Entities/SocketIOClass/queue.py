@@ -78,6 +78,23 @@ class QueueSocketNameSpace(socketio.AsyncNamespace):
                 await self.disconnect(socket_id, namespace="/queue")
                 return
 
+        # Reject queue join if player does not meet the minimum XP threshold (Level 3 / 160 XP)
+        MIN_RANKED_XP = 160
+        user_xp = int(user_data.get("xp", 0))
+        if user_xp < MIN_RANKED_XP:
+            print(f"[Queue] User {user_id} does not have required XP ({user_xp} < {MIN_RANKED_XP}). Rejecting /queue join.")
+            await self.emit("command", {
+                "id": getattr(commands, "Rank_Locked", "RankLocked"),
+                "data": {
+                    "min_xp": MIN_RANKED_XP,
+                    "min_level": 3,
+                    "current_xp": user_xp,
+                    "message": "برای شرکت در مسابقات رده‌بندی باید حداقل به سطح ۳ (۱۶۰ XP) برسید."
+                }
+            }, to=socket_id, namespace="/queue")
+            await self.disconnect(socket_id, namespace="/queue")
+            return
+
         if not rank_queue_session.can_user_join_queue(user_id, socket_id):
             print(f"[Queue] Duplicate queue join rejected for user {user_id} (socket {socket_id})")
             await self.disconnect(socket_id, namespace="/queue")
