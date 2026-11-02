@@ -35,10 +35,10 @@ class UsersCollectionManager:
         return self.collection.find_one(query)
 
     def create_user(self, phone, name="", device_id="0"):
-        if str(phone).startswith("bot_") or str(name).startswith("bot_") or str(phone).startswith("test_bot") or str(device_id).startswith("bot_device"):
-            return None, False
         data = self.is_phone_avaialble(phone)
         if data is None:
+            if str(phone).startswith("bot_") or str(name).startswith("bot_") or str(phone).startswith("test_bot"):
+                return None, False
             user_data = create_user_json(phone=phone, name=name, device_id=device_id)
             self.collection.insert_one(user_data)
             return user_data, True
@@ -62,13 +62,13 @@ class UsersCollectionManager:
         return result
 
     def read_ranking_users_by_score(self):
-        query = {'score': {'$gt': 0}, '_id': {'$not': {'$regex': '^bot_'}}}
+        query = {'score': {'$gt': 0}, '_id': {'$ne': '3goBRU', '$not': {'$regex': '^bot_'}}}
         selection_items = {"username": 1, "image": 1, "score": 1, "join_date": 1}
         data = self.collection.find(query, selection_items).sort([('score', pymongo.DESCENDING)]).limit(25)
         return data
 
     def read_ranking_users_by_win(self, users_id: list):
-        clean_ids = [uid for uid in users_id if not (str(uid).startswith("bot_") or str(uid).startswith("test_bot"))]
+        clean_ids = [uid for uid in users_id if not (str(uid).startswith("bot_") or str(uid).startswith("test_bot") or str(uid) == "3goBRU")]
         query = {'_id': {'$in': clean_ids}}
         selection_items = {"username": 1, "image": 1, "join_date": 1}
         data = list(self.collection.find(query, selection_items))

@@ -46,7 +46,7 @@ class UserHistoryCollectionManager:
             return None
 
     def read_ranking_users_by_win(self):
-        query = {'win_rank': {'$gt': 0}, '_id': {'$not': {'$regex': '^bot_'}}}
+        query = {'win_rank': {'$gt': 0}, '_id': {'$ne': '3goBRU', '$not': {'$regex': '^bot_'}}}
         selection_items = {"win_rank": 1}
         data = self.collection.find(query, selection_items).sort([('win_rank', pymongo.DESCENDING)]).limit(25)
         return data
