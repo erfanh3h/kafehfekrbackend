@@ -104,7 +104,7 @@ class BaseGamePlayClass:
                      'score_awarded': getattr(self.score_manager, 'last_awarded_score', {}),
                      'coin_awarded': getattr(self.score_manager, 'last_awarded_coin', {})}
         session_gamer_map = {}
-        if self.game_session is not None and not self.game_session.is_game_finished:
+        if self.game_session is not None:
             for sg in getattr(self.game_session, 'gamers', []):
                 if getattr(sg, 'gamer_id', 0) > 0:
                     session_gamer_map[str(sg.user_id)] = sg.gamer_id
@@ -179,9 +179,17 @@ class BaseGamePlayClass:
                 if str(sg.user_id) == uid_str:
                     session_gamer = sg
                     break
+        is_socket_alive = False
+        if active_sid:
+            try:
+                from Entities.SocketIOManagerClass import Socket_Server
+                is_socket_alive = bool(Socket_Server.manager.is_connected(active_sid, "/game"))
+            except Exception:
+                is_socket_alive = True
         is_marked_disconnected = (
             uid_str in self.disconnected_user_ids
             or not active_sid
+            or not is_socket_alive
             or (session_gamer is not None and getattr(session_gamer, "is_disconnected", False))
         )
         if not is_marked_disconnected:
@@ -215,7 +223,7 @@ class BaseGamePlayClass:
         self.register_user_connection(user_id, socket_id)
         if self.is_game_started:
             self.send_game_play_data(socket_id)
-            if self.game_session is not None and not self.game_session.is_game_finished:
+            if self.game_session is not None:
                 if self.game_session.is_game_running:
                     self.navigate_to_game(socket_id, is_reconnect=True)
                 self.game_session.join_gamer(user_id, socket_id)
@@ -297,6 +305,11 @@ class BaseGamePlayClass:
                 GamerModel(user_id=gamer.user_id, username=gamer.username, user_image=gamer.user_image,
                            user_score=gamer.user_score, user_coin=gamer.user_coin))
             self.game_session.join_gamer(gamer.user_id, gamer.socket_id)
+            if getattr(gamer, "is_disconnected", False) or str(gamer.user_id) in self.disconnected_user_ids:
+                for sg in self.game_session.gamers:
+                    if str(sg.user_id) == str(gamer.user_id):
+                        sg.is_disconnected = True
+                        break
         self.game_session.start_game_timer()
 
     def is_user_id_valid(self, user_id):
@@ -395,8 +408,42 @@ class BaseGamePlayClass:
         except Exception as e:
             print(f"[BaseGamePlayClass] Error updating game_play_history: {e}")
         self.is_game_finished = True
+        self.game_winner_id = rank1_id
+        rank1_gid = self.game_session.find_gamer_id_from_user_id(rank1_id) if self.game_session is not None else 0
+        rank2_gid = self.game_session.find_gamer_id_from_user_id(rank2_id) if self.game_session is not None else 0
+        from Entities.SocketIOManagerClass import send_private_command
+        last_xp = getattr(self.score_manager, "last_awarded_xp", {})
+        last_score = getattr(self.score_manager, "last_awarded_score", {})
+        last_coin = getattr(self.score_manager, "last_awarded_coin", {})
         for gamer in self.gamers:
             self.send_game_play_data(gamer.socket_id)
+            if gamer.socket_id:
+                try:
+                    earned = last_xp.get(gamer.user_id, 0)
+                    s_earned = last_score.get(gamer.user_id, 0)
+                    c_earned = last_coin.get(gamer.user_id, 0)
+                    safe_run_async(
+                        send_private_command(
+                            command=make_command_json(
+                                id=commands.Finish_Game,
+                                data={
+                                    "rank1": rank1_gid,
+                                    "rank2": rank2_gid,
+                                    "Winner": rank1_gid,
+                                    "winner": rank1_gid,
+                                    "game_winner_id": rank1_id,
+                                    "series_scores": self.gamer_scores,
+                                    "xp_earned": earned,
+                                    "score_earned": s_earned,
+                                    "coin_earned": c_earned,
+                                }
+                            ),
+                            socket_id=gamer.socket_id,
+                            game_id=self.game_play_id
+                        )
+                    )
+                except Exception as e:
+                    print(f"[BaseGamePlayClass] Error sending multiplayer Finish_Game: {e}")
         from Entities.SocketIOClass.game import delete_game
         try:
             delete_game(self.game_play_id)
@@ -454,24 +501,44 @@ class BaseGamePlayClass:
         last_score = getattr(self.score_manager, 'last_awarded_score', {})
         last_coin = getattr(self.score_manager, 'last_awarded_coin', {})
 
+        client_winner = winner_idx
+        if self.game_session is not None and winner_id not in (0, None, "0", ""):
+            session_gid = self.game_session.find_gamer_id_from_user_id(winner_id)
+            if session_gid > 0:
+                client_winner = session_gid
+
+        rank1_val = None
+        rank2_val = None
+        if self.game_session is not None and hasattr(self.game_session, "game_controller"):
+            rank1_val = getattr(self.game_session.game_controller, "rank1", None)
+            rank2_val = getattr(self.game_session.game_controller, "rank2", None)
+
         for gamer in self.gamers:
             self.send_game_play_data(gamer.socket_id)
+            if not gamer.socket_id:
+                continue
             try:
                 earned = last_xp.get(gamer.user_id, 0)
                 s_earned = last_score.get(gamer.user_id, 0)
                 c_earned = last_coin.get(gamer.user_id, 0)
+                finish_payload = {
+                    "Winner": client_winner,
+                    "winner": client_winner,
+                    "game_winner_id": winner_id,
+                    "series_scores": self.gamer_scores,
+                    "xp_earned": earned,
+                    "score_earned": s_earned,
+                    "coin_earned": c_earned,
+                }
+                if rank1_val is not None:
+                    finish_payload["rank1"] = rank1_val
+                if rank2_val is not None:
+                    finish_payload["rank2"] = rank2_val
                 safe_run_async(
                     send_private_command(
                         command=make_command_json(
                             id=commands.Finish_Game,
-                            data={
-                                "Winner": winner_idx,
-                                "winner": winner_idx,
-                                "scores": self.gamer_scores,
-                                "xp_earned": earned,
-                                "score_earned": s_earned,
-                                "coin_earned": c_earned,
-                            }
+                            data=finish_payload
                         ),
                         socket_id=gamer.socket_id,
                         game_id=self.game_play_id

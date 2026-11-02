@@ -88,9 +88,9 @@ class LobbySession:
         game_id = static_functions.create_random_game_id()
         final_game_types = [lobby_data.game_type]
         game_data = {'game_id': game_id}
-        await send_lobby_command(command=make_command_json(id=commands.Start_Game, data=game_data), lobby_id=lobby_id)
         from Entities.SocketIOClass.game import add_new_game
         add_new_game(game_id, queuers, final_game_types, self.game_score_type)
+        await send_lobby_command(command=make_command_json(id=commands.Start_Game, data=game_data), lobby_id=lobby_id)
         await self.delete_lobby(lobby_id, ignores_id=queuers_idis, need_send_message=False)
 
     async def create_lobby(self, user_id, game_type, lobby_name, lobby_password, lobby_count):
@@ -109,8 +109,16 @@ class LobbySession:
         await send_global_lobby_command(command=make_command_json(id=commands.Lobby_Created, data=new_lobby.to_json()))
 
     async def join_queuers_list(self, user_data: QueuerModel) -> bool:
-        if self.is_user_connected_in_lobby_namespace(user_data.user_id):
-            return False
+        # Remove any stale entries for this user in free_queuers
+        for fq in list(self.free_queuers):
+            if str(fq.user_id) == str(user_data.user_id):
+                self.free_queuers.remove(fq)
+        # Clean up any stale lobby room membership from a previous socket
+        for lobby in list(self.lobbies):
+            for q in list(lobby.queuers):
+                if str(q.user_id) == str(user_data.user_id) and q.socket_id != user_data.socket_id:
+                    await self.disconnect_user(q.socket_id)
+                    break
         self.free_queuers.append(user_data)
         from Entities.SocketIOManagerClass import send_private_lobby_command
         await send_private_lobby_command(
@@ -167,7 +175,9 @@ class LobbySession:
                 command=make_command_json(id=commands.Lobby_List, data=self.get_lobbies_data()),
                 socket_id=gamer_data.socket_id)
         if data['id'] == commands.Lobby_Player_Ready:
-            lobby_id = self.socketid_lobbyid_pairs[socket_id]
+            lobby_id = self.socketid_lobbyid_pairs.get(socket_id)
+            if lobby_id is None:
+                return
             user_data = self.find_gamer_from_user_id(lobby_id, user_id)
             if user_data is None:
                 return
@@ -195,20 +205,26 @@ class LobbySession:
                 await send_private_lobby_command(
                     command=make_command_json(id=commands.Lobby_Full, data={}), socket_id=socket_id)
         if data['id'] == commands.Lobby_Start_Game:
-            lobby_id = self.socketid_lobbyid_pairs[socket_id]
+            lobby_id = self.socketid_lobbyid_pairs.get(socket_id)
+            if lobby_id is None:
+                return
             lobby_data = self.find_lobby_from_id(lobby_id)
             if lobby_data is None or lobby_data.creator_id != user_id or len(
                     lobby_data.queuers) != int(lobby_data.lobby_count):
                 return
             await self.start_new_game(lobby_id)
         if data['id'] == commands.Lobby_Delete:
-            lobby_id = self.socketid_lobbyid_pairs[socket_id]
+            lobby_id = self.socketid_lobbyid_pairs.get(socket_id)
+            if lobby_id is None:
+                return
             lobby_data = self.find_lobby_from_id(lobby_id)
             if lobby_data is None or lobby_data.creator_id != user_id:
                 return
             await self.delete_lobby(lobby_id)
         if data['id'] == commands.Lobby_Kick:
-            lobby_id = self.socketid_lobbyid_pairs[socket_id]
+            lobby_id = self.socketid_lobbyid_pairs.get(socket_id)
+            if lobby_id is None:
+                return
             lobby_data = self.find_lobby_from_id(lobby_id)
             if lobby_data is None or lobby_data.creator_id != user_id:
                 return
@@ -244,7 +260,9 @@ class LobbySession:
                                           data={'lobby_id': lobby_id, 'count': len(lobby.queuers)}), )
 
         if data['id'] == commands.Lobby_Quit:
-            lobby_id = self.socketid_lobbyid_pairs[socket_id]
+            lobby_id = self.socketid_lobbyid_pairs.get(socket_id)
+            if lobby_id is None:
+                return
             lobby = self.find_lobby_from_id(lobby_id)
             if lobby is None:
                 return

@@ -24,7 +24,7 @@ class MultiQueueSocketNameSpace(socketio.AsyncNamespace):
         if game_type is None:
             await self.disconnect(socket_id, namespace="/multi-queue")
             return
-        if not multi_rank_queue_session.can_user_join_queue(user_id):
+        if not multi_rank_queue_session.can_user_join_queue(user_id, socket_id):
             print(f"[MultiQueue] Duplicate queue join rejected for user {user_id} (socket {socket_id})")
             await self.disconnect(socket_id, namespace="/multi-queue")
             return

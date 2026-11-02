@@ -29,14 +29,17 @@ class ClassicRankSocketNameSpace(socketio.AsyncNamespace):
             await self.disconnect(socket_id, namespace="/classic-rank")
             return
 
-        # Reject if user already has an active ongoing game in memory
+        # Reject if user already has a live active ongoing game in memory
         from Entities.SocketIOClass.game import games
         for g_id, game_play in list(games.items()):
             if not getattr(game_play, "is_game_finished", False) and not getattr(game_play, "is_game_terminated", False):
                 if game_play.is_user_id_valid(user_id):
-                    print(f"[ClassicRankSocket] User {user_id} already in active game {g_id}. Rejecting duplicate classic-rank start.")
-                    await self.disconnect(socket_id, namespace="/classic-rank")
-                    return
+                    uid_str = str(user_id)
+                    active_sid = getattr(game_play, "active_user_sockets", {}).get(uid_str, "")
+                    if active_sid and uid_str not in getattr(game_play, "disconnected_user_ids", set()):
+                        print(f"[ClassicRankSocket] User {user_id} already in active game {g_id}. Rejecting duplicate classic-rank start.")
+                        await self.disconnect(socket_id, namespace="/classic-rank")
+                        return
 
         await self.enter_room(socket_id, socket_id, namespace="/classic-rank")
 

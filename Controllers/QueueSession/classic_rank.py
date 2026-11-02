@@ -80,13 +80,18 @@ class ClassicRankSession:
         # Launch bot connection in background
         asyncio.create_task(bot.start())
 
-        # Notify human client that the match is ready
+        # Notify human client that the match is ready (after namespace Connect ACK is flushed)
         game_data = {"game_id": game_id, "game_type": game_type}
         from Entities.SocketIOClass import Socket_Server
-        await Socket_Server.emit(
-            "command",
-            make_command_json(id=commands.Start_Game, data=game_data),
-            to=socket_id,
-            namespace="/classic-rank",
-        )
+
+        async def _delayed_start_emit():
+            await asyncio.sleep(0.05)
+            await Socket_Server.emit(
+                "command",
+                make_command_json(id=commands.Start_Game, data=game_data),
+                to=socket_id,
+                namespace="/classic-rank",
+            )
+
+        asyncio.create_task(_delayed_start_emit())
         print(f"[ClassicRankSession] Match started: {game_id} | Game: {game_type} | Human: {human_queuer.username} vs Bot: {bot_name} (Lvl 2)")

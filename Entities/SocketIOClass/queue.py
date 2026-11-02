@@ -1,3 +1,4 @@
+import asyncio
 import socketio
 from Commons import static_functions
 from Controllers.QueueSession.rank import RankQueueSession
@@ -16,11 +17,11 @@ class QueueSocketNameSpace(socketio.AsyncNamespace):
             return
         token_data = await check_is_token_valid(auth)
         if not token_data:
-            await self.emit('command', {'id': commands.Logout}, to=socket_id, namespace="/queue")
+            await self.emit("command", {"id": commands.Logout}, to=socket_id, namespace="/queue")
             await self.disconnect(socket_id, namespace="/queue")
             return
-        user_id = token_data['id']
-        pre_game_id = auth.get('pre_game_id')
+        user_id = token_data["id"]
+        pre_game_id = auth.get("pre_game_id")
 
         from Entities.Database import game_database
         user_data = game_database.users_manager.read_user(user_id)
@@ -32,15 +33,15 @@ class QueueSocketNameSpace(socketio.AsyncNamespace):
             user_id,
             user_data.get("username", "Gamer"),
             socket_id=socket_id,
-            user_image=user_data.get('image', 1),
-            user_coin=user_data.get('coin', 1000),
-            user_score=user_data.get('score', 1000),
+            user_image=user_data.get("image", 1),
+            user_coin=user_data.get("coin", 1000),
+            user_score=user_data.get("score", 1000),
         )
 
         # Determine if user is attempting to reconnect to an active pre-game
         target_pre_game_id = pre_game_id
         if not target_pre_game_id:
-            open_pre_id = user_data.get('open_pre_game_id', '') if isinstance(user_data, dict) else ''
+            open_pre_id = user_data.get("open_pre_game_id", "") if isinstance(user_data, dict) else ""
             if open_pre_id and open_pre_id in rank_queue_session.active_pre_games:
                 target_pre_game_id = open_pre_id
             elif open_pre_id:
@@ -49,7 +50,7 @@ class QueueSocketNameSpace(socketio.AsyncNamespace):
         if target_pre_game_id:
             if target_pre_game_id not in rank_queue_session.active_pre_games:
                 game_database.users_manager.update_user(user_id, open_pre_game_id="")
-                await self.emit('command', {'id': commands.Game_Finished, 'data': {}}, to=socket_id, namespace="/queue")
+                await self.emit("command", {"id": commands.Game_Finished, "data": {}}, to=socket_id, namespace="/queue")
                 await self.disconnect(socket_id, namespace="/queue")
                 return
             if not rank_queue_session.can_user_reconnect_pre_game(target_pre_game_id, user_id, socket_id):
@@ -57,14 +58,19 @@ class QueueSocketNameSpace(socketio.AsyncNamespace):
                 await self.disconnect(socket_id, namespace="/queue")
                 return
             await self.enter_room(socket_id, socket_id, namespace="/queue")
-            rank_queue_session.reconnect_queuer(target_pre_game_id, queuer_data)
+
+            async def _delayed_pre_game_reconn():
+                await asyncio.sleep(0.05)
+                rank_queue_session.reconnect_queuer(target_pre_game_id, queuer_data)
+
+            asyncio.create_task(_delayed_pre_game_reconn())
             return
 
         # Clear stale open_game_id if that game is no longer in memory
-        open_game_id = user_data.get('open_game_id', '') if isinstance(user_data, dict) else ''
+        open_game_id = user_data.get("open_game_id", "") if isinstance(user_data, dict) else ""
         if open_game_id:
             from Entities.SocketIOClass.game import games
-            if open_game_id not in games or getattr(games[open_game_id], "is_game_finished", False):
+            if open_game_id not in games or getattr(games[open_game_id], "is_game_finished", False) or getattr(games[open_game_id], "is_game_terminated", False):
                 game_database.users_manager.update_user(user_id, open_game_id="")
                 open_game_id = ""
             else:
@@ -72,7 +78,7 @@ class QueueSocketNameSpace(socketio.AsyncNamespace):
                 await self.disconnect(socket_id, namespace="/queue")
                 return
 
-        if not rank_queue_session.can_user_join_queue(user_id):
+        if not rank_queue_session.can_user_join_queue(user_id, socket_id):
             print(f"[Queue] Duplicate queue join rejected for user {user_id} (socket {socket_id})")
             await self.disconnect(socket_id, namespace="/queue")
             return
@@ -84,7 +90,7 @@ class QueueSocketNameSpace(socketio.AsyncNamespace):
         await rank_queue_session.disconnect_user(socket_id)
 
     async def on_user_command(self, socket_id, data):
-        print('User Sent command ', data)
+        print("User Sent command ", data)
         await rank_queue_session.command_received(data, socket_id)
 
 

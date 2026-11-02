@@ -57,7 +57,12 @@ class PreGameClass:
         if user_data is None:
             return False
         if not user_data.is_disconnected and user_data.socket_id and user_data.socket_id != socket_id:
-            return False
+            try:
+                from Entities.SocketIOClass import Socket_Server
+                if Socket_Server.manager.is_connected(user_data.socket_id, "/queue"):
+                    return False
+            except Exception:
+                return False
         return True
 
     def get_reconnect_data(self):

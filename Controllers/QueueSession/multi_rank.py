@@ -28,9 +28,20 @@ class MultiRankQueueSession(BaseQueueSession):
                 return queuer
         return None
 
-    def can_user_join_queue(self, user_id) -> bool:
-        if self.find_gamer_from_user_id(user_id) is not None:
-            return False
+    def can_user_join_queue(self, user_id, socket_id=None) -> bool:
+        existing_q = self.find_gamer_from_user_id(user_id)
+        if existing_q is not None:
+            if socket_id and existing_q.socket_id == socket_id:
+                self.ludo_queuers.remove(existing_q)
+            else:
+                try:
+                    from Entities.SocketIOClass import Socket_Server
+                    if not Socket_Server.manager.is_connected(existing_q.socket_id, "/multi-queue"):
+                        self.ludo_queuers.remove(existing_q)
+                    else:
+                        return False
+                except Exception:
+                    return False
         try:
             from Entities.SocketIOClass.game import games
             for g_id, game_play in list(games.items()):
@@ -87,7 +98,7 @@ class MultiRankQueueSession(BaseQueueSession):
                 time.sleep(4)
 
     def join_user(self, user_data: QueuerModel, game_type) -> bool:
-        if not self.can_user_join_queue(user_data.user_id):
+        if not self.can_user_join_queue(user_data.user_id, user_data.socket_id):
             return False
         if game_type == GameTypesEnum.LUDO.value:
             self.ludo_queuers.append(user_data)

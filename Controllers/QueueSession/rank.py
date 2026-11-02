@@ -55,6 +55,15 @@ class RankQueueSession(BaseQueueSession):
     def is_user_in_accept_phase(self, user_id) -> bool:
         return any(str(uid) == str(user_id) for uid in self.queuer_accept_pairs.keys())
 
+    def _is_socket_connected(self, socket_id: str, namespace: str = "/queue") -> bool:
+        if not socket_id:
+            return False
+        try:
+            from Entities.SocketIOClass import Socket_Server
+            return bool(Socket_Server.manager.is_connected(socket_id, namespace))
+        except Exception:
+            return True
+
     def has_active_ongoing_game(self, user_id) -> bool:
         try:
             from Entities.SocketIOClass.game import games
@@ -66,13 +75,21 @@ class RankQueueSession(BaseQueueSession):
             pass
         return False
 
-    def can_user_join_queue(self, user_id) -> bool:
-        # Reject if already in queue
-        if self.find_gamer_from_user_id(user_id) is not None:
-            return False
-        # Reject if waiting for match accept
+    def can_user_join_queue(self, user_id, socket_id=None) -> bool:
+        # Check if already in queue: clean up if same socket or dead socket, reject if live second connection
+        existing_q = self.find_gamer_from_user_id(user_id)
+        if existing_q is not None:
+            if socket_id and existing_q.socket_id == socket_id:
+                self.queuers.remove(existing_q)
+            elif not self._is_socket_connected(existing_q.socket_id, "/queue"):
+                self.queuers.remove(existing_q)
+            else:
+                return False
+        # Reject if waiting for match accept with a live socket
         if self.is_user_in_accept_phase(user_id):
-            return False
+            expected_sid = self.accept_phase_sockets.get(user_id) or self.accept_phase_sockets.get(str(user_id))
+            if not expected_sid or self._is_socket_connected(expected_sid, "/queue"):
+                return False
         # Reject if in an active pre-game draft
         pg_id, pg, q = self.find_active_pre_game_for_user(user_id)
         if pg is not None:
@@ -125,19 +142,18 @@ class RankQueueSession(BaseQueueSession):
             return
         self.socket_id_pre_games_pairs.pop(queuers[0].socket_id, None)
         self.socket_id_pre_games_pairs.pop(queuers[1].socket_id, None)
+        self.active_pre_games.pop(pre_game_id, None)
         from Entities.SocketIOManagerClass import send_queue_command
+        from Entities.SocketIOClass.game import add_new_game
         game_id = static_functions.create_random_game_id()
         final_game_types = game_types
-        # game_id = 'testgame'
+        add_new_game(game_id, queuers, final_game_types, self.game_score_type)
         game_data = {'game_id': game_id}
         for queuer_data in queuers:
+            game_database.users_manager.update_user(queuer_data.user_id, open_game_id=game_id, open_pre_game_id="")
             safe_run_async(
                 send_queue_command(command=make_command_json(id=commands.Start_Game, data=game_data),
                                    socket_id=queuer_data.socket_id))
-            game_database.users_manager.update_user(queuer_data.user_id, open_game_id=game_id, open_pre_game_id="")
-        self.active_pre_games.pop(pre_game_id, None)
-        from Entities.SocketIOClass.game import add_new_game
-        add_new_game(game_id, queuers, final_game_types, self.game_score_type)
 
     def start_new_pre_game(self, queuers):
         if len(queuers) != 2:
@@ -231,7 +247,7 @@ class RankQueueSession(BaseQueueSession):
                 time.sleep(1.0)
 
     def join_queuer(self, user_data: QueuerModel) -> bool:
-        if not self.can_user_join_queue(user_data.user_id):
+        if not self.can_user_join_queue(user_data.user_id, user_data.socket_id):
             return False
         self.queuers.append(user_data)
         return True

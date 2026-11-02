@@ -89,7 +89,8 @@ class BaseMultiplayerGameSession(BaseGameSession):
             self.game_controller.is_game_finished = True
             winner = self.game_controller.get_game_winner()
             final_winner = self.game_controller.rank1 if self.game_controller.rank1 is not None else winner
-            if self.game_score_type not in (GameScoreTypesEnum.RANK, GameScoreTypesEnum.CLASSIC_RANK):
+            from Entities.SocketIOClass.game import games
+            if self.game_score_type not in (GameScoreTypesEnum.RANK, GameScoreTypesEnum.CLASSIC_RANK) and self.game_id not in games:
                 safe_run_async(
                     send_command(
                         command=make_command_json(
@@ -118,9 +119,14 @@ class BaseMultiplayerGameSession(BaseGameSession):
         self.is_game_finished = True
         user_idis = [g.user_id for g in self.gamers],
         from Entities.Database import game_database
-        game_database.game_history_manager.create_game_history(self.game_history_id, self.game_id, user_idis,
-                                                               str(self.game_type.value), self.game_score_type.value,
-                                                               self.game_controller.rank1)
+        try:
+            game_type_val = self.game_type.value if hasattr(self.game_type, "value") else str(self.game_type)
+            game_score_val = self.game_score_type.value if hasattr(self.game_score_type, "value") else str(self.game_score_type)
+            game_database.game_history_manager.create_game_history(self.game_history_id, self.game_id, user_idis,
+                                                                   str(game_type_val), game_score_val,
+                                                                   self.game_controller.rank1)
+        except Exception as e:
+            print(f"[BaseMultiplayerGameSession] Error creating game history: {e}")
         from Entities.SocketIOClass.game import finish_multiplayer_game
         rank1_id = self.gamer_id_to_user_id(self.game_controller.rank1)
         rank2_id = self.gamer_id_to_user_id(self.game_controller.rank2)

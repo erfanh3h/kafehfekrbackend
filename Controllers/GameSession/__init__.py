@@ -467,7 +467,8 @@ class BaseGameSession:
         if gamer.not_played_turns >= 2:
             self.afk_user_id = gamer.user_id
 
-            if self.game_score_type != GameScoreTypesEnum.RANK:
+            from Entities.SocketIOClass.game import games
+            if self.game_score_type != GameScoreTypesEnum.RANK and self.game_id not in games:
                 safe_run_async(
                     send_command(command=make_command_json(id=commands.Finish_Game, data={"Winner": winner}),
                                  game_id=self.game_id))
@@ -496,7 +497,8 @@ class BaseGameSession:
 
             # Multi-game series (RANK) has master BaseGamePlayClass that emits Finish_Game when the entire series concludes.
 
-            if self.game_score_type != GameScoreTypesEnum.RANK:
+            from Entities.SocketIOClass.game import games
+            if self.game_score_type != GameScoreTypesEnum.RANK and self.game_id not in games:
 
                 safe_run_async(
 
