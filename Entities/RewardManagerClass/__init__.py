@@ -165,11 +165,11 @@ class RewardManagerClass:
             g_type = game_types[0] if game_types else ""
             diff = gametype_to_difficulty(g_type)
             if diff == GameDifficultyEnum.Easy:
-                win_xp, draw_xp, lose_xp = 15, 8, 4
+                win_xp, draw_xp, lose_xp = 8, 4, 2
             elif diff == GameDifficultyEnum.Normal:
-                win_xp, draw_xp, lose_xp = 25, 14, 7
+                win_xp, draw_xp, lose_xp = 14, 7, 3
             else:
-                win_xp, draw_xp, lose_xp = 40, 20, 10
+                win_xp, draw_xp, lose_xp = 20, 10, 5
 
             for idx in range(num_players):
                 uid = self.players_idis[idx]

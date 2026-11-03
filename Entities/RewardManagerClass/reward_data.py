@@ -30,15 +30,15 @@ multi_rank_rank2_score = 4
 multi_rank_rank3_score = -4
 multi_rank_rankn_score = -8
 
-multi_rank_rank1_xp = 50
-multi_rank_rank2_xp = 30
-multi_rank_rank3_xp = 15
-multi_rank_rankn_xp = 10
+multi_rank_rank1_xp = 25
+multi_rank_rank2_xp = 15
+multi_rank_rank3_xp = 8
+multi_rank_rankn_xp = 4
 
 # Streak and Daily First Win Bonuses
-DAILY_FIRST_WIN_XP = 30
+DAILY_FIRST_WIN_XP = 15
 DAILY_FIRST_WIN_COIN = 15
-WIN_STREAK_XP_BONUS = 15
+WIN_STREAK_XP_BONUS = 8
 
 
 def calculate_elo_change(
@@ -134,11 +134,11 @@ def calculate_rank_series_xp(
             continue
 
         if diff == GameDifficultyEnum.Easy:
-            win_val, draw_val, lose_val = 25, 15, 10
+            win_val, draw_val, lose_val = 8, 5, 3
         elif diff == GameDifficultyEnum.Normal:
-            win_val, draw_val, lose_val = 45, 25, 18
+            win_val, draw_val, lose_val = 12, 7, 4
         else:  # Hard
-            win_val, draw_val, lose_val = 70, 40, 25
+            win_val, draw_val, lose_val = 16, 10, 6
 
         if sub_winner == 0:
             total_xp += draw_val
@@ -149,13 +149,13 @@ def calculate_rank_series_xp(
 
     # Series outcome bonus
     if winner_gamer_id == 0:
-        total_xp += 20  # Series Draw
+        total_xp += 8  # Series Draw
     elif winner_gamer_id == gamer_num:
-        total_xp += 35  # Series Winner
+        total_xp += 15  # Series Winner
         if is_clean_sweep:
-            total_xp += 20  # Clean sweep (2-0) bonus
+            total_xp += 5  # Clean sweep (2-0) bonus
     else:
-        total_xp += 15  # Series Completion effort reward (surrenders receive this normally)
+        total_xp += 5  # Series Completion effort reward (surrenders receive this normally)
 
     return max(0, total_xp)
 
@@ -169,11 +169,11 @@ def calculate_social_xp(game_type: str, is_win: bool, is_draw: bool, is_afk_or_d
 
     diff = gametype_to_difficulty(game_type)
     if diff == GameDifficultyEnum.Easy:
-        win_xp, draw_xp, lose_xp = 8, 4, 2
+        win_xp, draw_xp, lose_xp = 5, 2, 1
     elif diff == GameDifficultyEnum.Normal:
-        win_xp, draw_xp, lose_xp = 14, 7, 4
+        win_xp, draw_xp, lose_xp = 9, 4, 2
     else:  # Hard
-        win_xp, draw_xp, lose_xp = 20, 10, 5
+        win_xp, draw_xp, lose_xp = 14, 7, 3
 
     if is_draw:
         return draw_xp
