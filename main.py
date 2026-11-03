@@ -1,3 +1,4 @@
+import os
 import sys
 try:
     if hasattr(sys.stdout, 'reconfigure'):
@@ -11,16 +12,31 @@ import logging
 
 import socketio
 import uvicorn
+from fastapi import FastAPI
 
 from Entities.SocketIOClass import Socket_Server
 from Entities.Database import game_database
-app = socketio.ASGIApp(Socket_Server)
+
+# Health app for container healthchecks & monitoring
+health_app = FastAPI(docs_url=None, redoc_url=None)
+
+@health_app.get("/health")
+async def health_check():
+    return {"status": "ok", "service": "backend"}
+
+@health_app.get("/")
+async def root():
+    return {"status": "ok", "service": "backend"}
+
+app = socketio.ASGIApp(Socket_Server, other_asgi_app=health_app)
 # logging.basicConfig(level=logging.DEBUG)
 if __name__ == '__main__':
     # for fix asyncio errors
     import nest_asyncio
     nest_asyncio.apply()
-    uvicorn.run(app, host='0.0.0.0', port=5000)
+    host = os.getenv("HOST", "0.0.0.0")
+    port = int(os.getenv("PORT", 5000))
+    uvicorn.run(app, host=host, port=port)
     # eventlet.wsgi.server(eventlet.listen(('', 5000)), app)
     
     
