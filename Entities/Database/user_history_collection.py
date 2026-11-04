@@ -73,20 +73,20 @@ class UserHistoryCollectionManager:
     def update_user_history_multiplayer(self, user_id, incoming_data: dict):
         if str(user_id).startswith("bot_") or str(user_id).startswith("test_bot"):
             return None
-        # try:
-        query = {'_id': user_id}
-        update_data = {}
-        user_data = self.read_user_history(user_id)
-        for key in incoming_data.keys():
-            if self.game_types.__contains__(key):
-                # check prevoisly data was added
-                if user_data.keys().__contains__(key):
-                    update_data[key] = incoming_data[key] + user_data[key]
-                else:
-                    update_data[key] = incoming_data[key]
-        self.collection.find_one_and_update(query, {'$set': update_data})
-        # except:
-        #     pass
+        try:
+            query = {'_id': user_id}
+            update_data = {}
+            user_data = self.read_user_history(user_id) or {}
+            for key in incoming_data.keys():
+                if self.game_types.__contains__(key):
+                    if user_data.keys().__contains__(key):
+                        update_data[key] = incoming_data[key] + user_data[key]
+                    else:
+                        update_data[key] = incoming_data[key]
+            if update_data:
+                self.collection.find_one_and_update(query, {'$set': update_data}, upsert=True)
+        except Exception:
+            pass
 
     def delete_user_history(self, user_id):
         query = {'_id': user_id}

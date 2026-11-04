@@ -15,6 +15,9 @@ class BaseMultiplayerGameSession(BaseGameSession):
         pass
 
     async def command_received(self, data, socket_id):
+        if not isinstance(data, dict) or "id" not in data:
+            return None
+        data.setdefault("data", None)
         if isinstance(data, dict) and data.get('id') in [commands.Reconnect_Data, "RequestReconnectData", "reconnect_data"]:
             self.send_reconnect_data(socket_id)
             return None
@@ -117,7 +120,13 @@ class BaseMultiplayerGameSession(BaseGameSession):
             return
         print("finish from normal")
         self.is_game_finished = True
-        user_idis = [g.user_id for g in self.gamers],
+        self.timer.stop(False)
+        for g in self.gamers:
+            try:
+                g.timer.stop()
+            except Exception:
+                pass
+        user_idis = [g.user_id for g in self.gamers]
         from Entities.Database import game_database
         try:
             game_type_val = self.game_type.value if hasattr(self.game_type, "value") else str(self.game_type)

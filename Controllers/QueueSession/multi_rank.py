@@ -66,14 +66,14 @@ class MultiRankQueueSession(BaseQueueSession):
         game_id = static_functions.create_random_game_id()
         final_game_types = [game_type]
         game_data = {'game_id': game_id}
+        from Entities.SocketIOClass.game import add_new_game
+        add_new_game(game_id, queuers, final_game_types, self.game_score_type)
         for queuer_data in queuers:
+            if queuer_data in self.ludo_queuers:
+                self.ludo_queuers.remove(queuer_data)
             safe_run_async(
                 send_queue_command(command=make_command_json(id=commands.Start_Game, data=game_data),
                                    socket_id=queuer_data.socket_id, namespace='/multi-queue'))
-            if queuer_data in self.ludo_queuers:
-                self.ludo_queuers.remove(queuer_data)
-        from Entities.SocketIOClass.game import add_new_game
-        add_new_game(game_id, queuers, final_game_types, self.game_score_type)
 
     def check_start_new_game(self):
         while True:

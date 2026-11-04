@@ -123,8 +123,8 @@ class UsersCollectionManager:
 
     def reset_all_users_active_games(self):
         query = {}
-        update_data = {'open_game_id': ""}
-        self.collection.find_one_and_update(query, {'$set': update_data})
+        update_data = {'open_game_id': "", 'open_pre_game_id': ""}
+        self.collection.update_many(query, {'$set': update_data})
 
     def get_count_of_users(self):
         return self.collection.count_documents({})

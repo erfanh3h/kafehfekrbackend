@@ -26,7 +26,7 @@ class RPCGameSession(BaseGameSession):
         t.start()
 
     def check_start_game(self):
-        while True:
+        while not self.is_game_finished:
             if self.check_all_players_joined():
                 time.sleep(0.8)
                 self.is_game_running = True

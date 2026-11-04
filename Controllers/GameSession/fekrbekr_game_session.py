@@ -1,3 +1,4 @@
+from Entities.RewardManagerClass import GameScoreTypesEnum
 import asyncio
 import time
 
@@ -19,7 +20,7 @@ class FekrBekrGameSession(BaseGameSession):
         super().start_game_timer()
 
     def check_start_game(self):
-        while True:
+        while not self.is_game_finished:
             if self.check_all_players_joined():
                 time.sleep(0.8)
                 self.is_game_running = True
@@ -108,9 +109,11 @@ class FekrBekrGameSession(BaseGameSession):
         self.game_controller.change_round()
         if self.game_controller.check_game_ended():
             winner = self.game_controller.get_game_winner()
-            safe_run_async(
-                send_command(command=make_command_json(id=commands.Finish_Game, data={"Winner": winner}),
-                             game_id=self.game_id))
+            from Entities.SocketIOClass.game import games
+            if self.game_score_type != GameScoreTypesEnum.RANK and self.game_id not in games:
+                safe_run_async(
+                    send_command(command=make_command_json(id=commands.Finish_Game, data={"Winner": winner}),
+                                 game_id=self.game_id))
             self.finish_game(winner)
             return
 

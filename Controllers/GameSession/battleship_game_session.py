@@ -1,3 +1,4 @@
+from Entities.RewardManagerClass import GameScoreTypesEnum
 import asyncio
 import threading
 import time
@@ -27,7 +28,7 @@ class BattleShipGameSession(BaseGameSession):
         t.start()
 
     def check_start_game(self):
-        while True:
+        while not self.is_game_finished:
             if self.check_all_players_joined():
                 time.sleep(0.8)
                 self.is_game_running = True
@@ -86,9 +87,11 @@ class BattleShipGameSession(BaseGameSession):
         def function():
             if self.game_controller.is_game_finished:
                 winner_id = self.game_controller.get_game_winner()
-                safe_run_async(
-                    send_command(command=make_command_json(id=commands.Finish_Game, data={"Winner": winner_id}),
-                                 game_id=self.game_id))
+                from Entities.SocketIOClass.game import games
+                if self.game_score_type != GameScoreTypesEnum.RANK and self.game_id not in games:
+                    safe_run_async(
+                        send_command(command=make_command_json(id=commands.Finish_Game, data={"Winner": winner_id}),
+                                     game_id=self.game_id))
                 self.finish_game(winner_id)
                 return
             self.game_controller.change_turn()

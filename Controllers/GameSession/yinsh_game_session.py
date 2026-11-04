@@ -1,3 +1,4 @@
+from Entities.RewardManagerClass import GameScoreTypesEnum
 import asyncio
 
 from Entities.Games.Yinsh import YinshGameClass
@@ -63,10 +64,11 @@ class YinshGameSession(BaseGameSession):
 
         if self.game_controller.check_game_ended():
             winner = self.game_controller.get_game_winner()
-            safe_run_async(
-                send_command(
-                    command=make_command_json(id=commands.Finish_Game, data={"Winner": winner}),
-                    game_id=self.game_id))
+            from Entities.SocketIOClass.game import games
+            if self.game_score_type != GameScoreTypesEnum.RANK and self.game_id not in games:
+                safe_run_async(
+                    send_command(command=make_command_json(id=commands.Finish_Game, data={"Winner": winner}),
+                                 game_id=self.game_id))
             self.finish_game(winner)
             return
 
@@ -141,10 +143,11 @@ class YinshGameSession(BaseGameSession):
             self.game_controller.is_ring_setuped = True
         if self.game_controller.check_game_ended():
             winner = self.game_controller.get_game_winner()
-            safe_run_async(
-                send_command(
-                    command=make_command_json(id=commands.Finish_Game, data={"Winner": winner}),
-                    game_id=self.game_id))
+            from Entities.SocketIOClass.game import games
+            if self.game_score_type != GameScoreTypesEnum.RANK and self.game_id not in games:
+                safe_run_async(
+                    send_command(command=make_command_json(id=commands.Finish_Game, data={"Winner": winner}),
+                                 game_id=self.game_id))
             self.finish_game(winner)
             return
         self.game_controller.change_turn()

@@ -48,7 +48,22 @@ def delete_game(game_id):
     try:
         game_obj = games.get(game_id)
         if game_obj is not None:
+            try:
+                game_obj.timer.stop(False)
+            except Exception:
+                pass
+            if getattr(game_obj, 'game_session', None) is not None:
+                try:
+                    game_obj.game_session.timer.stop(False)
+                    for sg in getattr(game_obj.game_session, 'gamers', []):
+                        sg.timer.stop()
+                except Exception:
+                    pass
             for gamer in getattr(game_obj, 'gamers', []):
+                try:
+                    gamer.timer.stop()
+                except Exception:
+                    pass
                 uid = getattr(gamer, 'user_id', None)
                 if uid and not str(uid).startswith("bot_"):
                     try:

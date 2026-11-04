@@ -142,6 +142,9 @@ class LobbySession:
             self.free_queuers.remove(user_data)
 
     async def command_received(self, data, socket_id):
+        if not isinstance(data, dict) or "id" not in data:
+            return
+        data.setdefault("data", {})
         print(data)
         gamer_data = self.find_free_gamer_from_socket_id(socket_id)
         if gamer_data is None:

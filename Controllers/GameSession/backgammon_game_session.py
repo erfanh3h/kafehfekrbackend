@@ -23,7 +23,9 @@ class BackGammonGameSession(BaseGameSession):
         if gamer_id is None:
             return
         if data['id'] == commands.Roll_Dice:
-            have_selection = await self.game_controller.recieve_data(data['id'], data['data'], gamer_id)
+            if self.game_controller.is_game_finished or self.game_controller.current_turn != gamer_id or self.game_controller.current_turn_player_rolled:
+                return
+            have_selection = await self.game_controller.recieve_data(data['id'], data.get('data'), gamer_id)
             if have_selection:
                 self.send_dices()
             else:

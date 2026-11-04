@@ -200,6 +200,11 @@ class PreGameClass:
             self.timer.start(20, self.send_current_turn)
 
         if self.dced_user is not None:
+            for q in self.queuers:
+                try:
+                    q.timer.stop()
+                except Exception:
+                    pass
             self.set_pre_game_id_db("")
             self.delete_game_function(self.pre_game_id, self.dced_user, self.queuers)
             return
@@ -215,6 +220,11 @@ class PreGameClass:
 
         self.select_turn_index += 1
         if self.select_turn_index == 8:  # last turn
+            for q in self.queuers:
+                try:
+                    q.timer.stop()
+                except Exception:
+                    pass
             self.set_pre_game_id_db("")
             self.start_game_function(self.queuers, [self.queuers[0].selected_game, self.queuers[1].selected_game,
                                                     self.system_selected_game], self.pre_game_id)

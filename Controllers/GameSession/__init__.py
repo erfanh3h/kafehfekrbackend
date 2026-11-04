@@ -109,7 +109,7 @@ class BaseGameSession:
 
     def check_start_game(self):
 
-        while True:
+        while not self.is_game_finished:
 
             if self.check_all_players_joined():
 
@@ -302,6 +302,9 @@ class BaseGameSession:
 
     async def command_received(self, data, socket_id):
 
+        if not isinstance(data, dict) or "id" not in data:
+            return None
+        data.setdefault("data", None)
         if isinstance(data, dict) and data.get('id') in [commands.Reconnect_Data, "RequestReconnectData", "reconnect_data"]:
             self.send_reconnect_data(socket_id)
             return None
@@ -411,6 +414,8 @@ class BaseGameSession:
 
 
     def finish_reconnect_time(self, user_id):
+        if self.is_game_finished:
+            return
         self.dc_timeout_user_id = user_id
 
         safe_run_async(
@@ -535,7 +540,12 @@ class BaseGameSession:
         self.is_game_finished = True
         self.timer.stop(False)
 
-        user_idis = [g.user_id for g in self.gamers],
+        for g in self.gamers:
+            try:
+                g.timer.stop()
+            except Exception:
+                pass
+        user_idis = [g.user_id for g in self.gamers]
 
         from Entities.Database import game_database
         try:

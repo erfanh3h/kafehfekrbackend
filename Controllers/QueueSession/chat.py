@@ -21,13 +21,17 @@ class ChatSession:
         return None
 
     async def command_received(self, data, socket_id):
-        print(data)
+        if not isinstance(data, dict) or 'id' not in data:
+            return
         gamer_data = self.find_user_from_socket_id(socket_id)
         if gamer_data is None:
             return
         if data['id'] == commands.Message:
+            content = str(data.get('content') or '').strip()[:500]
+            if not content:
+                return
             from Entities.SocketIOManagerClass import send_global_command
-            send_data = {'name': gamer_data.username, 'content': data['content'], 'id': gamer_data.user_id}
+            send_data = {'name': gamer_data.username, 'content': content, 'id': gamer_data.user_id}
             await send_global_command(
                 command=make_command_json(id=commands.Message, data=send_data), namespace='/chat')
 

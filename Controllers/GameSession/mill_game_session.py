@@ -1,3 +1,4 @@
+from Entities.RewardManagerClass import GameScoreTypesEnum
 from Commons.static_functions import safe_run_async
 import asyncio
 import time
@@ -50,9 +51,11 @@ class MillGameSession(BaseGameSession):
         from Entities.SocketIOManagerClass import send_command
         if self.game_controller.is_game_finished:
             winner_id = self.game_controller.get_game_winner()
-            safe_run_async(
-                send_command(command=make_command_json(id=commands.Finish_Game, data={"Winner": winner_id}),
-                             game_id=self.game_id))
+            from Entities.SocketIOClass.game import games
+            if self.game_score_type != GameScoreTypesEnum.RANK and self.game_id not in games:
+                safe_run_async(
+                    send_command(command=make_command_json(id=commands.Finish_Game, data={"Winner": winner_id}),
+                                 game_id=self.game_id))
             self.finish_game(winner_id)
             return
         if self.game_controller.current_remover == 0:
