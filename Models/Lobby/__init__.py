@@ -27,12 +27,14 @@ class LobbyModel:
 
     def to_json(self):
         data = {'lobby_id': self.lobby_id, 'lobby_name': self.lobby_name, 'creator_id': self.creator_id,
-                'game_type': self.game_type, 'queuers_length': len(self.queuers), 'lobby_count': self.lobby_count}
+                'game_type': self.game_type, 'queuers_length': len(self.queuers), 'lobby_count': self.lobby_count,
+                'has_password': bool(self.lobby_password)}
         return data
 
     def to_complete_json(self):
         data = {'lobby_id': self.lobby_id, 'lobby_name': self.lobby_name, 'creator_id': self.creator_id,
-                'game_type': self.game_type, 'lobby_count': self.lobby_count, 'queuers_length': len(self.queuers), }
+                'game_type': self.game_type, 'lobby_count': self.lobby_count, 'queuers_length': len(self.queuers),
+                'has_password': bool(self.lobby_password)}
         queuer_data = []
         for queuer in self.queuers:
             queuer_data.append(queuer.to_lobby_json())

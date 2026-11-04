@@ -161,7 +161,7 @@ class LobbySession:
             except (ValueError, TypeError):
                 lobby_count = 2
             lobby_count = max(2, min(4, lobby_count))
-            lobby_password = ""
+            lobby_password = str(lobby_data.get('lobby_password', lobby_data.get('password', ''))).strip()
             game_type = lobby_data.get('game_type', None)
             if game_type is None:
                 return
@@ -193,6 +193,13 @@ class LobbySession:
             if lobby_data is None:
                 await send_private_lobby_command(
                     command=make_command_json(id=commands.Lobby_Not_Exists, data={'lobby_id': lobby_id}),
+                    socket_id=socket_id)
+                return
+
+            entered_password = str(data['data'].get('lobby_password', data['data'].get('password', ''))).strip()
+            if lobby_data.lobby_password and lobby_data.lobby_password != entered_password and lobby_data.creator_id != user_id:
+                await send_private_lobby_command(
+                    command=make_command_json(id=commands.Lobby_Wrong_Password, data={'lobby_id': lobby_id}),
                     socket_id=socket_id)
                 return
 
