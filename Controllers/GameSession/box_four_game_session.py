@@ -30,9 +30,13 @@ class BoxFourGameSession(BaseGameSession):
                 self.timer.stop()
 
     def send_current_turn(self):
-        if self.check_afk_turn():
+        if self.is_game_finished:
+            self.timer.stop(False)
             return
         if self.check_finish_game():
+            self.timer.stop(False)
+            return
+        if self.check_afk_turn():
             return
         self.game_controller.change_turn()
         from Entities.SocketIOManagerClass import send_command

@@ -22,7 +22,6 @@ class RPCGameSession(BaseGameSession):
         def entrypoint():
             self.check_start_game()
 
-        # self.timer.start(Join_Game_Limit_Time, self.join_game_limit_time)
         t = threading.Thread(target=entrypoint, daemon=True)
         t.start()
 
@@ -31,7 +30,7 @@ class RPCGameSession(BaseGameSession):
             if self.check_all_players_joined():
                 time.sleep(0.8)
                 self.is_game_running = True
-                self.timer.stop()
+                self.timer.stop(False)
                 self.prepare_gamers()
                 self.send_game_data(self.start_new_turn_round)
                 break
@@ -49,44 +48,46 @@ class RPCGameSession(BaseGameSession):
 
     def send_current_turn(self):
         from Entities.SocketIOManagerClass import send_command
+        self.timer.stop(False)
+        if self.is_game_finished:
+            return
         self.game_controller.check_turn_round_winner()
         if self.game_controller.is_game_finished:
-            def function2():
-                winner_id = self.game_controller.get_game_winner()
-                safe_run_async(
-                    send_command(command=make_command_json(id=commands.Finish_Game, data={"Winner": winner_id}),
-                                 game_id=self.game_id))
-                self.finish_game(winner_id)
-
-            def function1():
-                self.check_and_send_round_winner()
-                self.timer.start(3, function2)
+            def finish_after_clash():
+                if self.is_game_finished:
+                    return
+                self.check_finish_game()
 
             self.check_and_send_turn_round_winner()
-            self.timer.start(3, function1)
+            self.timer.start(RPC_Sleep_Turn_Round_Time, finish_after_clash, is_user_turn=False)
 
         elif self.game_controller.is_round_finished:
-            def function():
-                self.check_and_send_round_winner()
-                self.timer.start(RPC_Sleep_Round_Time, self.start_new_turn_round)
-                self.game_controller.change_round()
-
             self.check_and_send_turn_round_winner()
-            self.timer.start(RPC_Sleep_Round_Time, function)
-            #print("end round ", self.game_controller.current_round)
+            self.check_and_send_round_winner()
+            self.game_controller.change_round()
+
+            def start_next_round():
+                if self.is_game_finished or self.game_controller.is_game_finished:
+                    return
+                safe_run_async(
+                    send_command(command=make_command_json(id=commands.New_Round, data=self.game_controller.current_round),
+                                 game_id=self.game_id))
+                self.start_new_turn_round()
+
+            self.timer.start(RPC_Sleep_Round_Time, start_next_round, is_user_turn=False)
 
         elif self.game_controller.is_turn_round_finished:
-            #print("end turn round ", self.game_controller.current_turn_round)
             self.check_and_send_turn_round_winner()
-            self.timer.start(RPC_Sleep_Turn_Round_Time, self.start_new_turn_round)
             self.game_controller.change_turn_round()
+            self.timer.start(RPC_Sleep_Turn_Round_Time, self.start_new_turn_round, is_user_turn=False)
         else:
             self.start_new_turn_round()
 
     def start_new_turn_round(self):
-        #print("start turn round ", self.game_controller.current_turn_round)
+        if self.is_game_finished or self.game_controller.is_game_finished:
+            return
         from Entities.SocketIOManagerClass import send_command
-        self.timer.start(RPC_Turn_Round_Time, self.send_current_turn)
+        self.timer.start(RPC_Turn_Round_Time, self.send_current_turn, is_user_turn=True)
         safe_run_async(
             send_command(command=make_command_json(id=commands.New_Turn_Round, data=None), game_id=self.game_id))
 

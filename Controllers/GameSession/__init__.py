@@ -316,10 +316,12 @@ class BaseGameSession:
         if gamer_data is None:
             return None
 
-        if hasattr(gamer_data, "reset_not_played_turns"):
-            gamer_data.reset_not_played_turns()
-        if hasattr(self, "game_controller") and hasattr(self.game_controller, "is_current_turn_played"):
-            self.game_controller.is_current_turn_played = True
+        cur_turn = getattr(self.game_controller, "current_turn", 0) if hasattr(self, "game_controller") else 0
+        if cmd_id not in (commands.Surrender, commands.Exit_Game) and cur_turn in (0, gamer_data.gamer_id):
+            if hasattr(gamer_data, "reset_not_played_turns"):
+                gamer_data.reset_not_played_turns()
+            if hasattr(self, "game_controller") and hasattr(self.game_controller, "is_current_turn_played"):
+                self.game_controller.is_current_turn_played = True
 
         if any(g.gamer_id == 0 for g in self.gamers):
             self.prepare_gamers()
@@ -437,8 +439,18 @@ class BaseGameSession:
         """Universal AFK check for 2-player turn-based games called in send_current_turn()."""
         if len(self.gamers) < 2:
             return False
+        if (
+            self.is_game_finished
+            or getattr(self.game_controller, 'is_game_finished', False)
+            or getattr(self.game_controller, 'is_round_finished', False)
+        ):
+            if hasattr(self, 'game_controller'):
+                self.game_controller.is_current_turn_played = False
+            return False
         if getattr(self, 'is_first_turn', True):
             self.is_first_turn = False
+            if hasattr(self, 'game_controller'):
+                self.game_controller.is_current_turn_played = False
             return False
         if not getattr(self.game_controller, 'is_current_turn_played', False):
             if self.check_finish_game_by_not_play_turn(self.game_controller.current_turn):
@@ -521,6 +533,7 @@ class BaseGameSession:
             return
 
         self.is_game_finished = True
+        self.timer.stop(False)
 
         user_idis = [g.user_id for g in self.gamers],
 

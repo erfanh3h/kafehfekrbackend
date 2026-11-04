@@ -25,6 +25,7 @@ class TicTacToeGameClass(BaseGameClass):
     async def recieve_data(self, command_id, data, gamer_id):
         #print(command_id, data, gamer_id)
         peace_number = data
+        self.is_current_turn_played = True
         self.counter += 1
         if gamer_id == 1:
             self.board[peace_number] = self.symbol_1

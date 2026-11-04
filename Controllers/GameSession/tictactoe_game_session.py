@@ -1,5 +1,6 @@
 from Commons.static_functions import safe_run_async
 import asyncio
+import threading
 import time
 
 from Entities.Games.game_types import GameTypesEnum
@@ -27,36 +28,48 @@ class TicTacToeGameSession(BaseGameSession):
             peace_id = data['data']
             is_selection_correct = self.game_controller.check_authority(peace_id, gamer_id)
             if is_selection_correct:
+                self.game_controller.is_current_turn_played = True
+                self.timer.stop(False)
                 await self.game_controller.recieve_data(data['id'], peace_id, gamer_id)
-                self.timer.stop()
+                self.send_current_turn()
 
     def send_current_turn(self):
         from Entities.SocketIOManagerClass import send_command
-        if self.check_afk_turn():
+        if self.is_game_finished:
+            self.timer.stop(False)
             return
         if self.check_finish_game():
+            self.timer.stop(False)
             return
         if self.game_controller.is_round_finished:
+            self.timer.stop(False)
             self.change_round()
+            return
+        if self.check_afk_turn():
             return
         self.game_controller.change_turn()
         safe_run_async(
             send_command(command=make_command_json(id=commands.Current_Turn, data=self.game_controller.current_turn),
                          game_id=self.game_id))
-        self.timer.start(TicTacToe_Turn_Time, self.send_current_turn)
+        self.timer.start(TicTacToe_Turn_Time, self.send_current_turn, is_user_turn=True)
 
     def change_round(self):
         from Entities.SocketIOManagerClass import send_command
+        self.timer.stop(False)
         winner = self.game_controller.round_winner
         safe_run_async(
             send_command(command=make_command_json(id=commands.Finish_Round, data={"Winner": winner}),
                          game_id=self.game_id))
 
         def function():
+            if self.is_game_finished or self.game_controller.is_game_finished:
+                return
             self.game_controller.change_round()
+            self.is_first_turn = True
+            self.game_controller.is_current_turn_played = False
             safe_run_async(
                 send_command(command=make_command_json(id=commands.New_Round, data=self.game_controller.current_round),
                              game_id=self.game_id))
             self.send_current_turn()
 
-        self.timer.start(TicTacToe_Sleep_Round_Time, function)
+        self.timer.start(TicTacToe_Sleep_Round_Time, function, is_user_turn=False)
