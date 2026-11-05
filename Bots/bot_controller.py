@@ -8,6 +8,7 @@ and Persian social reactions & chat responses.
 """
 
 import asyncio
+import os
 import random
 import sys
 from typing import Callable, Optional
@@ -43,7 +44,7 @@ class ClassicRankBot:
         bot_avatar: int,
         token: str,
         level: int = 2,  # Default level must always be 2 for Classic Rank
-        server_url: str = "http://127.0.0.1:5000",
+        server_url: Optional[str] = None,
         on_finished_callback: Optional[Callable[[int], None]] = None,
     ):
         self.game_id = game_id
@@ -53,8 +54,12 @@ class ClassicRankBot:
         self.bot_avatar = bot_avatar
         self.token = token
         self.level = level
+        if not server_url:
+            port = os.getenv("PORT", "5000")
+            server_url = f"http://127.0.0.1:{port}"
         self.server_url = server_url
         self.on_finished_callback = on_finished_callback
+        self._http_session = None
 
         self.game_logic: BaseGameLogic = get_game_logic(self.game_type, level=self.level)
         self.behavior = HumanBehavior()
@@ -69,7 +74,13 @@ class ClassicRankBot:
         self.is_active = True
         self.game_logic.on_game_start(self.game_id)
 
-        self.sio = socketio.AsyncClient()
+        try:
+            import aiohttp
+            self._http_session = aiohttp.ClientSession(trust_env=False)
+            self.sio = socketio.AsyncClient(http_session=self._http_session)
+        except Exception:
+            self._http_session = None
+            self.sio = socketio.AsyncClient()
         self._setup_handlers()
 
         # Brief delay to ensure GamePlay session is ready in backend
@@ -358,6 +369,11 @@ class ClassicRankBot:
         if self.sio and self.sio.connected:
             try:
                 await self.sio.disconnect()
+            except Exception:
+                pass
+        if hasattr(self, "_http_session") and self._http_session and not self._http_session.closed:
+            try:
+                await self._http_session.close()
             except Exception:
                 pass
         self.is_active = False
