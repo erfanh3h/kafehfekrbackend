@@ -62,7 +62,6 @@ class GamePlayHistoryCollectionManager:
             scores = list(user_scores) if isinstance(user_scores, (list, tuple)) else []
             update_data = {
                 "finish_date": now,
-                "finish_data": now,
                 "is_finished": True,
                 "winner_list": list(winner_list) if isinstance(winner_list, (list, tuple)) else [],
                 "user_scores": scores,

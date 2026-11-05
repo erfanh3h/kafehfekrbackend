@@ -26,6 +26,10 @@ from .behavior.human_behavior import HumanBehavior
 from .games import get_game_logic
 from .games.base_game import BaseGameLogic
 from .bot_data import (
+    get_intelligent_bot_reaction,
+    get_opening_reaction,
+    get_critical_move_reaction,
+    get_game_finish_reaction,
     KORI_GREETING,
     KORI_COMPLIMENT,
     KORI_SURPRISED,
@@ -68,6 +72,7 @@ class ClassicRankBot:
         self._pending_tasks: list[asyncio.Task] = []
         self.is_active = False
         self.my_role = 2  # default player 2, updated via GameData/UserData
+        self._last_reaction_time: float = 0.0
 
     async def start(self):
         """Initializes and connects to the /game namespace."""
@@ -137,6 +142,7 @@ class ClassicRankBot:
             await asyncio.sleep(delay)
         if not self.is_active or not self.sio or not self.sio.connected:
             return
+        self._last_reaction_time = asyncio.get_event_loop().time()
         print(f"[ClassicRankBot:{self.bot_name}] Sending reaction: {reaction_id}")
         await self.emit("user_reaction", reaction_id)
 
@@ -148,22 +154,18 @@ class ClassicRankBot:
         reaction_id = data.get("reactionId", 0)
 
         # Ignore reactions sent by the bot itself
-        if int(sender_id) == self.my_role:
+        if int(sender_id) == int(self.my_role):
             return
 
-        # 80% chance to react back, with human-like delay
-        if random.random() < 0.80:
-            delay = round(random.uniform(1.2, 2.6), 2)
-            # Pick a suitable reaction
-            if reaction_id in (1, 2, 18, 20) or (101 <= reaction_id <= 130 and reaction_id in KORI_COMPLIMENT):
-                response_id = random.choice(KORI_COMPLIMENT)
-            elif reaction_id in (7, 10, 15) or reaction_id in KORI_SURPRISED:
-                response_id = random.choice(KORI_SURPRISED)
-            elif reaction_id in (3, 4, 8) or reaction_id in KORI_WITTY:
-                response_id = random.choice(KORI_WITTY)
-            else:
-                response_id = random.choice(KORI_COMPLIMENT + KORI_WITTY)
+        # Cooldown guard: avoid spamming reactions if user sends rapidly
+        now = asyncio.get_event_loop().time()
+        if now - getattr(self, "_last_reaction_time", 0.0) < 1.6:
+            return
 
+        # 80% chance to react back, with realistic human reading & typing delay
+        if random.random() < 0.80:
+            delay = round(random.uniform(1.2, 2.5), 2)
+            response_id = get_intelligent_bot_reaction(reaction_id)
             task = asyncio.create_task(self.send_bot_reaction(response_id, delay=delay))
             self._pending_tasks.append(task)
 
@@ -203,10 +205,10 @@ class ClassicRankBot:
 
         elif cmd_id == "StartGame":
             self.game_logic.handle_server_command(cmd_id, payload)
-            # 55% chance to send friendly opening greeting after 2.5 - 4.5s
-            if random.random() < 0.55:
+            # 50% chance to send friendly opening greeting or early match kori after 2.0 - 3.8s
+            if random.random() < 0.50:
                 task = asyncio.create_task(
-                    self.send_bot_reaction(random.choice(KORI_GREETING), delay=random.uniform(2.5, 4.5))
+                    self.send_bot_reaction(get_opening_reaction(), delay=random.uniform(2.0, 3.8))
                 )
                 self._pending_tasks.append(task)
 
@@ -295,10 +297,14 @@ class ClassicRankBot:
             self.is_active = False
             self.game_logic.on_game_finished(winner)
 
-            # 65% chance to send congratulatory GG or finish praise
-            if random.random() < 0.65:
+            bot_won = (int(winner) == int(self.my_role))
+            is_draw = (int(winner) == 0)
+
+            # 70% chance to send an outcome-appropriate reaction (victory praise or sportsmanship GG)
+            if random.random() < 0.70:
+                finish_reaction = get_game_finish_reaction(bot_won=bot_won, is_draw=is_draw)
                 task = asyncio.create_task(
-                    self.send_bot_reaction(random.choice(KORI_FINISH), delay=random.uniform(0.6, 1.4))
+                    self.send_bot_reaction(finish_reaction, delay=random.uniform(0.6, 1.4))
                 )
                 self._pending_tasks.append(task)
 
@@ -324,9 +330,9 @@ class ClassicRankBot:
             await asyncio.sleep(0.55)
         else:
             is_critical = self.game_logic.is_critical_turn()
-            # 30% chance to send a spontaneous tactical reaction during tense turns
-            if is_critical and random.random() < 0.30:
-                reaction_choice = random.choice([6, 7, 14, 132])
+            # 25% chance to send a tactical reaction during tense, critical turns
+            if is_critical and random.random() < 0.25:
+                reaction_choice = get_critical_move_reaction()
                 asyncio.create_task(self.send_bot_reaction(reaction_choice, delay=0.4))
 
             await self.behavior.simulate_thinking(
