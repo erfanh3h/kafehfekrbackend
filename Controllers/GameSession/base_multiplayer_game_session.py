@@ -131,9 +131,16 @@ class BaseMultiplayerGameSession(BaseGameSession):
         try:
             game_type_val = self.game_type.value if hasattr(self.game_type, "value") else str(self.game_type)
             game_score_val = self.game_score_type.value if hasattr(self.game_score_type, "value") else str(self.game_score_type)
+            users_info = []
+            for g in self.gamers:
+                users_info.append({
+                    "user_id": str(g.user_id),
+                    "username": getattr(g, "username", getattr(g, "name", "")),
+                    "image": int(getattr(g, "user_image", getattr(g, "image", 0))),
+                })
             game_database.game_history_manager.create_game_history(self.game_history_id, self.game_id, user_idis,
                                                                    str(game_type_val), game_score_val,
-                                                                   self.game_controller.rank1)
+                                                                   self.game_controller.rank1, users_info=users_info)
         except Exception as e:
             print(f"[BaseMultiplayerGameSession] Error creating game history: {e}")
         from Entities.SocketIOClass.game import finish_multiplayer_game

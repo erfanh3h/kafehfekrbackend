@@ -64,8 +64,18 @@ class BaseGamePlayClass:
         user_idis = [g.user_id for g in self.gamers]
         self.score_manager.set_user_data(user_idis)
         game_database.game_play_history_manager.delete_game_play_history(self.game_play_id)
-        game_database.game_play_history_manager.create_game_play_history(self.game_play_id, user_idis, self.game_types,
-                                                                         str(self.game_score_type.value))
+        users_info = []
+        for g in self.gamers:
+            users_info.append({
+                "user_id": str(g.user_id),
+                "username": getattr(g, "username", getattr(g, "name", "")),
+                "image": int(getattr(g, "user_image", getattr(g, "image", 0))),
+                "score": int(getattr(g, "user_score", getattr(g, "score", 0))),
+            })
+        score_val = self.game_score_type.value if hasattr(self.game_score_type, "value") else str(self.game_score_type)
+        game_database.game_play_history_manager.create_game_play_history(
+            self.game_play_id, user_idis, self.game_types, score_val, users_info=users_info
+        )
         for user_id in user_idis:
             if not str(user_id).startswith("bot_"):
                 game_database.users_manager.update_user(user_id, open_game_id=self.game_play_id)
@@ -404,8 +414,9 @@ class BaseGamePlayClass:
                 except Exception as e:
                     print(f"[BaseGamePlayClass] Error clearing open_game_id for {gamer.user_id}: {e}")
         try:
-            game_database.game_play_history_manager.update_game_play_history(self.game_play_id, self.game_winners,
-                                                                             self.gamer_scores)
+            game_database.game_play_history_manager.update_game_play_history(
+                self.game_play_id, self.game_winners, self.gamer_scores, winner_id=rank1_id
+            )
         except Exception as e:
             print(f"[BaseGamePlayClass] Error updating game_play_history: {e}")
         self.is_game_finished = True
@@ -490,8 +501,9 @@ class BaseGamePlayClass:
                 except Exception as e:
                     print(f"[BaseGamePlayClass] Error clearing open_game_id for {gamer.user_id}: {e}")
         try:
-            game_database.game_play_history_manager.update_game_play_history(self.game_play_id, self.game_winners,
-                                                                             self.gamer_scores)
+            game_database.game_play_history_manager.update_game_play_history(
+                self.game_play_id, self.game_winners, self.gamer_scores, winner_id=winner_id
+            )
         except Exception as e:
             print(f"[BaseGamePlayClass] Error updating game_play_history: {e}")
         self.is_game_finished = True

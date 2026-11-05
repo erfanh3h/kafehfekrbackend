@@ -551,9 +551,16 @@ class BaseGameSession:
         try:
             game_type_val = self.game_type.value if hasattr(self.game_type, "value") else str(self.game_type)
             game_score_val = self.game_score_type.value if hasattr(self.game_score_type, "value") else str(self.game_score_type)
+            users_info = []
+            for g in self.gamers:
+                users_info.append({
+                    "user_id": str(g.user_id),
+                    "username": getattr(g, "username", getattr(g, "name", "")),
+                    "image": int(getattr(g, "user_image", getattr(g, "image", 0))),
+                })
             game_database.game_history_manager.create_game_history(self.game_history_id, self.game_id, user_idis,
                                                                    str(game_type_val), game_score_val,
-                                                                   winner_gamer_id)
+                                                                   winner_gamer_id, users_info=users_info)
         except Exception as e:
             print(f"[BaseGameSession] Error creating game history: {e}")
 
