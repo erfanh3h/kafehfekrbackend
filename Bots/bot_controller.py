@@ -198,9 +198,10 @@ class ClassicRankBot:
                         self.game_logic.set_player_role(role)
                         print(f"[ClassicRankBot:{self.bot_name}] Assigned Role: Player {role}")
             elif isinstance(payload, dict):
-                role = payload.get("user", 2)
+                role = payload.get("user", payload.get("index", self.my_role or 2))
                 self.my_role = role
                 self.game_logic.set_player_role(role)
+                self.game_logic.handle_server_command(cmd_id, payload)
                 print(f"[ClassicRankBot:{self.bot_name}] Assigned Role: Player {role}")
 
         elif cmd_id == "StartGame":
@@ -316,6 +317,8 @@ class ClassicRankBot:
 
         else:
             self.game_logic.handle_server_command(cmd_id, payload)
+            if hasattr(self.game_logic, "should_continue_turn") and self.game_logic.should_continue_turn():
+                await self._take_turn(is_continuation=True)
 
     async def _take_turn(self, is_continuation: bool = False):
         """Simulates human thinking time (Level 2) and plays move."""

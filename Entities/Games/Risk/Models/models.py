@@ -12,6 +12,20 @@ class RiskStrategyModel(Enum):
     EXPAND = "Expand"
     SPY = "Spy"
 
+    @classmethod
+    def all(cls) -> List["RiskStrategyModel"]:
+        return list(cls)
+
+    @classmethod
+    def data_to_model(cls, data):
+        if isinstance(data, cls):
+            return data
+        s = str(data).strip().lower()
+        for member in cls:
+            if member.value.lower() == s or member.name.lower() == s:
+                return member
+        return None
+
 
 class RiskContinentModel(Enum):
     ASIA = "Asia"
@@ -22,23 +36,27 @@ class RiskContinentModel(Enum):
     AUSTRALIA = "Australia"
 
     @classmethod
-    def all(cls) -> List[Enum]:
+    def all(cls) -> List["RiskContinentModel"]:
         return list(cls)
 
     @classmethod
     def data_to_model(cls, data):
-        if data == "Asia":
+        if isinstance(data, cls):
+            return data
+        s = str(data).strip().lower().replace("_", "").replace(" ", "")
+        if s == "asia":
             return cls.ASIA
-        if data == "Africa":
+        elif s == "africa":
             return cls.AFRICA
-        if data == "Europe":
+        elif s == "europe":
             return cls.EUROPE
-        if data == "NorthAmerica":
+        elif s in ("northamerica", "na"):
             return cls.NORTHAMERICA
-        if data == "SouthAmerica":
+        elif s in ("southamerica", "sa"):
             return cls.SOUTHAMERICA
-        else:
+        elif s == "australia":
             return cls.AUSTRALIA
+        return None
 
 
 class RiskGameState(Enum):
