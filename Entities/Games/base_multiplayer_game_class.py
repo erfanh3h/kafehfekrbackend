@@ -11,33 +11,26 @@ class BaseMultiPlayerGameClass(BaseGameClass):
         self.players_count = players_count
 
     def change_turn(self):
-        if self.current_turn == 1:
-            self.current_turn = 2
-        else:
-            if self.players_count == 4:
-                if self.current_turn == 2:
-                    self.current_turn = 3
-                elif self.current_turn == 3:
-                    self.current_turn = 4
-                else:
-                    self.current_turn = 1
-            if self.players_count == 3:
-                if self.current_turn == 2:
-                    self.current_turn = 3
-                else:
-                    self.current_turn = 1
-            else:
-                self.current_turn = 1
-        if len(self.active_player_indexes) != 0 and not self.active_player_indexes.__contains__(self.current_turn):
-            self.change_turn()
+        if not self.active_player_indexes:
+            self.current_turn = (self.current_turn % max(1, self.players_count)) + 1
+            return
+        if self.current_turn <= 0:
+            self.current_turn = self.active_player_indexes[0]
+            return
+        for step in range(1, self.players_count + 1):
+            candidate = ((self.current_turn - 1 + step) % self.players_count) + 1
+            if candidate in self.active_player_indexes:
+                self.current_turn = candidate
+                return
+        self.current_turn = self.active_player_indexes[0]
 
     def check_game_ended(self):
         if self.rank1 is not None and self.rank2 is not None:
             return True
         return False
 
-    async def surrender(self, gamer_id):
-        if not self.active_player_indexes.__contains__(gamer_id):
+    def _apply_surrender_sync(self, gamer_id):
+        if gamer_id not in self.active_player_indexes:
             return False
         if len(self.active_player_indexes) == 2:
             if self.rank2 is None:
@@ -51,6 +44,8 @@ class BaseMultiPlayerGameClass(BaseGameClass):
             return True
         return False
 
+    async def surrender(self, gamer_id):
+        return self._apply_surrender_sync(gamer_id)
+
     def finish_reconnect_time(self, gamer_id):
-        import asyncio
-        safe_run_async(self.surrender(gamer_id))
+        self._apply_surrender_sync(gamer_id)

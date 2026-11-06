@@ -1,9 +1,20 @@
 import random
 from typing import Optional
+
 from Commons import commands
 from Entities.Games.Risk.Models.models import RiskContinentModel, RiskStrategyModel, RiskGameState
 from Entities.Games.Risk.Models.user_spot import UserSpotClass
 from Entities.Games.base_multiplayer_game_class import BaseMultiPlayerGameClass
+
+
+DOMINATION_THRESHOLDS: dict[str, int] = {
+    "Asia": 4,
+    "NorthAmerica": 4,
+    "Europe": 3,
+    "Africa": 3,
+    "Australia": 3,
+    "SouthAmerica": 3,
+}
 
 
 def roll_dice(dice_count: int) -> list[int]:
@@ -20,6 +31,7 @@ class RiskGameClass(BaseMultiPlayerGameClass):
         self.tokens: list[str] = []
         self.current_dice: dict = {"attacker": [], "defender": []}
         self.attacked_this_turn: bool = False
+        self.attacks_this_turn: int = 0
         self.ignore_adjacency: bool = False
         self.pending_attacker_canon_bonus: int = 0
         self.winner_id: int = 0
@@ -69,7 +81,7 @@ class RiskGameClass(BaseMultiPlayerGameClass):
             self.continents.append(RiskContinentModel.AUSTRALIA)
             self.continents.append(RiskContinentModel.SOUTHAMERICA)
 
-        # 6 Continent Domination Tokens
+        # 6 Continent Domination Tokens start unclaimed on the board
         for continent in RiskContinentModel.all():
             self.tokens.append(continent.value)
 
@@ -84,7 +96,7 @@ class RiskGameClass(BaseMultiPlayerGameClass):
             random.shuffle(self.continents)
         if self.continents:
             return self.continents.pop()
-        return random.choice(RiskContinentModel.all())
+        return None
 
     def draw_strategy_card(self) -> Optional[RiskStrategyModel]:
         if not self.strategies and self.discarded_strategies:
@@ -93,7 +105,7 @@ class RiskGameClass(BaseMultiPlayerGameClass):
             random.shuffle(self.strategies)
         if self.strategies:
             return self.strategies.pop()
-        return RiskStrategyModel.ARMY
+        return None
 
     def init_game(self):
         self.players_data.clear()
@@ -118,30 +130,39 @@ class RiskGameClass(BaseMultiPlayerGameClass):
                 if extra_s is not None:
                     player_data.add_strategy(extra_s)
 
-        # Ensure no player starts Turn 0 already holding 2 Domination Tokens
-        self.update_domination_tokens()
+        # Ensure no player starts Turn 0 with 3 identical continent cards (so no continent starts pre-dominated)
         for p in self.players_data:
-            while len(p.tokens) >= 2:
-                tok_to_break = p.tokens[-1]
-                # Swap one of this player's cards of tok_to_break with an opponent's continent card
-                p.remove_continent(tok_to_break, 1)
-                self.continents.insert(0, RiskContinentModel.data_to_model(tok_to_break))
-                other_p = self.players_data[(p.index) % len(self.players_data)]
-                other_p.add_continent(tok_to_break, 1)
-                self.update_domination_tokens()
+            for c_name, cnt in list(p.continents.items()):
+                if cnt >= 3 and self.continents:
+                    replacement_idx = next(
+                        (i for i, c in enumerate(self.continents) if c.value != c_name),
+                        None,
+                    )
+                    if replacement_idx is not None:
+                        rep_card = self.continents.pop(replacement_idx)
+                        p.remove_continent(c_name, 1)
+                        p.add_continent(rep_card, 1)
+                        self.continents.insert(0, RiskContinentModel.data_to_model(c_name))
 
-    def update_domination_tokens(self, conquered_continent: Optional[str] = None, conqueror_idx: Optional[int] = None) -> list[dict]:
+    def update_domination_tokens(
+        self,
+        conquered_continent: Optional[str] = None,
+        conqueror_idx: Optional[int] = None,
+    ) -> list[dict]:
         """
         Updates the 6 Continent Domination Tokens according to Risk Strike rules:
-        1. If a player holds a token for continent C but now has 0 cards of C, they lose the token.
-        2. If exactly one active player has >= 1 card of continent C (sole presence in C) and >= 2 cards total in C
-           (or conquered C in combat / holds monopoly of C in play), they claim the Domination Token for C.
-        3. If a player wipes out a defender's last card in `conquered_continent` during combat and no other opponent
-           has more cards in `conquered_continent` than the conqueror, the conqueror claims its Domination Token!
+        1. If a player holds a token for continent C but now has 0 cards of C (or left the game), they lose the token.
+        2. Combat Conquest: If `conqueror_idx` wiped out a defender's last card in `conquered_continent` during battle,
+           and `conqueror` holds >= 1 card in `conquered_continent` with at least as many (or strictly more) cards
+           in `conquered_continent` as any other active player (or no other player holds cards there),
+           `conqueror` claims the Domination Token for `conquered_continent`.
+        3. Continent Domination: If an active player holds >= DOMINATION_THRESHOLDS[C] cards in continent C
+           and strictly more cards in C than every other active player, they claim (or steal) the Domination Token for C.
         """
         events = []
         for c_model in RiskContinentModel.all():
             c_name = c_model.value
+            threshold = DOMINATION_THRESHOLDS.get(c_name, 3)
             holders = [
                 p for p in self.players_data
                 if p.index in self.active_player_indexes and p.continents.get(c_name, 0) > 0
@@ -159,40 +180,61 @@ class RiskGameClass(BaseMultiPlayerGameClass):
                     else:
                         current_owner = p
 
-            # Step 2: Check if a single player solely controls this continent (all other active players have 0 cards in c_name)
-            if len(holders) == 1:
-                sole_player = holders[0]
-                # Sole control of a continent claims its Domination Token if they have >= 2 cards in it or conquered it
-                if sole_player.continents.get(c_name, 0) >= 2 or (conquered_continent == c_name and conqueror_idx == (sole_player.index - 1)):
-                    if current_owner != sole_player:
-                        if current_owner is not None:
-                            current_owner.remove_token(c_name)
-                        if c_name in self.tokens:
-                            self.tokens.remove(c_name)
-                        sole_player.add_token(c_name)
-                        events.append({"event": "token_claimed", "continent": c_name, "gamer_id": sole_player.index})
-            elif conquered_continent == c_name and conqueror_idx is not None and 0 <= conqueror_idx < len(self.players_data):
-                # Step 3: Direct conquest in battle when wiping out defender's continent presence
+            # Step 2: Direct conquest in battle when wiping out defender's continent presence
+            claimed_by_conquest = False
+            if conquered_continent == c_name and conqueror_idx is not None and 0 <= conqueror_idx < len(self.players_data):
                 conqueror = self.players_data[conqueror_idx]
-                if conqueror.index in self.active_player_indexes:
-                    # If no other active player holds c_name, or conqueror has strictly the most cards in c_name
+                conq_count = conqueror.continents.get(c_name, 0)
+                if conqueror.index in self.active_player_indexes and conq_count >= 1:
                     max_other = max(
-                        (p.continents.get(c_name, 0) for p in self.players_data if p.index != conqueror.index and p.index in self.active_player_indexes),
-                        default=0
+                        (
+                            p.continents.get(c_name, 0)
+                            for p in self.players_data
+                            if p.index != conqueror.index and p.index in self.active_player_indexes
+                        ),
+                        default=0,
                     )
-                    if max_other == 0 or (conqueror.continents.get(c_name, 0) > max_other and conqueror.continents.get(c_name, 0) >= 1):
+                    if max_other == 0 or conq_count > max_other:
+                        claimed_by_conquest = True
                         if current_owner != conqueror:
                             if current_owner is not None:
                                 current_owner.remove_token(c_name)
                             if c_name in self.tokens:
                                 self.tokens.remove(c_name)
                             conqueror.add_token(c_name)
+                            current_owner = conqueror
                             events.append({"event": "token_claimed", "continent": c_name, "gamer_id": conqueror.index})
+
+            if claimed_by_conquest:
+                continue
+
+            # Step 3: Continent Domination by accumulating >= threshold cards and strictly leading all opponents
+            best_player = None
+            best_count = 0
+            second_best_count = 0
+            for p in holders:
+                cnt = p.continents.get(c_name, 0)
+                if cnt > best_count:
+                    second_best_count = best_count
+                    best_count = cnt
+                    best_player = p
+                elif cnt > second_best_count:
+                    second_best_count = cnt
+
+            if best_player is not None and best_count >= threshold and best_count > second_best_count:
+                if current_owner != best_player:
+                    if current_owner is not None:
+                        current_owner.remove_token(c_name)
+                    if c_name in self.tokens:
+                        self.tokens.remove(c_name)
+                    best_player.add_token(c_name)
+                    current_owner = best_player
+                    events.append({"event": "token_claimed", "continent": c_name, "gamer_id": best_player.index})
             elif current_owner is not None and len(holders) > 1:
-                # If another player now holds more cards in c_name than current_owner, current_owner loses monopoly
+                # If another player now holds strictly more cards in c_name than current_owner, current_owner loses monopoly
                 max_other = max(
                     (p.continents.get(c_name, 0) for p in holders if p.index != current_owner.index),
-                    default=0
+                    default=0,
                 )
                 if max_other > current_owner.continents.get(c_name, 0):
                     current_owner.remove_token(c_name)
@@ -216,7 +258,6 @@ class RiskGameClass(BaseMultiPlayerGameClass):
         candidates = [p for p in self.players_data if p.index != winner_id]
         if not candidates:
             return 0
-        # Sort by (active, token count, total continent cards, strategy count)
         candidates.sort(
             key=lambda p: (
                 1 if p.index in self.active_player_indexes else 0,
@@ -289,27 +330,70 @@ class RiskGameClass(BaseMultiPlayerGameClass):
             return self.players_data[gamer_index].to_private_json()
         return {"index": gamer_index + 1, "continents": {}, "strategies": [], "tokens": []}
 
+    def _pick_valid_opponent(self, gamer_id: int, requested_target_id: Optional[int], require_continents: bool = False, preferred_continent: Optional[str] = None) -> Optional[int]:
+        opponents = [
+            p for p in self.players_data
+            if p.index != gamer_id and p.index in self.active_player_indexes
+        ]
+        if not opponents:
+            return None
+
+        if require_continents:
+            eligible = [p for p in opponents if p.total_continents() > 0]
+            if preferred_continent:
+                with_pref = [p for p in eligible if p.continents.get(preferred_continent, 0) > 0]
+                if requested_target_id is not None and any(p.index == requested_target_id for p in with_pref):
+                    return requested_target_id
+                if with_pref:
+                    with_pref.sort(key=lambda p: (len(p.tokens), p.total_continents(), len(p.strategies)), reverse=True)
+                    return with_pref[0].index
+            if requested_target_id is not None and any(p.index == requested_target_id for p in eligible):
+                return requested_target_id
+            if not eligible:
+                return None
+            eligible.sort(key=lambda p: (len(p.tokens), p.total_continents(), len(p.strategies)), reverse=True)
+            return eligible[0].index
+        else:
+            eligible = [p for p in opponents if len(p.strategies) > 0 or p.total_continents() > 0]
+            if requested_target_id is not None and any(p.index == requested_target_id for p in eligible):
+                return requested_target_id
+            if not eligible:
+                return None
+            eligible.sort(key=lambda p: (len(p.tokens), len(p.strategies), p.total_continents()), reverse=True)
+            return eligible[0].index
+
     def use_strategy_card(self, gamer_id: int, data: dict) -> Optional[dict]:
         if not (1 <= gamer_id <= len(self.players_data)):
             return None
         player = self.players_data[gamer_id - 1]
-        raw_strategy = data.get("strategy", data.get("card", data.get("type")))
+        raw_strategy = data.get("strategy", data.get("card", data.get("type"))) if isinstance(data, dict) else data
         strat = RiskStrategyModel.data_to_model(raw_strategy)
         if strat is None or not player.has_strategy(strat):
             return None
 
-        # Validate target if needed
-        target_id = data.get("target_index", data.get("target_id"))
-        if target_id is not None:
+        raw_target_id = data.get("target_index", data.get("target_id")) if isinstance(data, dict) else None
+        if raw_target_id is not None:
             try:
-                target_id = int(target_id)
+                raw_target_id = int(raw_target_id)
             except (TypeError, ValueError):
-                target_id = None
-        if target_id is None or target_id == gamer_id or target_id not in self.active_player_indexes:
-            # Pick leading active opponent by default
-            opponents = [p for p in self.players_data if p.index != gamer_id and p.index in self.active_player_indexes]
-            opponents.sort(key=lambda p: (len(p.tokens), p.total_continents(), len(p.strategies)), reverse=True)
-            target_id = opponents[0].index if opponents else None
+                raw_target_id = None
+        if raw_target_id == gamer_id or (raw_target_id is not None and raw_target_id not in self.active_player_indexes):
+            raw_target_id = None
+
+        raw_c = data.get("target_continent", data.get("continent")) if isinstance(data, dict) else None
+        req_c_model = RiskContinentModel.data_to_model(raw_c) if raw_c else None
+
+        if strat == RiskStrategyModel.DESTROY:
+            target_id = self._pick_valid_opponent(
+                gamer_id,
+                raw_target_id,
+                require_continents=True,
+                preferred_continent=req_c_model.value if req_c_model else None,
+            )
+        elif strat in (RiskStrategyModel.BOMB, RiskStrategyModel.SPY):
+            target_id = self._pick_valid_opponent(gamer_id, raw_target_id, require_continents=False)
+        else:
+            target_id = raw_target_id
 
         effect_summary = {"gamer_id": gamer_id, "strategy": strat.value, "target_index": target_id}
 
@@ -345,6 +429,8 @@ class RiskGameClass(BaseMultiPlayerGameClass):
             if target_id is None:
                 return None
             target_p = self.players_data[target_id - 1]
+            if len(target_p.strategies) == 0 and target_p.total_continents() == 0:
+                return None
             player.remove_strategy(strat)
             self.discarded_strategies.append(strat)
             discarded = []
@@ -367,24 +453,20 @@ class RiskGameClass(BaseMultiPlayerGameClass):
             if target_id is None:
                 return None
             target_p = self.players_data[target_id - 1]
-            raw_c = data.get("target_continent", data.get("continent"))
-            c_model = RiskContinentModel.data_to_model(raw_c) if raw_c else None
+            c_model = req_c_model
             if c_model is None or target_p.continents.get(c_model.value, 0) <= 0:
                 avail_c = [k for k, v in target_p.continents.items() if v > 0]
                 if not avail_c:
                     return None
-                # Prefer a continent where target_p has only 1 card or holds a token
                 avail_c.sort(key=lambda c: (1 if c in target_p.tokens else 0, -target_p.continents[c]), reverse=True)
                 c_model = RiskContinentModel.data_to_model(avail_c[0])
+
             player.remove_strategy(strat)
             self.discarded_strategies.append(strat)
             target_p.remove_continent(c_model, 1)
             self.discarded_continents.append(c_model)
             effect_summary["target_continent"] = c_model.value
-            effect_summary["token_events"] = self.update_domination_tokens(
-                conquered_continent=c_model.value if target_p.continents.get(c_model.value, 0) == 0 else None,
-                conqueror_idx=gamer_id - 1
-            )
+            effect_summary["token_events"] = self.update_domination_tokens()
 
         elif strat == RiskStrategyModel.SPY:
             if target_id is None:
@@ -431,20 +513,25 @@ class RiskGameClass(BaseMultiPlayerGameClass):
         elif strat == RiskStrategyModel.ARMY:
             if self.attack_handler.is_attack_active:
                 if gamer_id == (self.attack_handler.source_id + 1):
-                    self.attack_handler.add_attacker_army(1, gamer_id)
+                    added = self.attack_handler.add_attacker_army(1, gamer_id)
+                    if added <= 0:
+                        return None
                     effect_summary["army_added"] = "Attacker"
                 elif gamer_id == self.attack_handler.target_id:
-                    self.attack_handler.add_defender_army(1, gamer_id)
+                    added = self.attack_handler.add_defender_army(1, gamer_id)
+                    if added <= 0:
+                        return None
                     effect_summary["army_added"] = "Defender"
                 else:
                     return None
             else:
+                c1 = self.draw_continent_card()
+                if c1 is None:
+                    return None
                 player.remove_strategy(strat)
                 self.discarded_strategies.append(strat)
-                c1 = self.draw_continent_card()
-                if c1 is not None:
-                    player.add_continent(c1)
-                    effect_summary["drawn_continents"] = [c1.value]
+                player.add_continent(c1)
+                effect_summary["drawn_continents"] = [c1.value]
                 effect_summary["token_events"] = self.update_domination_tokens()
 
         self.check_player_eliminations()
@@ -456,15 +543,14 @@ class RiskGameClass(BaseMultiPlayerGameClass):
 
         if command_id == commands.Draw_Card:
             draw_type = payload.get("draw_type", data.get("draw_type", 3) if isinstance(data, dict) else 3)
-            res = self.draw_handler.draw_card(draw_type)
+            res = self.draw_handler.draw_card(draw_type, gamer_id - 1)
             if not self.is_game_finished:
                 self.game_state = RiskGameState.SELECTACTION
             return res
 
         elif command_id == commands.Pass_Turn:
             # In official Risk Strike, a player draws 1 Tactic/Strategy card at end of turn if they did not attack
-            # (or via draw_type=4 as supported by the existing protocol)
-            res = self.draw_handler.draw_card(4) if not self.attacked_this_turn else []
+            res = self.draw_handler.draw_card(4, gamer_id - 1) if not self.attacked_this_turn else []
             return res
 
         elif command_id == commands.Declare_Attack:
@@ -515,13 +601,14 @@ class RiskGameClass(BaseMultiPlayerGameClass):
 
     def change_turn(self):
         self.attacked_this_turn = False
+        self.attacks_this_turn = 0
         self.ignore_adjacency = False
         self.pending_attacker_canon_bonus = 0
         self.attack_handler.reset()
         self.game_state = RiskGameState.DRAW
         super().change_turn()
 
-    async def surrender(self, gamer_id):
+    def _apply_risk_surrender_sync(self, gamer_id: int) -> bool:
         if gamer_id not in self.active_player_indexes:
             return False
         if 1 <= gamer_id <= len(self.players_data):
@@ -530,11 +617,31 @@ class RiskGameClass(BaseMultiPlayerGameClass):
                 p.remove_token(t)
                 if t not in self.tokens:
                     self.tokens.append(t)
+            for c_name, cnt in list(p.continents.items()):
+                c_mod = RiskContinentModel.data_to_model(c_name)
+                if c_mod is not None and cnt > 0:
+                    for _ in range(cnt):
+                        self.discarded_continents.append(c_mod)
+            for s_mod in list(p.strategies):
+                self.discarded_strategies.append(s_mod)
             p.clear()
-        res = await super().surrender(gamer_id)
+
+        if self.attack_handler.is_attack_active:
+            if gamer_id in (self.attack_handler.source_id + 1, self.attack_handler.target_id):
+                self.attack_handler.reset()
+                if not self.is_game_finished:
+                    self.game_state = RiskGameState.SELECTACTION
+
+        res = self._apply_surrender_sync(gamer_id)
         self.update_domination_tokens()
         self.check_game_ended()
         return res
+
+    async def surrender(self, gamer_id):
+        return self._apply_risk_surrender_sync(gamer_id)
+
+    def finish_reconnect_time(self, gamer_id):
+        self._apply_risk_surrender_sync(gamer_id)
 
     def check_authority(self, data, gamer_id: int) -> bool:
         if self.is_game_finished:
@@ -547,45 +654,81 @@ class RiskGameClass(BaseMultiPlayerGameClass):
         cmd_id = data["id"]
         payload = data.get("data") if isinstance(data.get("data"), dict) else data
 
-        # Defender (or third-party in QuestArmy) is authorized to respond during an active attack
         if cmd_id == commands.DefenderArmy:
             return (
                 self.attack_handler.is_attack_active
                 and self.game_state in (RiskGameState.DECLAREATTACK, RiskGameState.ATTACKERARMY, RiskGameState.DEFENDERARMY)
                 and gamer_id == self.attack_handler.target_id
             )
+
         if cmd_id == getattr(commands, "Cancel_Attack", "CancelAttack"):
             return (
                 self.attack_handler.is_attack_active
-                and gamer_id == self.attack_handler.target_id
+                and gamer_id in (self.attack_handler.target_id, self.attack_handler.source_id + 1)
                 and self.players_data[gamer_id - 1].has_strategy(RiskStrategyModel.CANCEL)
             )
-        if cmd_id == commands.QuestArmy:
-            return self.attack_handler.is_attack_active
 
-        # Allow defender to play CANCEL or CANON during defense
+        if cmd_id == commands.QuestArmy:
+            return (
+                self.attack_handler.is_attack_active
+                and self.players_data[gamer_id - 1].has_strategy(RiskStrategyModel.ARMY)
+            )
+
         if cmd_id in (getattr(commands, "Use_Strategy", "UseStrategy"), commands.Select_Peace):
-            strat = RiskStrategyModel.data_to_model(payload.get("strategy", payload.get("card", payload.get("type"))))
-            if self.attack_handler.is_attack_active and gamer_id == self.attack_handler.target_id:
-                return strat in (RiskStrategyModel.CANCEL, RiskStrategyModel.CANON, RiskStrategyModel.ARMY)
+            raw_strat = payload.get("strategy", payload.get("card", payload.get("type"))) if isinstance(payload, dict) else None
+            strat = RiskStrategyModel.data_to_model(raw_strat)
+            if strat is None or not self.players_data[gamer_id - 1].has_strategy(strat):
+                return False
+            if self.attack_handler.is_attack_active:
+                if gamer_id in (self.attack_handler.source_id + 1, self.attack_handler.target_id):
+                    return strat in (RiskStrategyModel.CANCEL, RiskStrategyModel.CANON, RiskStrategyModel.ARMY)
+                return False
+            if self.current_turn != gamer_id:
+                return False
+            if strat == RiskStrategyModel.CANCEL:
+                return False
+            return self.game_state in (RiskGameState.DRAWRESULT, RiskGameState.SELECTACTION, RiskGameState.ACTIONRESULT)
 
         # All other commands require it to be `gamer_id`'s turn
         if self.current_turn != gamer_id:
             return False
 
         if cmd_id == commands.Draw_Card:
-            return self.game_state in (RiskGameState.STARTGAME, RiskGameState.DRAW)
+            if self.attack_handler.is_attack_active:
+                return False
+            raw_dt = payload.get("draw_type", data.get("draw_type", 3)) if isinstance(payload, dict) else 3
+            try:
+                dt = int(raw_dt)
+            except (TypeError, ValueError):
+                return False
+            return dt in (1, 2, 3) and self.game_state in (RiskGameState.STARTGAME, RiskGameState.DRAW)
 
         if cmd_id == commands.Declare_Attack:
-            return self.game_state in (RiskGameState.DRAWRESULT, RiskGameState.SELECTACTION, RiskGameState.ACTIONRESULT)
+            if self.attack_handler.is_attack_active:
+                return False
+            if self.game_state not in (RiskGameState.DRAWRESULT, RiskGameState.SELECTACTION, RiskGameState.ACTIONRESULT):
+                return False
+            src_c = payload.get("source_continent", data.get("source_continent")) if isinstance(payload, dict) else None
+            tgt_c = payload.get("target_continent", data.get("target_continent")) if isinstance(payload, dict) else None
+            tgt_idx = payload.get("target_index", data.get("target_index")) if isinstance(payload, dict) else None
+            src_m = RiskContinentModel.data_to_model(src_c)
+            tgt_m = RiskContinentModel.data_to_model(tgt_c)
+            return self.attack_handler.check_declare_is_valid(src_m, tgt_m, tgt_idx, attacker_idx=gamer_id - 1)
 
         if cmd_id == commands.AttackerArmy:
-            return self.attack_handler.is_attack_active and self.game_state in (RiskGameState.DECLAREATTACK, RiskGameState.ATTACKERARMY)
+            return (
+                self.attack_handler.is_attack_active
+                and gamer_id == (self.attack_handler.source_id + 1)
+                and self.game_state in (RiskGameState.DECLAREATTACK, RiskGameState.ATTACKERARMY)
+            )
 
         if cmd_id in (commands.Attack, commands.Roll_Dice):
             return self.attack_handler.is_attack_active
 
         if cmd_id == commands.Pass_Turn:
-            return self.game_state in (RiskGameState.DRAWRESULT, RiskGameState.SELECTACTION, RiskGameState.ACTIONRESULT)
+            return (
+                not self.attack_handler.is_attack_active
+                and self.game_state in (RiskGameState.DRAWRESULT, RiskGameState.SELECTACTION, RiskGameState.ACTIONRESULT)
+            )
 
-        return True
+        return False
