@@ -35,13 +35,14 @@ class RiskAttackHandler:
         self.target_continent: RiskContinentModel = RiskContinentModel.ASIA
         self.source_id: int = 0       # 0-based attacker index (gamer_id - 1)
         self.target_id: int = 0       # 1-based defender gamer_id
-        self.source_army: int = 0     # extra ARMY tactic cards committed to attack
-        self.target_army: int = 0     # extra ARMY tactic cards committed to defense
+        self.source_army: int = 0     # active ARMY tactic cards committed before battle starts
+        self.target_army: int = 0     # active ARMY tactic cards committed before battle starts
         self.attacker_canon_bonus: int = 0
         self.defender_canon_bonus: int = 0
         self.is_attack_active: bool = False
         self.attacker_committed: bool = False
         self.defender_committed: bool = False
+        self.battle_started: bool = False
         self.last_battle_result: Optional[dict] = None
 
     def reset(self):
@@ -56,6 +57,7 @@ class RiskAttackHandler:
         self.is_attack_active = False
         self.attacker_committed = False
         self.defender_committed = False
+        self.battle_started = False
 
     def check_declare_is_valid(
         self,
@@ -88,6 +90,9 @@ class RiskAttackHandler:
         return True
 
     def declare_war(self, source_continent, target_continent, target_id) -> bool:
+        # In Risk Strike, once an attack is declared/started on a turn, a second separate attack declaration cannot be made
+        if self.is_attack_active or self.game.attacked_this_turn:
+            return False
         src_model = RiskContinentModel.data_to_model(source_continent)
         tgt_model = RiskContinentModel.data_to_model(target_continent)
         self.source_id = self.game.current_turn - 1
@@ -109,53 +114,74 @@ class RiskAttackHandler:
         self.is_attack_active = True
         self.attacker_committed = False
         self.defender_committed = False
+        self.battle_started = False
         self.game.attacked_this_turn = True
         self.game.attacks_this_turn = getattr(self.game, "attacks_this_turn", 0) + 1
         return True
 
     def add_attacker_army(self, count: int, gamer_id: int = None) -> int:
-        if not self.is_attack_active:
+        # Rule: After attack starts (or once attacker has committed), players can NO LONGER add new army cards to battle!
+        if not self.is_attack_active or self.battle_started or self.attacker_committed:
             return 0
         p_idx = (gamer_id - 1) if gamer_id is not None else self.source_id
-        if not (0 <= p_idx < len(self.game.players_data)):
+        if p_idx != self.source_id or not (0 <= p_idx < len(self.game.players_data)):
             return 0
         player = self.game.players_data[p_idx]
-        attacker = self.game.players_data[self.source_id]
-        atk_cards = attacker.continents.get(self.source_continent.value, 1)
-        base_atk_dice = min(3, max(1, atk_cards))
-        max_extra = max(0, 5 - base_atk_dice - self.source_army)
         req = max(0, int(count or 0))
         avail = player.count_strategy(RiskStrategyModel.ARMY)
-        actual = min(req, avail, max_extra)
+        actual = min(req, avail)
         for _ in range(actual):
             player.remove_strategy(RiskStrategyModel.ARMY)
             self.game.discarded_strategies.append(RiskStrategyModel.ARMY)
         self.source_army += actual
-        if p_idx == self.source_id:
-            self.attacker_committed = True
+        self.attacker_committed = True
         return actual
 
     def add_defender_army(self, count: int, gamer_id: int = None) -> int:
-        if not self.is_attack_active:
+        # Rule: After attack starts (or once defender has committed), players can NO LONGER add new army cards to battle!
+        if not self.is_attack_active or self.battle_started or self.defender_committed:
             return 0
         p_idx = (gamer_id - 1) if gamer_id is not None else (self.target_id - 1)
-        if not (0 <= p_idx < len(self.game.players_data)):
+        if p_idx != (self.target_id - 1) or not (0 <= p_idx < len(self.game.players_data)):
             return 0
         player = self.game.players_data[p_idx]
-        defender = self.game.players_data[self.target_id - 1]
-        def_cards = defender.continents.get(self.target_continent.value, 1)
-        base_def_dice = min(2, max(1, def_cards))
-        max_extra = max(0, 4 - base_def_dice - self.target_army)
         req = max(0, int(count or 0))
         avail = player.count_strategy(RiskStrategyModel.ARMY)
-        actual = min(req, avail, max_extra)
+        actual = min(req, avail)
         for _ in range(actual):
             player.remove_strategy(RiskStrategyModel.ARMY)
             self.game.discarded_strategies.append(RiskStrategyModel.ARMY)
         self.target_army += actual
-        if p_idx == (self.target_id - 1):
-            self.defender_committed = True
+        self.defender_committed = True
         return actual
+
+    def stop_attack(self) -> dict:
+        if not self.is_attack_active:
+            return self.last_battle_result or {}
+        stopped_summary = {
+            "canceled": False,
+            "stopped": True,
+            "attacker_id": self.source_id + 1,
+            "defender_id": self.target_id,
+            "source_continent": self.source_continent.value,
+            "target_continent": self.target_continent.value,
+            "attacker_dice": [],
+            "defender_dice": [],
+            "attacker_army": 0,
+            "defender_army": 0,
+            "attacker_losses": 0,
+            "defender_losses": 0,
+            "returned_continents_count": 0,
+            "conquered": False,
+            "battle_continues": False,
+            "token_events": [],
+            "is_game_finished": False,
+            "winner": 0,
+        }
+        self.last_battle_result = stopped_summary
+        self.reset()
+        self.game.game_state = RiskGameState.SELECTACTION
+        return stopped_summary
 
     def cancel_attack_by_card(self, gamer_id: int) -> bool:
         if not self.is_attack_active:
@@ -178,9 +204,13 @@ class RiskAttackHandler:
             "target_continent": self.target_continent.value,
             "attacker_dice": [],
             "defender_dice": [],
+            "attacker_army": 0,
+            "defender_army": 0,
             "attacker_losses": 0,
             "defender_losses": 0,
+            "returned_continents_count": 0,
             "conquered": False,
+            "battle_continues": False,
             "token_events": [],
             "is_game_finished": False,
             "winner": 0,
@@ -194,6 +224,11 @@ class RiskAttackHandler:
         if not self.is_attack_active:
             return self.last_battle_result or {}
 
+        # Once dice rolling starts, the battle has officially started and no new Army cards can be added
+        self.attacker_committed = True
+        self.defender_committed = True
+        self.battle_started = True
+
         attacker = self.game.players_data[self.source_id]
         defender = self.game.players_data[self.target_id - 1]
         src_c = self.source_continent.value
@@ -203,13 +238,15 @@ class RiskAttackHandler:
         def_cards = defender.continents.get(tgt_c, 0)
 
         # Official Risk Strike Dice Limits:
-        # Base attack dice: 1 to 3 based on continent cards in attacking continent + committed ARMY cards (max 5 dice)
-        # Base defense dice: 1 to 2 based on continent cards in defending continent + committed ARMY cards (max 4 dice)
-        atk_dice_count = min(5, min(3, max(1, atk_cards)) + self.source_army)
-        def_dice_count = min(4, min(2, max(1, def_cards)) + self.target_army)
+        # Total combat dice = participating continent cards + active troop (Army) cards
+        # Maximum 3 dice for Attacker, Maximum 2 dice for Defender
+        atk_dice_count = min(3, max(1, atk_cards + self.source_army))
+        def_dice_count = min(2, max(1, def_cards + self.target_army))
 
         attacker_dice = _roll_sorted_dice(atk_dice_count, bonus=self.attacker_canon_bonus)
         defender_dice = _roll_sorted_dice(def_dice_count, bonus=self.defender_canon_bonus)
+        self.attacker_canon_bonus = 0
+        self.defender_canon_bonus = 0
         self.game.current_dice = {"attacker": attacker_dice, "defender": defender_dice}
 
         # Pairwise comparison of highest dice (ties go to Defender per official Risk Strike rules)
@@ -222,27 +259,42 @@ class RiskAttackHandler:
             else:
                 atk_casualties += 1
 
-        # Apply attacker casualties to attacking Continent cards (discarded to continent discard pile)
-        actual_atk_loss = attacker.remove_continent(self.source_continent, atk_casualties)
-        for _ in range(actual_atk_loss):
-            self.game.discarded_continents.append(self.source_continent)
+        # 1. Attacker casualties: first discard active Army cards; remaining losses surrender Continent cards to center of table
+        atk_army_lost = min(self.source_army, atk_casualties)
+        self.source_army -= atk_army_lost
+        rem_atk_casualties = atk_casualties - atk_army_lost
+        actual_atk_c_loss = attacker.remove_continent(self.source_continent, rem_atk_casualties)
+        if actual_atk_c_loss > 0:
+            self.game.return_continent_cards_to_table(self.source_continent, actual_atk_c_loss)
+            if attacker.continents.get(src_c, 0) <= 0 and src_c in attacker.tokens:
+                attacker.remove_token(src_c)
+                if src_c not in self.game.tokens:
+                    self.game.tokens.append(src_c)
 
-        # Apply defender casualties to defending Continent cards:
-        # Per Risk Strike rules, if the defender suffers losses in the attacked continent,
-        # the attacker captures 1 card of target_continent, and any additional losses go to discard.
-        actual_def_loss = defender.remove_continent(self.target_continent, def_casualties)
-        captured_cards = 0
-        if actual_def_loss > 0:
-            attacker.add_continent(self.target_continent, 1)
-            captured_cards = 1
-            for _ in range(actual_def_loss - 1):
-                self.game.discarded_continents.append(self.target_continent)
+        # 2. Defender casualties: first discard active Army cards; remaining losses surrender Continent cards to center of table
+        def_army_lost = min(self.target_army, def_casualties)
+        self.target_army -= def_army_lost
+        rem_def_casualties = def_casualties - def_army_lost
+        actual_def_c_loss = defender.remove_continent(self.target_continent, rem_def_casualties)
+        if actual_def_c_loss > 0:
+            self.game.return_continent_cards_to_table(self.target_continent, actual_def_c_loss)
+            if defender.continents.get(tgt_c, 0) <= 0 and tgt_c in defender.tokens:
+                defender.remove_token(tgt_c)
+                if tgt_c not in self.game.tokens:
+                    self.game.tokens.append(tgt_c)
 
-        conquered = (defender.continents.get(tgt_c, 0) == 0 and actual_def_loss > 0)
+        total_atk_loss = atk_army_lost + actual_atk_c_loss
+        total_def_loss = def_army_lost + actual_def_c_loss
+        returned_to_table = actual_atk_c_loss + actual_def_c_loss
+
+        rem_atk_c = attacker.continents.get(src_c, 0)
+        rem_def_c = defender.continents.get(tgt_c, 0)
+        conquered = (rem_def_c == 0 and actual_def_c_loss > 0)
+
         if conquered:
             token_events = self.game.update_domination_tokens(
                 conquered_continent=tgt_c,
-                conqueror_idx=self.source_id
+                conqueror_idx=self.source_id,
             )
         else:
             token_events = self.game.update_domination_tokens()
@@ -250,8 +302,13 @@ class RiskAttackHandler:
         self.game.check_player_eliminations()
         is_ended = self.game.check_game_ended()
 
+        # If both sides still have continent cards in the battle and the match isn't over,
+        # the battle can continue (Attack state) using remaining committed forces (no new Army cards allowed!)
+        battle_continues = (not is_ended and not conquered and rem_atk_c > 0 and rem_def_c > 0)
+
         result = {
             "canceled": False,
+            "stopped": False,
             "attacker_id": self.source_id + 1,
             "defender_id": self.target_id,
             "source_continent": src_c,
@@ -260,16 +317,24 @@ class RiskAttackHandler:
             "defender_dice": defender_dice,
             "attacker_army": self.source_army,
             "defender_army": self.target_army,
-            "attacker_losses": actual_atk_loss,
-            "defender_losses": actual_def_loss,
-            "captured_cards": captured_cards,
+            "attacker_losses": total_atk_loss,
+            "defender_losses": total_def_loss,
+            "attacker_continent_losses": actual_atk_c_loss,
+            "defender_continent_losses": actual_def_c_loss,
+            "returned_continents_count": returned_to_table,
+            "captured_cards": 0,
             "conquered": conquered,
+            "battle_continues": battle_continues,
             "token_events": token_events,
             "is_game_finished": is_ended,
             "winner": self.game.get_game_winner() if is_ended else 0,
         }
         self.last_battle_result = result
-        self.reset()
-        if not is_ended:
-            self.game.game_state = RiskGameState.SELECTACTION
+        if battle_continues:
+            self.game.game_state = RiskGameState.ATTACK
+        else:
+            self.reset()
+            if not is_ended:
+                self.game.game_state = RiskGameState.SELECTACTION
         return result
+

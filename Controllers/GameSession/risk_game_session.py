@@ -134,6 +134,8 @@ class RiskGameSession(BaseMultiplayerGameSession):
         payload = dict(battle_res)
         payload["players_data"] = [p.to_global_json() for p in self.game_controller.players_data]
         payload["tokens"] = list(self.game_controller.tokens)
+        payload["continents"] = len(self.game_controller.continents)
+        payload["strategies"] = len(self.game_controller.strategies)
         payload["game_state"] = self.game_controller.game_state.value
         await self._sync_all_private_user_data_async()
         await self.send_command(commands.Roll_Result, payload)
@@ -194,7 +196,10 @@ class RiskGameSession(BaseMultiplayerGameSession):
                     'gamer_id': gamer_id,
                     'draw_type': draw_type,
                     'new_data': self.game_controller.players_data[gamer_id - 1].to_global_json(),
+                    'players_data': [p.to_global_json() for p in self.game_controller.players_data],
                     'tokens': list(self.game_controller.tokens),
+                    'continents': len(self.game_controller.continents),
+                    'strategies': len(self.game_controller.strategies),
                     'game_state': self.game_controller.game_state.value,
                 },
             )
@@ -204,6 +209,8 @@ class RiskGameSession(BaseMultiplayerGameSession):
                     'data': draw_result,
                     'draw_type': draw_type,
                     'new_user_data': self.game_controller.get_user_private_game_data(gamer_id - 1),
+                    'continents': len(self.game_controller.continents),
+                    'strategies': len(self.game_controller.strategies),
                 },
                 gamer_id,
             )
@@ -231,6 +238,8 @@ class RiskGameSession(BaseMultiplayerGameSession):
                     'source_continent': src_c,
                     'target_continent': tgt_c,
                     'target_index': tgt_idx,
+                    'continents': len(self.game_controller.continents),
+                    'strategies': len(self.game_controller.strategies),
                     'game_state': self.game_controller.game_state.value,
                 },
             )
@@ -246,6 +255,9 @@ class RiskGameSession(BaseMultiplayerGameSession):
                     'gamer_id': gamer_id,
                     'count': added,
                     'target_index': self.game_controller.attack_handler.target_id,
+                    'players_data': [p.to_global_json() for p in self.game_controller.players_data],
+                    'continents': len(self.game_controller.continents),
+                    'strategies': len(self.game_controller.strategies),
                     'game_state': self.game_controller.game_state.value,
                 },
             )
@@ -258,6 +270,8 @@ class RiskGameSession(BaseMultiplayerGameSession):
 
         elif cmd_id == commands.QuestArmy:
             added = await self.game_controller.recieve_data(cmd_id, data, gamer_id)
+            if added <= 0:
+                return
             q_type = payload.get('type', data.get('type', 'Attacker'))
             await self._sync_all_private_user_data_async()
             await self.send_command(
@@ -268,6 +282,9 @@ class RiskGameSession(BaseMultiplayerGameSession):
                     'count': added,
                     'attacker_army': self.game_controller.attack_handler.source_army,
                     'defender_army': self.game_controller.attack_handler.target_army,
+                    'players_data': [p.to_global_json() for p in self.game_controller.players_data],
+                    'continents': len(self.game_controller.continents),
+                    'strategies': len(self.game_controller.strategies),
                 },
             )
 
@@ -283,6 +300,8 @@ class RiskGameSession(BaseMultiplayerGameSession):
             effect_payload = dict(effect)
             effect_payload["players_data"] = [p.to_global_json() for p in self.game_controller.players_data]
             effect_payload["tokens"] = list(self.game_controller.tokens)
+            effect_payload["continents"] = len(self.game_controller.continents)
+            effect_payload["strategies"] = len(self.game_controller.strategies)
             effect_payload["game_state"] = self.game_controller.game_state.value
             await self._sync_all_private_user_data_async()
             await self.send_command(getattr(commands, "Strategy_Result", "StrategyResult"), effect_payload)
@@ -329,7 +348,10 @@ class RiskGameSession(BaseMultiplayerGameSession):
                         'gamer_id': cur_turn,
                         'draw_type': 3,
                         'new_data': self.game_controller.players_data[cur_turn - 1].to_global_json(),
+                        'players_data': [p.to_global_json() for p in self.game_controller.players_data],
                         'tokens': list(self.game_controller.tokens),
+                        'continents': len(self.game_controller.continents),
+                        'strategies': len(self.game_controller.strategies),
                         'game_state': self.game_controller.game_state.value,
                     },
                 )
@@ -353,6 +375,9 @@ class RiskGameSession(BaseMultiplayerGameSession):
                         'gamer_id': cur_turn,
                         'count': 0,
                         'target_index': self.game_controller.attack_handler.target_id,
+                        'players_data': [p.to_global_json() for p in self.game_controller.players_data],
+                        'continents': len(self.game_controller.continents),
+                        'strategies': len(self.game_controller.strategies),
                         'game_state': self.game_controller.game_state.value,
                     },
                 )
@@ -360,13 +385,19 @@ class RiskGameSession(BaseMultiplayerGameSession):
             self.timer.start(Risk_Turn_Time, self.on_turn_timeout)
             return
 
-        # 3. If Defender timed out during DEFENDERARMY, auto-resolve combat
-        if self.game_controller.attack_handler.is_attack_active:
+        # 3. If Defender timed out during DEFENDERARMY, auto-resolve first combat round
+        if self.game_controller.attack_handler.is_attack_active and state == RiskGameState.DEFENDERARMY:
             battle_res = self.game_controller.attack_handler.resolve_attack()
             safe_run_async(self._broadcast_battle_result(battle_res))
             return
 
-        # 4. Otherwise in SELECTACTION, auto-pass turn
+        # 4. If Attacker timed out during ongoing ATTACK (after first roll), stop attack and pass turn
+        if self.game_controller.attack_handler.is_attack_active and state == RiskGameState.ATTACK:
+            self.game_controller.attack_handler.stop_attack()
+            safe_run_async(self.pass_turn([], cur_turn))
+            return
+
+        # 5. Otherwise in SELECTACTION, auto-pass turn
         draw_res = (
             self.game_controller.draw_handler.draw_card(4, cur_turn - 1)
             if not self.game_controller.attacked_this_turn
@@ -386,6 +417,8 @@ class RiskGameSession(BaseMultiplayerGameSession):
                     data={
                         'turn': self.game_controller.current_turn,
                         'game_state': self.game_controller.game_state.value,
+                        'continents': len(self.game_controller.continents),
+                        'strategies': len(self.game_controller.strategies),
                     },
                 ),
                 game_id=self.game_id,
@@ -412,6 +445,8 @@ class RiskGameSession(BaseMultiplayerGameSession):
                     'data': draw_result,
                     'draw_type': 4,
                     'new_user_data': self.game_controller.get_user_private_game_data(p_idx),
+                    'continents': len(self.game_controller.continents),
+                    'strategies': len(self.game_controller.strategies),
                 },
                 gamer_id,
             )
@@ -421,7 +456,10 @@ class RiskGameSession(BaseMultiplayerGameSession):
                 'gamer_index': p_idx,
                 'gamer_id': gamer_id,
                 'new_data': self.game_controller.players_data[p_idx].to_global_json(),
+                'players_data': [p.to_global_json() for p in self.game_controller.players_data],
                 'tokens': list(self.game_controller.tokens),
+                'continents': len(self.game_controller.continents),
+                'strategies': len(self.game_controller.strategies),
             },
         )
         if self.check_finish_game():

@@ -70,3 +70,5 @@ class RiskGameState(Enum):
     ATTACKERARMY = "AttackerArmy"
     DEFENDERARMY = "DefenderArmy"
     QUESTARMY = "QuestArmy"
+    ATTACK = "Attack"
+

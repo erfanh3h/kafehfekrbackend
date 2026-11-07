@@ -89,6 +89,17 @@ class RiskGameClass(BaseMultiPlayerGameClass):
             random.shuffle(self.strategies)
             random.shuffle(self.continents)
 
+    def return_continent_cards_to_table(self, continent_model: Optional[RiskContinentModel], count: int = 1):
+        """
+        Official Risk Strike rule: When a player loses Continent (قاره) cards in battle,
+        Destroy/Sabotage, Bomb, or surrender, those Continent cards are returned to the
+        center of the table (bottom of the Continent deck), immediately updating the table count.
+        """
+        if continent_model is None or count <= 0:
+            return
+        for _ in range(int(count)):
+            self.continents.insert(0, continent_model)
+
     def draw_continent_card(self) -> Optional[RiskContinentModel]:
         if not self.continents and self.discarded_continents:
             self.continents.extend(self.discarded_continents)
@@ -151,10 +162,9 @@ class RiskGameClass(BaseMultiPlayerGameClass):
     ) -> list[dict]:
         """
         Updates the 6 Continent Domination Tokens according to Risk Strike rules:
-        1. If a player holds a token for continent C but now has 0 cards of C (or left the game), they lose the token.
+        1. If a player holds a token for continent C and left the game or has 0 total continents, they lose it.
         2. Combat Conquest: If `conqueror_idx` wiped out a defender's last card in `conquered_continent` during battle,
-           and `conqueror` holds >= 1 card in `conquered_continent` with at least as many (or strictly more) cards
-           in `conquered_continent` as any other active player (or no other player holds cards there),
+           and no other active player holds more cards in `conquered_continent` than `conqueror`,
            `conqueror` claims the Domination Token for `conquered_continent`.
         3. Continent Domination: If an active player holds >= DOMINATION_THRESHOLDS[C] cards in continent C
            and strictly more cards in C than every other active player, they claim (or steal) the Domination Token for C.
@@ -168,11 +178,11 @@ class RiskGameClass(BaseMultiPlayerGameClass):
                 if p.index in self.active_player_indexes and p.continents.get(c_name, 0) > 0
             ]
 
-            # Step 1: Anyone holding the token who no longer has any cards in c_name loses it
+            # Step 1: Anyone holding the token who is inactive or has 0 total continents loses it
             current_owner = None
             for p in self.players_data:
                 if c_name in p.tokens:
-                    if p.index not in self.active_player_indexes or p.continents.get(c_name, 0) <= 0:
+                    if p.index not in self.active_player_indexes or p.total_continents() <= 0:
                         p.remove_token(c_name)
                         if c_name not in self.tokens:
                             self.tokens.append(c_name)
@@ -185,7 +195,7 @@ class RiskGameClass(BaseMultiPlayerGameClass):
             if conquered_continent == c_name and conqueror_idx is not None and 0 <= conqueror_idx < len(self.players_data):
                 conqueror = self.players_data[conqueror_idx]
                 conq_count = conqueror.continents.get(c_name, 0)
-                if conqueror.index in self.active_player_indexes and conq_count >= 1:
+                if conqueror.index in self.active_player_indexes and conqueror.total_continents() > 0:
                     max_other = max(
                         (
                             p.continents.get(c_name, 0)
@@ -310,6 +320,7 @@ class RiskGameClass(BaseMultiPlayerGameClass):
                 "target_continent": self.attack_handler.target_continent.value,
                 "attacker_army": self.attack_handler.source_army,
                 "defender_army": self.attack_handler.target_army,
+                "battle_started": self.attack_handler.battle_started,
             }
         return {
             "current_turn": self.current_turn,
@@ -434,6 +445,7 @@ class RiskGameClass(BaseMultiPlayerGameClass):
             player.remove_strategy(strat)
             self.discarded_strategies.append(strat)
             discarded = []
+            returned_continents = []
             for _ in range(min(2, len(target_p.strategies))):
                 victim_card = random.choice(target_p.strategies)
                 target_p.remove_strategy(victim_card)
@@ -443,10 +455,18 @@ class RiskGameClass(BaseMultiPlayerGameClass):
                 avail_c = [k for k, v in target_p.continents.items() if v > 0]
                 if avail_c:
                     c_hit = random.choice(avail_c)
+                    c_hit_model = RiskContinentModel.data_to_model(c_hit)
                     target_p.remove_continent(c_hit, 1)
-                    self.discarded_continents.append(RiskContinentModel.data_to_model(c_hit))
+                    self.return_continent_cards_to_table(c_hit_model, 1)
                     discarded.append(c_hit)
+                    returned_continents.append(c_hit)
+                    if target_p.continents.get(c_hit, 0) <= 0 and c_hit in target_p.tokens:
+                        target_p.remove_token(c_hit)
+                        if c_hit not in self.tokens:
+                            self.tokens.append(c_hit)
             effect_summary["discarded"] = discarded
+            if returned_continents:
+                effect_summary["returned_continents"] = returned_continents
             effect_summary["token_events"] = self.update_domination_tokens()
 
         elif strat == RiskStrategyModel.DESTROY:
@@ -464,8 +484,14 @@ class RiskGameClass(BaseMultiPlayerGameClass):
             player.remove_strategy(strat)
             self.discarded_strategies.append(strat)
             target_p.remove_continent(c_model, 1)
-            self.discarded_continents.append(c_model)
+            # Return lost continent card to the center of the table
+            self.return_continent_cards_to_table(c_model, 1)
+            if target_p.continents.get(c_model.value, 0) <= 0 and c_model.value in target_p.tokens:
+                target_p.remove_token(c_model.value)
+                if c_model.value not in self.tokens:
+                    self.tokens.append(c_model.value)
             effect_summary["target_continent"] = c_model.value
+            effect_summary["returned_continents"] = [c_model.value]
             effect_summary["token_events"] = self.update_domination_tokens()
 
         elif strat == RiskStrategyModel.SPY:
@@ -485,6 +511,10 @@ class RiskGameClass(BaseMultiPlayerGameClass):
                 avail_c = [k for k, v in target_p.continents.items() if v > 0]
                 stolen_c = random.choice(avail_c)
                 target_p.remove_continent(stolen_c, 1)
+                if target_p.continents.get(stolen_c, 0) <= 0 and stolen_c in target_p.tokens:
+                    target_p.remove_token(stolen_c)
+                    if stolen_c not in self.tokens:
+                        self.tokens.append(stolen_c)
                 player.add_continent(stolen_c, 1)
                 effect_summary["stolen_continent"] = stolen_c
                 effect_summary["token_events"] = self.update_domination_tokens()
@@ -512,6 +542,9 @@ class RiskGameClass(BaseMultiPlayerGameClass):
 
         elif strat == RiskStrategyModel.ARMY:
             if self.attack_handler.is_attack_active:
+                # Once dice rolling has started, players can no longer add new Army cards to the battle!
+                if self.attack_handler.battle_started:
+                    return None
                 if gamer_id == (self.attack_handler.source_id + 1):
                     added = self.attack_handler.add_attacker_army(1, gamer_id)
                     if added <= 0:
@@ -549,6 +582,8 @@ class RiskGameClass(BaseMultiPlayerGameClass):
             return res
 
         elif command_id == commands.Pass_Turn:
+            if self.attack_handler.is_attack_active and self.attack_handler.battle_started:
+                self.attack_handler.stop_attack()
             # In official Risk Strike, a player draws 1 Tactic/Strategy card at end of turn if they did not attack
             res = self.draw_handler.draw_card(4, gamer_id - 1) if not self.attacked_this_turn else []
             return res
@@ -563,6 +598,8 @@ class RiskGameClass(BaseMultiPlayerGameClass):
             return is_attack_valid
 
         elif command_id == commands.AttackerArmy:
+            if self.attack_handler.battle_started:
+                return 0
             cnt = payload.get("count", data.get("count", 0) if isinstance(data, dict) else 0)
             added = self.attack_handler.add_attacker_army(cnt, gamer_id)
             self.game_state = RiskGameState.DEFENDERARMY
@@ -572,11 +609,15 @@ class RiskGameClass(BaseMultiPlayerGameClass):
             if payload.get("cancel") or (isinstance(data, dict) and data.get("cancel")):
                 if self.attack_handler.cancel_attack_by_card(gamer_id):
                     return self.attack_handler.last_battle_result
+            if self.attack_handler.battle_started:
+                return None
             cnt = payload.get("count", data.get("count", 0) if isinstance(data, dict) else 0)
             self.attack_handler.add_defender_army(cnt, gamer_id)
             return self.attack_handler.resolve_attack()
 
         elif command_id == commands.QuestArmy:
+            if self.attack_handler.battle_started:
+                return 0
             q_type = payload.get("type", data.get("type", "Attacker") if isinstance(data, dict) else "Attacker")
             cnt = payload.get("count", data.get("count", 0) if isinstance(data, dict) else 0)
             if str(q_type).lower() == "defender":
@@ -586,10 +627,23 @@ class RiskGameClass(BaseMultiPlayerGameClass):
 
         elif command_id in (commands.Attack, commands.Roll_Dice):
             if self.attack_handler.is_attack_active:
+                if payload.get("stop") or (isinstance(data, dict) and data.get("stop")):
+                    return self.attack_handler.stop_attack()
                 return self.attack_handler.resolve_attack()
             return None
 
         elif command_id == getattr(commands, "Cancel_Attack", "CancelAttack"):
+            if (
+                self.attack_handler.is_attack_active
+                and self.attack_handler.battle_started
+                and gamer_id == (self.attack_handler.source_id + 1)
+                and (
+                    payload.get("stop")
+                    or (isinstance(data, dict) and data.get("stop"))
+                    or not self.players_data[gamer_id - 1].has_strategy(RiskStrategyModel.CANCEL)
+                )
+            ):
+                return self.attack_handler.stop_attack()
             if self.attack_handler.cancel_attack_by_card(gamer_id):
                 return self.attack_handler.last_battle_result
             return None
@@ -620,8 +674,7 @@ class RiskGameClass(BaseMultiPlayerGameClass):
             for c_name, cnt in list(p.continents.items()):
                 c_mod = RiskContinentModel.data_to_model(c_name)
                 if c_mod is not None and cnt > 0:
-                    for _ in range(cnt):
-                        self.discarded_continents.append(c_mod)
+                    self.return_continent_cards_to_table(c_mod, cnt)
             for s_mod in list(p.strategies):
                 self.discarded_strategies.append(s_mod)
             p.clear()
@@ -655,13 +708,27 @@ class RiskGameClass(BaseMultiPlayerGameClass):
         payload = data.get("data") if isinstance(data.get("data"), dict) else data
 
         if cmd_id == commands.DefenderArmy:
+            if (
+                self.attack_handler.is_attack_active
+                and gamer_id == self.attack_handler.target_id
+                and (payload.get("cancel") or (isinstance(data, dict) and data.get("cancel")))
+                and self.players_data[gamer_id - 1].has_strategy(RiskStrategyModel.CANCEL)
+            ):
+                return True
             return (
                 self.attack_handler.is_attack_active
+                and not self.attack_handler.battle_started
                 and self.game_state in (RiskGameState.DECLAREATTACK, RiskGameState.ATTACKERARMY, RiskGameState.DEFENDERARMY)
                 and gamer_id == self.attack_handler.target_id
             )
 
         if cmd_id == getattr(commands, "Cancel_Attack", "CancelAttack"):
+            if (
+                self.attack_handler.is_attack_active
+                and self.attack_handler.battle_started
+                and gamer_id == (self.attack_handler.source_id + 1)
+            ):
+                return True
             return (
                 self.attack_handler.is_attack_active
                 and gamer_id in (self.attack_handler.target_id, self.attack_handler.source_id + 1)
@@ -671,6 +738,8 @@ class RiskGameClass(BaseMultiPlayerGameClass):
         if cmd_id == commands.QuestArmy:
             return (
                 self.attack_handler.is_attack_active
+                and not self.attack_handler.battle_started
+                and gamer_id in (self.attack_handler.source_id + 1, self.attack_handler.target_id)
                 and self.players_data[gamer_id - 1].has_strategy(RiskStrategyModel.ARMY)
             )
 
@@ -681,6 +750,8 @@ class RiskGameClass(BaseMultiPlayerGameClass):
                 return False
             if self.attack_handler.is_attack_active:
                 if gamer_id in (self.attack_handler.source_id + 1, self.attack_handler.target_id):
+                    if strat == RiskStrategyModel.ARMY and self.attack_handler.battle_started:
+                        return False
                     return strat in (RiskStrategyModel.CANCEL, RiskStrategyModel.CANON, RiskStrategyModel.ARMY)
                 return False
             if self.current_turn != gamer_id:
@@ -704,7 +775,7 @@ class RiskGameClass(BaseMultiPlayerGameClass):
             return dt in (1, 2, 3) and self.game_state in (RiskGameState.STARTGAME, RiskGameState.DRAW)
 
         if cmd_id == commands.Declare_Attack:
-            if self.attack_handler.is_attack_active:
+            if self.attack_handler.is_attack_active or self.attacked_this_turn:
                 return False
             if self.game_state not in (RiskGameState.DRAWRESULT, RiskGameState.SELECTACTION, RiskGameState.ACTIONRESULT):
                 return False
@@ -718,6 +789,7 @@ class RiskGameClass(BaseMultiPlayerGameClass):
         if cmd_id == commands.AttackerArmy:
             return (
                 self.attack_handler.is_attack_active
+                and not self.attack_handler.battle_started
                 and gamer_id == (self.attack_handler.source_id + 1)
                 and self.game_state in (RiskGameState.DECLAREATTACK, RiskGameState.ATTACKERARMY)
             )
@@ -726,9 +798,13 @@ class RiskGameClass(BaseMultiPlayerGameClass):
             return self.attack_handler.is_attack_active
 
         if cmd_id == commands.Pass_Turn:
-            return (
-                not self.attack_handler.is_attack_active
-                and self.game_state in (RiskGameState.DRAWRESULT, RiskGameState.SELECTACTION, RiskGameState.ACTIONRESULT)
+            if self.attack_handler.is_attack_active and not self.attack_handler.battle_started:
+                return False
+            return self.game_state in (
+                RiskGameState.DRAWRESULT,
+                RiskGameState.SELECTACTION,
+                RiskGameState.ACTIONRESULT,
+                RiskGameState.ATTACK,
             )
 
         return False
