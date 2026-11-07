@@ -2,6 +2,7 @@ from Controllers.GameSession.base_multiplayer_game_session import BaseMultiplaye
 from Entities.Games.Risk import RiskGameClass
 from Entities.Games.Risk.Models.models import RiskGameState
 from Entities.Games.game_types import GameTypesEnum
+from Entities.RewardManagerClass import GameScoreTypesEnum
 from Entities.Games.wait_times import Risk_Turn_Time, Start_Game_Time, Risk_Pass_Time
 from Commons.static_functions import safe_run_async, make_command_json
 from Commons import commands
@@ -14,7 +15,13 @@ class RiskGameSession(BaseMultiplayerGameSession):
         self._first_turn_started: bool = False
 
     def start_game_timer(self):
-        self.game_controller = RiskGameClass(send_data_function=self.send_command, players_count=len(self.gamers))
+        # In Classic Rank, Risk is strictly a 2-player match against an AI bot.
+        # In Lobby, player count is based on the lobby creator's selection (len(self.gamers)).
+        if self.game_score_type == GameScoreTypesEnum.CLASSIC_RANK:
+            count = 2
+        else:
+            count = max(2, min(4, len(self.gamers)))
+        self.game_controller = RiskGameClass(send_data_function=self.send_command, players_count=count)
         self.game_type = GameTypesEnum.RISK
         super().start_game_timer()
 
