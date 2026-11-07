@@ -131,15 +131,20 @@ class RiskGameSession(BaseMultiplayerGameSession):
         if not battle_res:
             return
         self.timer.stop(False)
+        is_ended = bool(self.game_controller.is_game_finished or self.game_controller.check_game_ended())
         payload = dict(battle_res)
         payload["players_data"] = [p.to_global_json() for p in self.game_controller.players_data]
         payload["tokens"] = list(self.game_controller.tokens)
+        payload["token_events"] = list(getattr(self.game_controller, "last_token_events", []))
         payload["continents"] = len(self.game_controller.continents)
         payload["strategies"] = len(self.game_controller.strategies)
         payload["game_state"] = self.game_controller.game_state.value
+        payload["is_game_finished"] = is_ended
+        payload["winner"] = self.game_controller.get_game_winner() if is_ended else 0
         await self._sync_all_private_user_data_async()
         await self.send_command(commands.Roll_Result, payload)
-        if self.check_finish_game():
+        if is_ended:
+            self.timer.start(2, self.check_finish_game)
             return
         self.timer.start(Risk_Turn_Time, self.on_turn_timeout)
 
@@ -190,6 +195,9 @@ class RiskGameSession(BaseMultiplayerGameSession):
             self.timer.stop(False)
             draw_type = payload.get('draw_type', data.get('draw_type', 3))
             draw_result = await self.game_controller.recieve_data(cmd_id, data, gamer_id)
+            token_events = list(getattr(self.game_controller, 'last_token_events', []))
+            self.game_controller.last_token_events = []
+            is_ended, winner_id = self.game_controller.check_end_game()
             await self.send_command(
                 commands.Draw_Result,
                 {
@@ -198,9 +206,12 @@ class RiskGameSession(BaseMultiplayerGameSession):
                     'new_data': self.game_controller.players_data[gamer_id - 1].to_global_json(),
                     'players_data': [p.to_global_json() for p in self.game_controller.players_data],
                     'tokens': list(self.game_controller.tokens),
+                    'token_events': token_events,
                     'continents': len(self.game_controller.continents),
                     'strategies': len(self.game_controller.strategies),
                     'game_state': self.game_controller.game_state.value,
+                    'is_game_finished': bool(is_ended),
+                    'winner': int(winner_id) if is_ended else 0,
                 },
             )
             await self.send_private_command(
@@ -214,8 +225,8 @@ class RiskGameSession(BaseMultiplayerGameSession):
                 },
                 gamer_id,
             )
-            if self.check_finish_game():
-                self.timer.stop(False)
+            if is_ended:
+                self.timer.start(2, self.check_finish_game)
                 return
             self.timer.start(Risk_Turn_Time, self.on_turn_timeout)
 
@@ -297,19 +308,24 @@ class RiskGameSession(BaseMultiplayerGameSession):
             effect = await self.game_controller.recieve_data(cmd_id, data, gamer_id)
             if not effect:
                 return
+            is_ended = bool(self.game_controller.is_game_finished or self.game_controller.check_game_ended())
             effect_payload = dict(effect)
             effect_payload["players_data"] = [p.to_global_json() for p in self.game_controller.players_data]
             effect_payload["tokens"] = list(self.game_controller.tokens)
+            effect_payload["token_events"] = list(getattr(self.game_controller, "last_token_events", []))
             effect_payload["continents"] = len(self.game_controller.continents)
             effect_payload["strategies"] = len(self.game_controller.strategies)
             effect_payload["game_state"] = self.game_controller.game_state.value
+            effect_payload["is_game_finished"] = is_ended
+            effect_payload["winner"] = self.game_controller.get_game_winner() if is_ended else 0
             await self._sync_all_private_user_data_async()
             await self.send_command(getattr(commands, "Strategy_Result", "StrategyResult"), effect_payload)
             if effect.get("attack_canceled") and self.game_controller.attack_handler.last_battle_result:
                 await self._broadcast_battle_result(self.game_controller.attack_handler.last_battle_result)
                 return
-            if self.check_finish_game():
+            if is_ended:
                 self.timer.stop(False)
+                self.timer.start(2, self.check_finish_game)
                 return
 
     def finish_reconnect_time(self, user_id):
@@ -340,6 +356,7 @@ class RiskGameSession(BaseMultiplayerGameSession):
             self._first_turn_started = True
             self.game_controller.draw_handler.draw_card(3, cur_turn - 1)
             self.game_controller.game_state = RiskGameState.SELECTACTION
+            is_ended = bool(self.game_controller.is_game_finished or self.game_controller.check_game_ended())
             self._sync_all_private_user_data()
             safe_run_async(
                 self.send_command(
@@ -350,13 +367,17 @@ class RiskGameSession(BaseMultiplayerGameSession):
                         'new_data': self.game_controller.players_data[cur_turn - 1].to_global_json(),
                         'players_data': [p.to_global_json() for p in self.game_controller.players_data],
                         'tokens': list(self.game_controller.tokens),
+                        'token_events': list(getattr(self.game_controller, 'last_token_events', [])),
                         'continents': len(self.game_controller.continents),
                         'strategies': len(self.game_controller.strategies),
                         'game_state': self.game_controller.game_state.value,
+                        'is_game_finished': is_ended,
+                        'winner': self.game_controller.get_game_winner() if is_ended else 0,
                     },
                 )
             )
-            if self.check_finish_game():
+            if is_ended:
+                self.timer.start(2, self.check_finish_game)
                 return
             safe_run_async(self.pass_turn([], cur_turn))
             return

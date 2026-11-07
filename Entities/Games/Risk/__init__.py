@@ -8,10 +8,10 @@ from Entities.Games.base_multiplayer_game_class import BaseMultiPlayerGameClass
 
 
 DOMINATION_THRESHOLDS: dict[str, int] = {
-    "Asia": 4,
-    "NorthAmerica": 4,
-    "Europe": 3,
-    "Africa": 3,
+    "Asia": 8,
+    "NorthAmerica": 6,
+    "Europe": 5,
+    "Africa": 4,
     "Australia": 3,
     "SouthAmerica": 3,
 }
@@ -29,6 +29,7 @@ class RiskGameClass(BaseMultiPlayerGameClass):
         self.discarded_strategies: list[RiskStrategyModel] = []
         self.discarded_continents: list[RiskContinentModel] = []
         self.tokens: list[str] = []
+        self.last_token_events: list[dict] = []
         self.current_dice: dict = {"attacker": [], "defender": []}
         self.attacked_this_turn: bool = False
         self.attacks_this_turn: int = 0
@@ -161,28 +162,27 @@ class RiskGameClass(BaseMultiPlayerGameClass):
         conqueror_idx: Optional[int] = None,
     ) -> list[dict]:
         """
-        Updates the 6 Continent Domination Tokens according to Risk Strike rules:
-        1. If a player holds a token for continent C and left the game or has 0 total continents, they lose it.
-        2. Combat Conquest: If `conqueror_idx` wiped out a defender's last card in `conquered_continent` during battle,
-           and no other active player holds more cards in `conquered_continent` than `conqueror`,
-           `conqueror` claims the Domination Token for `conquered_continent`.
-        3. Continent Domination: If an active player holds >= DOMINATION_THRESHOLDS[C] cards in continent C
-           and strictly more cards in C than every other active player, they claim (or steal) the Domination Token for C.
+        Official Risk Strike Rulebook — Domination Coins (نشان سلطه):
+        1. Each continent card has a Domination Number (Asia: 8, NorthAmerica: 6, Europe: 5,
+           Africa: 4, SouthAmerica: 3, Australia: 3).
+        2. As soon as an active player holds a number of continent cards for continent C
+           equal to or greater than DOMINATION_THRESHOLDS[C], they immediately claim C's
+           Domination Coin (either from the center table or from another player who held it).
+        3. Once a player holds the Domination Coin for continent C, they KEEP it even if
+           they later lose continent cards and drop below DOMINATION_THRESHOLDS[C]—as long
+           as another active player does not collect DOMINATION_THRESHOLDS[C] cards of C
+           (or the holder leaves/surrenders the match).
         """
         events = []
         for c_model in RiskContinentModel.all():
             c_name = c_model.value
             threshold = DOMINATION_THRESHOLDS.get(c_name, 3)
-            holders = [
-                p for p in self.players_data
-                if p.index in self.active_player_indexes and p.continents.get(c_name, 0) > 0
-            ]
 
-            # Step 1: Anyone holding the token who is inactive or has 0 total continents loses it
+            # Step 1: If the current holder surrendered / left the match, return the coin to the table
             current_owner = None
             for p in self.players_data:
                 if c_name in p.tokens:
-                    if p.index not in self.active_player_indexes or p.total_continents() <= 0:
+                    if p.index not in self.active_player_indexes:
                         p.remove_token(c_name)
                         if c_name not in self.tokens:
                             self.tokens.append(c_name)
@@ -190,75 +190,46 @@ class RiskGameClass(BaseMultiPlayerGameClass):
                     else:
                         current_owner = p
 
-            # Step 2: Direct conquest in battle when wiping out defender's continent presence
-            claimed_by_conquest = False
-            if conquered_continent == c_name and conqueror_idx is not None and 0 <= conqueror_idx < len(self.players_data):
-                conqueror = self.players_data[conqueror_idx]
-                conq_count = conqueror.continents.get(c_name, 0)
-                if conqueror.index in self.active_player_indexes and conqueror.total_continents() > 0:
-                    max_other = max(
-                        (
-                            p.continents.get(c_name, 0)
-                            for p in self.players_data
-                            if p.index != conqueror.index and p.index in self.active_player_indexes
-                        ),
-                        default=0,
-                    )
-                    if max_other == 0 or conq_count > max_other:
-                        claimed_by_conquest = True
-                        if current_owner != conqueror:
-                            if current_owner is not None:
-                                current_owner.remove_token(c_name)
-                            if c_name in self.tokens:
-                                self.tokens.remove(c_name)
-                            conqueror.add_token(c_name)
-                            current_owner = conqueror
-                            events.append({"event": "token_claimed", "continent": c_name, "gamer_id": conqueror.index})
-
-            if claimed_by_conquest:
-                continue
-
-            # Step 3: Continent Domination by accumulating >= threshold cards and strictly leading all opponents
-            best_player = None
-            best_count = 0
-            second_best_count = 0
-            for p in holders:
-                cnt = p.continents.get(c_name, 0)
-                if cnt > best_count:
-                    second_best_count = best_count
-                    best_count = cnt
-                    best_player = p
-                elif cnt > second_best_count:
-                    second_best_count = cnt
-
-            if best_player is not None and best_count >= threshold and best_count > second_best_count:
-                if current_owner != best_player:
+            # Step 2: Check if any active player has reached or exceeded the continent's Domination Number
+            qualifying_players = [
+                p for p in self.players_data
+                if p.index in self.active_player_indexes and p.continents.get(c_name, 0) >= threshold
+            ]
+            if qualifying_players:
+                qualifying_players.sort(
+                    key=lambda p: (
+                        p.continents.get(c_name, 0),
+                        1 if p == current_owner else 0,
+                    ),
+                    reverse=True,
+                )
+                dominator = qualifying_players[0]
+                if current_owner != dominator:
+                    prev_owner_id = current_owner.index if current_owner is not None else 0
                     if current_owner is not None:
                         current_owner.remove_token(c_name)
                     if c_name in self.tokens:
                         self.tokens.remove(c_name)
-                    best_player.add_token(c_name)
-                    current_owner = best_player
-                    events.append({"event": "token_claimed", "continent": c_name, "gamer_id": best_player.index})
-            elif current_owner is not None and len(holders) > 1:
-                # If another player now holds strictly more cards in c_name than current_owner, current_owner loses monopoly
-                max_other = max(
-                    (p.continents.get(c_name, 0) for p in holders if p.index != current_owner.index),
-                    default=0,
-                )
-                if max_other > current_owner.continents.get(c_name, 0):
-                    current_owner.remove_token(c_name)
-                    if c_name not in self.tokens:
-                        self.tokens.append(c_name)
-                    events.append({"event": "token_contested", "continent": c_name, "gamer_id": current_owner.index})
+                    dominator.add_token(c_name)
+                    current_owner = dominator
+                    events.append({
+                        "event": "token_claimed",
+                        "continent": c_name,
+                        "gamer_id": dominator.index,
+                        "previous_owner": prev_owner_id,
+                        "count": dominator.continents.get(c_name, 0),
+                        "threshold": threshold,
+                    })
 
+        self.last_token_events = list(events)
         return events
 
     def check_player_eliminations(self):
-        # In Risk Strike, players rally (draw 2 cards) at the start of each turn,
-        # so having 0 cards temporarily does not eliminate an active player; only losing all continents loses tokens.
+        # Official Risk Strike rule:
+        # Players draw 2 cards at the start of every turn and keep earned Domination Coins
+        # even if they lose continent cards, unless they surrender/leave the match.
         for p in self.players_data:
-            if p.total_continents() == 0 and p.tokens:
+            if p.index not in self.active_player_indexes and p.tokens:
                 for t in list(p.tokens):
                     p.remove_token(t)
                     if t not in self.tokens:
@@ -460,10 +431,6 @@ class RiskGameClass(BaseMultiPlayerGameClass):
                     self.return_continent_cards_to_table(c_hit_model, 1)
                     discarded.append(c_hit)
                     returned_continents.append(c_hit)
-                    if target_p.continents.get(c_hit, 0) <= 0 and c_hit in target_p.tokens:
-                        target_p.remove_token(c_hit)
-                        if c_hit not in self.tokens:
-                            self.tokens.append(c_hit)
             effect_summary["discarded"] = discarded
             if returned_continents:
                 effect_summary["returned_continents"] = returned_continents
@@ -486,10 +453,6 @@ class RiskGameClass(BaseMultiPlayerGameClass):
             target_p.remove_continent(c_model, 1)
             # Return lost continent card to the center of the table
             self.return_continent_cards_to_table(c_model, 1)
-            if target_p.continents.get(c_model.value, 0) <= 0 and c_model.value in target_p.tokens:
-                target_p.remove_token(c_model.value)
-                if c_model.value not in self.tokens:
-                    self.tokens.append(c_model.value)
             effect_summary["target_continent"] = c_model.value
             effect_summary["returned_continents"] = [c_model.value]
             effect_summary["token_events"] = self.update_domination_tokens()
@@ -511,10 +474,6 @@ class RiskGameClass(BaseMultiPlayerGameClass):
                 avail_c = [k for k, v in target_p.continents.items() if v > 0]
                 stolen_c = random.choice(avail_c)
                 target_p.remove_continent(stolen_c, 1)
-                if target_p.continents.get(stolen_c, 0) <= 0 and stolen_c in target_p.tokens:
-                    target_p.remove_token(stolen_c)
-                    if stolen_c not in self.tokens:
-                        self.tokens.append(stolen_c)
                 player.add_continent(stolen_c, 1)
                 effect_summary["stolen_continent"] = stolen_c
                 effect_summary["token_events"] = self.update_domination_tokens()

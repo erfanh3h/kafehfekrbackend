@@ -266,10 +266,6 @@ class RiskAttackHandler:
         actual_atk_c_loss = attacker.remove_continent(self.source_continent, rem_atk_casualties)
         if actual_atk_c_loss > 0:
             self.game.return_continent_cards_to_table(self.source_continent, actual_atk_c_loss)
-            if attacker.continents.get(src_c, 0) <= 0 and src_c in attacker.tokens:
-                attacker.remove_token(src_c)
-                if src_c not in self.game.tokens:
-                    self.game.tokens.append(src_c)
 
         # 2. Defender casualties: first discard active Army cards; remaining losses surrender Continent cards to center of table
         def_army_lost = min(self.target_army, def_casualties)
@@ -278,10 +274,6 @@ class RiskAttackHandler:
         actual_def_c_loss = defender.remove_continent(self.target_continent, rem_def_casualties)
         if actual_def_c_loss > 0:
             self.game.return_continent_cards_to_table(self.target_continent, actual_def_c_loss)
-            if defender.continents.get(tgt_c, 0) <= 0 and tgt_c in defender.tokens:
-                defender.remove_token(tgt_c)
-                if tgt_c not in self.game.tokens:
-                    self.game.tokens.append(tgt_c)
 
         total_atk_loss = atk_army_lost + actual_atk_c_loss
         total_def_loss = def_army_lost + actual_def_c_loss
@@ -291,13 +283,7 @@ class RiskAttackHandler:
         rem_def_c = defender.continents.get(tgt_c, 0)
         conquered = (rem_def_c == 0 and actual_def_c_loss > 0)
 
-        if conquered:
-            token_events = self.game.update_domination_tokens(
-                conquered_continent=tgt_c,
-                conqueror_idx=self.source_id,
-            )
-        else:
-            token_events = self.game.update_domination_tokens()
+        token_events = self.game.update_domination_tokens()
 
         self.game.check_player_eliminations()
         is_ended = self.game.check_game_ended()
