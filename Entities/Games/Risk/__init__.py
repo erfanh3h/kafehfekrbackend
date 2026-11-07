@@ -280,6 +280,11 @@ class RiskGameClass(BaseMultiPlayerGameClass):
             return self.rank1
         return self.winner_id
 
+    def check_end_game(self) -> tuple[bool, int]:
+        is_ended = bool(self.is_game_finished or self.check_game_ended())
+        winner_id = int(self.get_game_winner() or 0) if is_ended else 0
+        return is_ended, winner_id
+
     def get_game_data(self):
         players_data = [player_data.to_global_json() for player_data in self.players_data]
         atk_info = None

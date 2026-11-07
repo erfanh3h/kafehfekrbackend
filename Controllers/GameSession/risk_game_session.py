@@ -356,7 +356,9 @@ class RiskGameSession(BaseMultiplayerGameSession):
             self._first_turn_started = True
             self.game_controller.draw_handler.draw_card(3, cur_turn - 1)
             self.game_controller.game_state = RiskGameState.SELECTACTION
-            is_ended = bool(self.game_controller.is_game_finished or self.game_controller.check_game_ended())
+            is_ended, winner_id = self.game_controller.check_end_game()
+            token_events = list(getattr(self.game_controller, 'last_token_events', []))
+            self.game_controller.last_token_events = []
             self._sync_all_private_user_data()
             safe_run_async(
                 self.send_command(
@@ -367,12 +369,12 @@ class RiskGameSession(BaseMultiplayerGameSession):
                         'new_data': self.game_controller.players_data[cur_turn - 1].to_global_json(),
                         'players_data': [p.to_global_json() for p in self.game_controller.players_data],
                         'tokens': list(self.game_controller.tokens),
-                        'token_events': list(getattr(self.game_controller, 'last_token_events', [])),
+                        'token_events': token_events,
                         'continents': len(self.game_controller.continents),
                         'strategies': len(self.game_controller.strategies),
                         'game_state': self.game_controller.game_state.value,
-                        'is_game_finished': is_ended,
-                        'winner': self.game_controller.get_game_winner() if is_ended else 0,
+                        'is_game_finished': bool(is_ended),
+                        'winner': int(winner_id) if is_ended else 0,
                     },
                 )
             )
