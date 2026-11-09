@@ -86,6 +86,25 @@ class BaseMultiplayerGameSession(BaseGameSession):
 
         return gamer_id
 
+    def finish_reconnect_time(self, user_id):
+        if self.is_game_finished:
+            return
+        self.dc_timeout_user_id = user_id
+        safe_run_async(self.send_command(commands.Finish_Reconnect_Time, {"user_id": user_id}))
+        gamer_id = self.find_gamer_id_from_user_id(user_id)
+        was_turn = (getattr(self.game_controller, "current_turn", 0) == gamer_id)
+        self.game_controller.finish_reconnect_time(gamer_id)
+        if gamer_id > 0:
+            safe_run_async(self.send_command(commands.Surrender, {"gamer_id": gamer_id}))
+        if self.check_finish_game():
+            self.timer.stop(False)
+            return
+        if was_turn:
+            self.timer.stop(False)
+            self.send_current_turn()
+        else:
+            self.timer.resume()
+
     def check_finish_game(self):
         from Entities.SocketIOManagerClass import send_command
         if self.game_controller.is_game_finished or self.game_controller.check_game_ended():

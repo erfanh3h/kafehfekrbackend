@@ -362,9 +362,6 @@ class LudoGameClass(BaseGameClass):
     async def surrender(self, gamer_id):
         if not self.active_player_indexes.__contains__(gamer_id):
             return False
-        if len(self.active_player_indexes) == 2:
-            if self.rank2 is None:
-                self.rank2 = gamer_id
         self.active_player_indexes.remove(gamer_id)
         self.players_out_pieces[gamer_id - 1] = 4
         if 0 <= gamer_id - 1 < len(self.start_pieces):
@@ -373,10 +370,13 @@ class LudoGameClass(BaseGameClass):
             if piece.is_gamer_id_spot(gamer_id):
                 piece.clear()
         if len(self.active_player_indexes) == 1:
+            last_survivor = self.active_player_indexes[0]
             if self.rank1 is None:
-                self.rank1 = self.active_player_indexes[0]
+                self.rank1 = last_survivor
+                if self.rank2 is None:
+                    self.rank2 = gamer_id
             elif self.rank2 is None:
-                self.rank2 = self.active_player_indexes[0]
+                self.rank2 = last_survivor
             self.is_game_finished = True
             return True
         if self.current_turn == gamer_id:

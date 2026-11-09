@@ -37,7 +37,13 @@ class BaseMultiPlayerGameClass(BaseGameClass):
                 self.rank2 = gamer_id
         self.active_player_indexes.remove(gamer_id)
         if len(self.active_player_indexes) == 1:
-            self.rank1 = self.active_player_indexes[0]
+            last_survivor = self.active_player_indexes[0]
+            if self.rank1 is None:
+                self.rank1 = last_survivor
+                if self.rank2 is None:
+                    self.rank2 = gamer_id
+            elif self.rank2 is None:
+                self.rank2 = last_survivor
             self.is_game_finished = True
             return True
         if self.current_turn == gamer_id:

@@ -431,9 +431,9 @@ class BaseGamePlayClass:
             self.send_game_play_data(gamer.socket_id)
             if gamer.socket_id:
                 try:
-                    earned = last_xp.get(gamer.user_id, 0)
-                    s_earned = last_score.get(gamer.user_id, 0)
-                    c_earned = last_coin.get(gamer.user_id, 0)
+                    earned = last_xp.get(gamer.user_id, last_xp.get(str(gamer.user_id), 0))
+                    s_earned = last_score.get(gamer.user_id, last_score.get(str(gamer.user_id), 0))
+                    c_earned = last_coin.get(gamer.user_id, last_coin.get(str(gamer.user_id), 0))
                     safe_run_async(
                         send_private_command(
                             command=make_command_json(
