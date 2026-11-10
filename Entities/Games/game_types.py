@@ -22,6 +22,7 @@ class GameTypesEnum(Enum):
     MILL = "Mill"
     LUDO = "Ludo"
     RISK = "Risk"
+    UNO = "Uno"
     BACKGAMMON = "BackGammon"
 
     @classmethod
@@ -30,7 +31,7 @@ class GameTypesEnum(Enum):
 
     @classmethod
     def multi_players_games(cls, ) -> List[Enum]:
-        return [cls.LUDO, cls.RISK]
+        return [cls.LUDO, cls.RISK, cls.UNO]
 
     @classmethod
     def two_players_games(cls, ) -> List[Enum]:
@@ -39,6 +40,8 @@ class GameTypesEnum(Enum):
             data.remove(cls.LUDO)
         if cls.RISK in data:
             data.remove(cls.RISK)
+        if cls.UNO in data:
+            data.remove(cls.UNO)
         return data
 
     @classmethod

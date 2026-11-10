@@ -41,7 +41,7 @@ def gametype_to_difficulty(game_type):
     val = game_type.value if hasattr(game_type, "value") else str(game_type)
     val_norm = val.lower().replace("_", "").replace("-", "")
 
-    easy_types = (GameTypesEnum.TIC_TAC_TOE, GameTypesEnum.RPC, GameTypesEnum.DOTBOX, GameTypesEnum.LUDO, GameTypesEnum.MNUMBERS)
+    easy_types = (GameTypesEnum.TIC_TAC_TOE, GameTypesEnum.RPC, GameTypesEnum.DOTBOX, GameTypesEnum.LUDO, GameTypesEnum.MNUMBERS, GameTypesEnum.UNO)
     for gt in easy_types:
         if val_norm == gt.value.lower().replace("_", "").replace("-", ""):
             return GameDifficultyEnum.Easy

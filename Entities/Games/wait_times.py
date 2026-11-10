@@ -37,3 +37,4 @@ Risk_Turn_Time = 30
 Risk_Pass_Time = 5
 BackGammon_Turn_Time = 30
 BackGammon_Out_Of_Move_time = 4
+Uno_Turn_Time = 20

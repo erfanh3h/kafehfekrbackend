@@ -18,6 +18,7 @@ class MultiRankQueueSession(BaseQueueSession):
         super().__init__(GameScoreTypesEnum.MultiRANK)
         self.ludo_queuers: list[QueuerModel] = []
         self.risk_queuers: list[QueuerModel] = []
+        self.uno_queuers: list[QueuerModel] = []
         self._lock = threading.Lock()
 
     @staticmethod
@@ -27,6 +28,8 @@ class MultiRankQueueSession(BaseQueueSession):
             return GameTypesEnum.LUDO.value
         if raw == "risk":
             return GameTypesEnum.RISK.value
+        if raw == "uno":
+            return GameTypesEnum.UNO.value
         return str(game_type)
 
     def _get_queue_list(self, game_type):
@@ -35,6 +38,8 @@ class MultiRankQueueSession(BaseQueueSession):
             return self.ludo_queuers, GameTypesEnum.LUDO.value
         if norm == GameTypesEnum.RISK.value:
             return self.risk_queuers, GameTypesEnum.RISK.value
+        if norm == GameTypesEnum.UNO.value:
+            return self.uno_queuers, GameTypesEnum.UNO.value
         return None, norm
 
     @staticmethod
@@ -49,13 +54,13 @@ class MultiRankQueueSession(BaseQueueSession):
         return distinct
 
     def find_gamer_from_user_id(self, user_id):
-        for queuer in list(self.ludo_queuers) + list(self.risk_queuers):
+        for queuer in list(self.ludo_queuers) + list(self.risk_queuers) + list(self.uno_queuers):
             if str(queuer.user_id) == str(user_id):
                 return queuer
         return None
 
     def find_gamer_from_socket_id(self, socket_id):
-        for queuer in list(self.ludo_queuers) + list(self.risk_queuers):
+        for queuer in list(self.ludo_queuers) + list(self.risk_queuers) + list(self.uno_queuers):
             if queuer.socket_id == socket_id:
                 return queuer
         return None
@@ -69,6 +74,8 @@ class MultiRankQueueSession(BaseQueueSession):
                         self.ludo_queuers.remove(existing_q)
                     if existing_q in self.risk_queuers:
                         self.risk_queuers.remove(existing_q)
+                    if existing_q in self.uno_queuers:
+                        self.uno_queuers.remove(existing_q)
             else:
                 try:
                     from Entities.SocketIOClass import Socket_Server
@@ -78,6 +85,8 @@ class MultiRankQueueSession(BaseQueueSession):
                                 self.ludo_queuers.remove(existing_q)
                             if existing_q in self.risk_queuers:
                                 self.risk_queuers.remove(existing_q)
+                            if existing_q in self.uno_queuers:
+                                self.uno_queuers.remove(existing_q)
                     else:
                         return False
                 except Exception:
@@ -155,6 +164,8 @@ class MultiRankQueueSession(BaseQueueSession):
                     self.ludo_queuers.remove(queuer_data)
                 if queuer_data in self.risk_queuers:
                     self.risk_queuers.remove(queuer_data)
+                if queuer_data in self.uno_queuers:
+                    self.uno_queuers.remove(queuer_data)
 
         for queuer_data in queuers:
             safe_run_async(
@@ -168,6 +179,7 @@ class MultiRankQueueSession(BaseQueueSession):
     def _try_matchmake_once(self) -> bool:
         ludo_match = None
         risk_match = None
+        uno_match = None
         with self._lock:
             distinct_ludo = self._distinct_queuers(self.ludo_queuers)
             if len(distinct_ludo) >= MULTI_RANK_REQUIRED_PLAYERS:
@@ -180,6 +192,12 @@ class MultiRankQueueSession(BaseQueueSession):
                 risk_match = distinct_risk[:MULTI_RANK_REQUIRED_PLAYERS]
                 matched_uids = {str(q.user_id) for q in risk_match}
                 self.risk_queuers = [q for q in self.risk_queuers if str(q.user_id) not in matched_uids]
+
+            distinct_uno = self._distinct_queuers(self.uno_queuers)
+            if len(distinct_uno) >= MULTI_RANK_REQUIRED_PLAYERS:
+                uno_match = distinct_uno[:MULTI_RANK_REQUIRED_PLAYERS]
+                matched_uids = {str(q.user_id) for q in uno_match}
+                self.uno_queuers = [q for q in self.uno_queuers if str(q.user_id) not in matched_uids]
 
         started_any = False
         if ludo_match is not None:
@@ -200,6 +218,15 @@ class MultiRankQueueSession(BaseQueueSession):
             ).start()
             self.broadcast_queue_status(GameTypesEnum.RISK.value)
 
+        if uno_match is not None:
+            started_any = True
+            threading.Thread(
+                target=self.start_new_game,
+                args=(uno_match, GameTypesEnum.UNO.value),
+                daemon=True,
+            ).start()
+            self.broadcast_queue_status(GameTypesEnum.UNO.value)
+
         return started_any
 
     def check_start_new_game(self):
@@ -209,7 +236,7 @@ class MultiRankQueueSession(BaseQueueSession):
 
     def join_user(self, user_data: QueuerModel, game_type) -> bool:
         norm_type = self.normalize_game_type(game_type)
-        if norm_type not in (GameTypesEnum.LUDO.value, GameTypesEnum.RISK.value):
+        if norm_type not in (GameTypesEnum.LUDO.value, GameTypesEnum.RISK.value, GameTypesEnum.UNO.value):
             return False
         if not self.can_user_join_queue(user_data.user_id, user_data.socket_id):
             return False
@@ -218,10 +245,13 @@ class MultiRankQueueSession(BaseQueueSession):
         with self._lock:
             self.ludo_queuers = [q for q in self.ludo_queuers if str(q.user_id) != str(user_data.user_id)]
             self.risk_queuers = [q for q in self.risk_queuers if str(q.user_id) != str(user_data.user_id)]
+            self.uno_queuers = [q for q in self.uno_queuers if str(q.user_id) != str(user_data.user_id)]
             if norm_type == GameTypesEnum.LUDO.value:
                 self.ludo_queuers.append(user_data)
             elif norm_type == GameTypesEnum.RISK.value:
                 self.risk_queuers.append(user_data)
+            elif norm_type == GameTypesEnum.UNO.value:
+                self.uno_queuers.append(user_data)
 
         self.broadcast_queue_status(norm_type)
         self._try_matchmake_once()
@@ -239,6 +269,11 @@ class MultiRankQueueSession(BaseQueueSession):
                 if socket_id == user_data.socket_id:
                     self.risk_queuers.remove(user_data)
                     affected_types.append(GameTypesEnum.RISK.value)
+                    break
+            for user_data in list(self.uno_queuers):
+                if socket_id == user_data.socket_id:
+                    self.uno_queuers.remove(user_data)
+                    affected_types.append(GameTypesEnum.UNO.value)
                     break
         for gt in affected_types:
             self.broadcast_queue_status(gt)
