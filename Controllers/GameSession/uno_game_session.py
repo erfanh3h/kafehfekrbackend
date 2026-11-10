@@ -68,6 +68,7 @@ class UnoGameSession(BaseMultiplayerGameSession):
         self.timer.start(Start_Game_Time, self._start_first_turn)
 
     def _build_turn_payload(self) -> dict:
+        deck_rem = len(self.game_controller.draw_pile)
         return {
             "turn": self.game_controller.current_turn,
             "direction": self.game_controller.direction,
@@ -75,8 +76,10 @@ class UnoGameSession(BaseMultiplayerGameSession):
             "current_value": self.game_controller.current_value,
             "top_card": self.game_controller.get_top_card(),
             "hands_count": self.game_controller.get_hands_count(),
-            "draw_pile_count": len(self.game_controller.draw_pile),
+            "draw_pile_count": deck_rem,
+            "deck_remaining": deck_rem,
             "has_drawn_this_turn": self.game_controller.has_drawn_this_turn,
+            "uno_called": self.game_controller.get_uno_called_dict(),
         }
 
     def _start_first_turn(self):
@@ -125,13 +128,17 @@ class UnoGameSession(BaseMultiplayerGameSession):
             if (gamer_data is not None and gamer_data.gamer_id > 0)
             else self.game_controller.current_turn
         )
+        user_priv = self.game_controller.get_user_private_game_data(gid)
+        g_data = self.game_controller.get_game_data()
+        g_data["game_type"] = GameTypesEnum.UNO.value
+        g_data["my_hand"] = user_priv.get("hand", [])
+        g_data["hand"] = user_priv.get("hand", [])
         reconnect_data = {
             "gamers": [g.to_json() for g in self.gamers],
-            "game_data": self.game_controller.get_game_data(),
+            "game_data": g_data,
             "game_type": GameTypesEnum.UNO.value,
-            "user_data": self.game_controller.get_user_private_game_data(gid),
+            "user_data": user_priv,
         }
-        reconnect_data["game_data"]["game_type"] = GameTypesEnum.UNO.value
         if self.timer.is_user_turn:
             reconnect_data["timer_data"] = {
                 "is_user_turn": True,
@@ -152,7 +159,7 @@ class UnoGameSession(BaseMultiplayerGameSession):
             send_private_command(
                 command=make_command_json(
                     id=commands.User_Data,
-                    data=reconnect_data["user_data"],
+                    data=user_priv,
                 ),
                 socket_id=socket_id,
                 game_id=self.game_id,
@@ -184,9 +191,12 @@ class UnoGameSession(BaseMultiplayerGameSession):
                 self.timer.start(Uno_Turn_Time, self.on_turn_timeout)
                 return
 
+            deck_rem = len(self.game_controller.draw_pile)
             payload = dict(res)
+            payload["player"] = gamer_id
             payload["hands_count"] = self.game_controller.get_hands_count()
-            payload["draw_pile_count"] = len(self.game_controller.draw_pile)
+            payload["draw_pile_count"] = deck_rem
+            payload["deck_remaining"] = deck_rem
             payload["top_card"] = self.game_controller.get_top_card()
 
             await self._sync_all_private_user_data_async()
@@ -196,6 +206,8 @@ class UnoGameSession(BaseMultiplayerGameSession):
                 await self.send_command(
                     commands.Win_Happened,
                     {
+                        "Winner": self.game_controller.rank1,
+                        "winner_id": self.game_controller.rank1,
                         "rank1": self.game_controller.rank1,
                         "rank2": self.game_controller.rank2,
                     },
@@ -215,16 +227,23 @@ class UnoGameSession(BaseMultiplayerGameSession):
                 return
 
             await self._sync_all_private_user_data_async()
+            user_priv = self.game_controller.get_user_private_game_data(gamer_id)
+            deck_rem = len(self.game_controller.draw_pile)
+            can_play_drawn = bool(res.get("drawn_is_playable", False)) and not bool(res.get("turn_passed", False))
             await self.send_private_command(
                 commands.Draw_Result_Private,
                 {
                     "gamer_id": gamer_id,
+                    "player": gamer_id,
                     "drawn_card": res.get("drawn_card"),
                     "drawn_is_playable": res.get("drawn_is_playable", False),
+                    "playable": can_play_drawn,
                     "playable_uids": res.get("playable_uids", []),
                     "has_drawn_this_turn": res.get("has_drawn_this_turn", False),
                     "turn_passed": res.get("turn_passed", False),
-                    "user_data": self.game_controller.get_user_private_game_data(gamer_id),
+                    "my_hand": user_priv.get("hand", []),
+                    "hand": user_priv.get("hand", []),
+                    "user_data": user_priv,
                 },
                 gamer_id,
             )
@@ -232,13 +251,15 @@ class UnoGameSession(BaseMultiplayerGameSession):
                 commands.Draw_Result,
                 {
                     "gamer_id": gamer_id,
+                    "player": gamer_id,
                     "drawn_count": 1,
                     "has_drawn_this_turn": res.get("has_drawn_this_turn", False),
                     "turn_passed": res.get("turn_passed", False),
                     "next_turn": self.game_controller.current_turn,
                     "direction": self.game_controller.direction,
                     "hands_count": self.game_controller.get_hands_count(),
-                    "draw_pile_count": len(self.game_controller.draw_pile),
+                    "draw_pile_count": deck_rem,
+                    "deck_remaining": deck_rem,
                 },
             )
             if res.get("turn_passed"):
@@ -253,15 +274,18 @@ class UnoGameSession(BaseMultiplayerGameSession):
                 self.timer.start(Uno_Turn_Time, self.on_turn_timeout)
                 return
 
+            deck_rem = len(self.game_controller.draw_pile)
             await self._sync_all_private_user_data_async()
             await self.send_command(
                 commands.Pass_Turn,
                 {
                     "gamer_id": gamer_id,
+                    "player": gamer_id,
                     "next_turn": self.game_controller.current_turn,
                     "direction": self.game_controller.direction,
                     "hands_count": self.game_controller.get_hands_count(),
-                    "draw_pile_count": len(self.game_controller.draw_pile),
+                    "draw_pile_count": deck_rem,
+                    "deck_remaining": deck_rem,
                 },
             )
             await self.send_command(commands.Current_Turn, self._build_turn_payload())
@@ -276,17 +300,23 @@ class UnoGameSession(BaseMultiplayerGameSession):
         if not self.game_controller.has_drawn_this_turn:
             res = self.game_controller.draw_card_for_turn(cur_turn, force_pass=True)
             self._sync_all_private_user_data()
+            user_priv = self.game_controller.get_user_private_game_data(cur_turn)
+            deck_rem = len(self.game_controller.draw_pile)
             safe_run_async(
                 self.send_private_command(
                     commands.Draw_Result_Private,
                     {
                         "gamer_id": cur_turn,
+                        "player": cur_turn,
                         "drawn_card": res.get("drawn_card"),
                         "drawn_is_playable": False,
+                        "playable": False,
                         "playable_uids": [],
                         "has_drawn_this_turn": False,
                         "turn_passed": True,
-                        "user_data": self.game_controller.get_user_private_game_data(cur_turn),
+                        "my_hand": user_priv.get("hand", []),
+                        "hand": user_priv.get("hand", []),
+                        "user_data": user_priv,
                     },
                     cur_turn,
                 )
@@ -296,49 +326,35 @@ class UnoGameSession(BaseMultiplayerGameSession):
                     commands.Draw_Result,
                     {
                         "gamer_id": cur_turn,
+                        "player": cur_turn,
                         "drawn_count": 1,
                         "has_drawn_this_turn": False,
                         "turn_passed": True,
                         "next_turn": self.game_controller.current_turn,
                         "direction": self.game_controller.direction,
                         "hands_count": self.game_controller.get_hands_count(),
-                        "draw_pile_count": len(self.game_controller.draw_pile),
+                        "draw_pile_count": deck_rem,
+                        "deck_remaining": deck_rem,
                     },
                 )
             )
         else:
             self.game_controller.pass_turn(cur_turn)
             self._sync_all_private_user_data()
+            deck_rem = len(self.game_controller.draw_pile)
             safe_run_async(
                 self.send_command(
                     commands.Pass_Turn,
                     {
                         "gamer_id": cur_turn,
+                        "player": cur_turn,
                         "next_turn": self.game_controller.current_turn,
                         "direction": self.game_controller.direction,
                         "hands_count": self.game_controller.get_hands_count(),
-                        "draw_pile_count": len(self.game_controller.draw_pile),
+                        "draw_pile_count": deck_rem,
+                        "deck_remaining": deck_rem,
                     },
                 )
             )
 
         self.send_current_turn()
-
-    def finish_reconnect_time(self, user_id):
-        if self.is_game_finished:
-            return
-        self.dc_timeout_user_id = user_id
-        safe_run_async(
-            self.send_command(commands.Finish_Reconnect_Time, {"user_id": user_id})
-        )
-        gamer_id = self.find_gamer_id_from_user_id(user_id)
-        was_turn = self.game_controller.current_turn == gamer_id
-        self.game_controller.finish_reconnect_time(gamer_id)
-        if self.check_finish_game():
-            self.timer.stop(False)
-            return
-        if was_turn:
-            self.timer.stop(False)
-            self.send_current_turn()
-        else:
-            self.timer.resume()

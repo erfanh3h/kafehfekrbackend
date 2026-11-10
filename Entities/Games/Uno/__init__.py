@@ -182,6 +182,16 @@ class UnoGameClass(BaseMultiPlayerGameClass):
             self.rank2 = 2 if self.rank1 == 1 else 1
         self.is_game_finished = True
 
+    def get_game_winner(self):
+        if self.rank1 is not None:
+            return self.rank1
+        return super().get_game_winner()
+
+    def check_end_game(self):
+        if self.is_game_finished or (self.rank1 is not None and self.rank2 is not None):
+            return True, (self.rank1 if self.rank1 is not None else 0)
+        return False, 0
+
     def _apply_surrender_sync(self, gamer_id: int) -> bool:
         was_turn = (self.current_turn == gamer_id)
         next_turn_candidate = self._next_active_player(gamer_id, steps=1) if was_turn else self.current_turn
@@ -204,7 +214,7 @@ class UnoGameClass(BaseMultiPlayerGameClass):
         payload = data.get("data") if isinstance(data.get("data"), dict) else data
 
         if cmd_id == commands.Call_Uno:
-            return len(self.hands.get(gamer_id, [])) <= 2
+            return 1 <= len(self.hands.get(gamer_id, [])) <= 2
 
         if gamer_id != self.current_turn:
             return False
@@ -236,6 +246,7 @@ class UnoGameClass(BaseMultiPlayerGameClass):
             return {
                 "action": "call_uno",
                 "gamer_id": gamer_id,
+                "player": gamer_id,
             }
 
         if command_type in (commands.Play_Card, commands.Select_Peace):
@@ -274,14 +285,13 @@ class UnoGameClass(BaseMultiPlayerGameClass):
         self.has_drawn_this_turn = False
         self.last_drawn_card = None
 
-        if len(self.hands[gamer_id]) == 1:
-            self.uno_called[gamer_id] = True
-        elif len(self.hands[gamer_id]) > 1:
+        if len(self.hands[gamer_id]) > 2:
             self.uno_called[gamer_id] = False
 
         penalty_target: int = 0
         penalty_cards: List[Dict[str, Any]] = []
         skipped_player: int = 0
+        effect_info: Dict[str, Any] = {"type": "number"}
 
         # Check win condition immediately
         if len(self.hands[gamer_id]) == 0:
@@ -289,6 +299,7 @@ class UnoGameClass(BaseMultiPlayerGameClass):
             result = {
                 "action": "play_card",
                 "gamer_id": gamer_id,
+                "player": gamer_id,
                 "card": played_card,
                 "current_color": self.current_color,
                 "current_value": self.current_value,
@@ -298,6 +309,7 @@ class UnoGameClass(BaseMultiPlayerGameClass):
                 "penalty_target": 0,
                 "penalty_count": 0,
                 "penalty_cards": [],
+                "effect": effect_info,
                 "uno_shout": False,
                 "next_turn": self.current_turn,
                 "is_game_finished": True,
@@ -307,7 +319,7 @@ class UnoGameClass(BaseMultiPlayerGameClass):
             self.last_action = result
             return result
 
-        # Apply action card effects
+        # Apply action card effects according to official UNO rules
         active_cnt = len(self.active_player_indexes)
         if c_val == "reverse":
             if active_cnt == 2:
@@ -317,9 +329,11 @@ class UnoGameClass(BaseMultiPlayerGameClass):
             else:
                 self.direction *= -1
                 self.change_turn(steps=1)
+            effect_info = {"type": "reverse", "skipped_player": skipped_player}
         elif c_val == "skip":
             skipped_player = self._next_active_player(gamer_id, steps=1)
             self.change_turn(steps=2)
+            effect_info = {"type": "skip", "skipped_player": skipped_player}
         elif c_val == "draw2":
             penalty_target = self._next_active_player(gamer_id, steps=1)
             skipped_player = penalty_target
@@ -329,6 +343,7 @@ class UnoGameClass(BaseMultiPlayerGameClass):
                 penalty_cards.append(dc)
             self.uno_called[penalty_target] = False
             self.change_turn(steps=2)
+            effect_info = {"type": "draw2", "target_player": penalty_target, "penalty_count": 2}
         elif c_val == "wild_draw4":
             penalty_target = self._next_active_player(gamer_id, steps=1)
             skipped_player = penalty_target
@@ -338,12 +353,17 @@ class UnoGameClass(BaseMultiPlayerGameClass):
                 penalty_cards.append(dc)
             self.uno_called[penalty_target] = False
             self.change_turn(steps=2)
+            effect_info = {"type": "wild_draw4", "target_player": penalty_target, "penalty_count": 4}
+        elif c_val == "wild":
+            self.change_turn(steps=1)
+            effect_info = {"type": "wild"}
         else:
             self.change_turn(steps=1)
 
         result = {
             "action": "play_card",
             "gamer_id": gamer_id,
+            "player": gamer_id,
             "card": played_card,
             "current_color": self.current_color,
             "current_value": self.current_value,
@@ -353,7 +373,8 @@ class UnoGameClass(BaseMultiPlayerGameClass):
             "penalty_target": penalty_target,
             "penalty_count": len(penalty_cards),
             "penalty_cards": penalty_cards,
-            "uno_shout": len(self.hands[gamer_id]) == 1,
+            "effect": effect_info,
+            "uno_shout": len(self.hands[gamer_id]) == 1 and bool(self.uno_called.get(gamer_id, False)),
             "next_turn": self.current_turn,
             "is_game_finished": self.is_game_finished,
             "rank1": self.rank1,
@@ -368,10 +389,13 @@ class UnoGameClass(BaseMultiPlayerGameClass):
         self.uno_called[gamer_id] = False
         self.last_drawn_card = drawn
 
-        playable_uids = self.get_playable_card_uids(gamer_id)
         drawn_is_playable = self.is_card_playable(drawn)
+        playable_uids = self.get_playable_card_uids(gamer_id)
 
-        if force_pass or not playable_uids:
+        # Official UNO rule: if the drawn card is not playable (or on timeout force_pass),
+        # the player's turn ends immediately. If the drawn card IS playable, the player
+        # may play a card or pass their turn.
+        if force_pass or not drawn_is_playable:
             self.change_turn(steps=1)
             turn_passed = True
         else:
@@ -381,8 +405,10 @@ class UnoGameClass(BaseMultiPlayerGameClass):
         result = {
             "action": "draw_card",
             "gamer_id": gamer_id,
+            "player": gamer_id,
             "drawn_card": drawn,
             "drawn_is_playable": drawn_is_playable,
+            "playable": drawn_is_playable and not turn_passed,
             "playable_uids": playable_uids if not turn_passed else [],
             "has_drawn_this_turn": self.has_drawn_this_turn,
             "turn_passed": turn_passed,
@@ -397,6 +423,7 @@ class UnoGameClass(BaseMultiPlayerGameClass):
         result = {
             "action": "pass_turn",
             "gamer_id": gamer_id,
+            "player": gamer_id,
             "next_turn": self.current_turn,
             "direction": self.direction,
         }
@@ -411,14 +438,20 @@ class UnoGameClass(BaseMultiPlayerGameClass):
     def get_hands_count(self) -> List[int]:
         return [len(self.hands.get(i, [])) for i in range(1, self.players_count + 1)]
 
+    def get_uno_called_dict(self) -> Dict[str, bool]:
+        return {str(k): bool(v) for k, v in self.uno_called.items()}
+
     def get_user_private_game_data(self, gamer_id: int) -> Dict[str, Any]:
         hand = [dict(c) for c in self.hands.get(gamer_id, [])]
         playable_uids = self.get_playable_card_uids(gamer_id) if gamer_id == self.current_turn else []
+        h_counts = self.get_hands_count()
+        deck_rem = len(self.draw_pile)
         return {
             "user": gamer_id,
             "index": gamer_id,
             "gamer_id": gamer_id,
             "hand": hand,
+            "my_hand": hand,
             "playable_uids": playable_uids,
             "has_drawn_this_turn": self.has_drawn_this_turn if gamer_id == self.current_turn else False,
             "current_color": self.current_color,
@@ -426,11 +459,17 @@ class UnoGameClass(BaseMultiPlayerGameClass):
             "top_card": self.get_top_card(),
             "direction": self.direction,
             "current_turn": self.current_turn,
-            "hands_count": self.get_hands_count(),
-            "draw_pile_count": len(self.draw_pile),
+            "hands_count": h_counts,
+            "draw_pile_count": deck_rem,
+            "deck_remaining": deck_rem,
+            "uno_called": self.get_uno_called_dict(),
+            "rank1": self.rank1,
+            "rank2": self.rank2,
         }
 
     def get_game_data(self) -> Dict[str, Any]:
+        h_counts = self.get_hands_count()
+        deck_rem = len(self.draw_pile)
         return {
             "players_count": self.players_count,
             "active_player_indexes": list(self.active_player_indexes),
@@ -439,9 +478,11 @@ class UnoGameClass(BaseMultiPlayerGameClass):
             "current_color": self.current_color,
             "current_value": self.current_value,
             "top_card": self.get_top_card(),
-            "hands_count": self.get_hands_count(),
-            "draw_pile_count": len(self.draw_pile),
+            "hands_count": h_counts,
+            "draw_pile_count": deck_rem,
+            "deck_remaining": deck_rem,
             "has_drawn_this_turn": self.has_drawn_this_turn,
+            "uno_called": self.get_uno_called_dict(),
             "rank1": self.rank1,
             "rank2": self.rank2,
             "is_game_finished": self.is_game_finished,
