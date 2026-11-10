@@ -166,6 +166,18 @@ class UnoGameSession(BaseMultiplayerGameSession):
             )
         )
 
+    async def _reset_gamer_missed_turns_async(self, gamer_id: int):
+        gamer_obj = self.find_gamer_from_gamer_id(gamer_id)
+        if gamer_obj is not None:
+            prev_missed = int(getattr(gamer_obj, "not_played_turns", 0))
+            if hasattr(gamer_obj, "reset_not_played_turns"):
+                gamer_obj.reset_not_played_turns()
+            if prev_missed > 0:
+                await self.send_command(
+                    commands.Not_played_Turns,
+                    {"gamer_id": gamer_id, "count": 0, "max_turns": 3},
+                )
+
     async def command_received(self, data, socket_id):
         gamer_id = await super().command_received(data, socket_id)
         if gamer_id is None:
@@ -190,6 +202,8 @@ class UnoGameSession(BaseMultiplayerGameSession):
             if not res:
                 self.timer.start(Uno_Turn_Time, self.on_turn_timeout)
                 return
+
+            await self._reset_gamer_missed_turns_async(gamer_id)
 
             deck_rem = len(self.game_controller.draw_pile)
             payload = dict(res)
@@ -225,6 +239,8 @@ class UnoGameSession(BaseMultiplayerGameSession):
             if not res:
                 self.timer.start(Uno_Turn_Time, self.on_turn_timeout)
                 return
+
+            await self._reset_gamer_missed_turns_async(gamer_id)
 
             await self._sync_all_private_user_data_async()
             user_priv = self.game_controller.get_user_private_game_data(gamer_id)
@@ -274,6 +290,8 @@ class UnoGameSession(BaseMultiplayerGameSession):
                 self.timer.start(Uno_Turn_Time, self.on_turn_timeout)
                 return
 
+            await self._reset_gamer_missed_turns_async(gamer_id)
+
             deck_rem = len(self.game_controller.draw_pile)
             await self._sync_all_private_user_data_async()
             await self.send_command(
@@ -291,6 +309,57 @@ class UnoGameSession(BaseMultiplayerGameSession):
             await self.send_command(commands.Current_Turn, self._build_turn_payload())
             self.timer.start(Uno_Turn_Time, self.on_turn_timeout)
 
+    def _eliminate_afk_player(self, cur_turn: int, gamer):
+        self.afk_user_id = gamer.user_id
+        if self.game_score_type != GameScoreTypesEnum.RANK and not str(gamer.user_id).startswith("bot_"):
+            try:
+                from Entities.Database import game_database
+                game_database.users_manager.update_user(gamer.user_id, open_game_id="")
+            except Exception as e:
+                print(f"[UnoGameSession] Error clearing open_game_id on AFK forfeit: {e}")
+
+        self.game_controller._apply_surrender_sync(cur_turn)
+
+        # If all remaining active players are bots (e.g. human AFK vs bots), finish immediately with bots winning
+        remaining_active = getattr(self.game_controller, "active_player_indexes", [])
+        has_remaining_human = False
+        for active_gid in remaining_active:
+            g_obj = self.find_gamer_from_gamer_id(active_gid)
+            if g_obj is not None and not str(g_obj.user_id).startswith("bot_"):
+                has_remaining_human = True
+                break
+        if not has_remaining_human and len(remaining_active) > 0:
+            if self.game_controller.rank1 is None:
+                self.game_controller.rank1 = remaining_active[0]
+            if self.game_controller.rank2 is None and len(remaining_active) > 1:
+                self.game_controller.rank2 = remaining_active[1]
+            self.game_controller.is_game_finished = True
+
+        safe_run_async(
+            self.send_command(
+                commands.Surrender,
+                {"gamer_id": cur_turn, "reason": "afk"},
+            )
+        )
+
+        if self.game_controller.is_game_finished or self.game_controller.check_game_ended():
+            self.game_controller.is_game_finished = True
+            safe_run_async(
+                self.send_command(
+                    commands.Win_Happened,
+                    {
+                        "Winner": self.game_controller.rank1,
+                        "winner_id": self.game_controller.rank1,
+                        "rank1": self.game_controller.rank1,
+                        "rank2": self.game_controller.rank2,
+                    },
+                )
+            )
+            self.check_finish_game()
+            return
+
+        self.send_current_turn()
+
     def on_turn_timeout(self):
         if self.is_game_finished or self.check_finish_game():
             return
@@ -298,6 +367,23 @@ class UnoGameSession(BaseMultiplayerGameSession):
         cur_turn = self.game_controller.current_turn
 
         if not self.game_controller.has_drawn_this_turn:
+            gamer = self.find_gamer_from_gamer_id(cur_turn)
+            if gamer is not None:
+                gamer.not_played_turn()
+                safe_run_async(
+                    self.send_command(
+                        commands.Not_played_Turns,
+                        {
+                            "gamer_id": cur_turn,
+                            "count": gamer.not_played_turns,
+                            "max_turns": 3,
+                        },
+                    )
+                )
+                if gamer.not_played_turns >= 3:
+                    self._eliminate_afk_player(cur_turn, gamer)
+                    return
+
             res = self.game_controller.draw_card_for_turn(cur_turn, force_pass=True)
             self._sync_all_private_user_data()
             user_priv = self.game_controller.get_user_private_game_data(cur_turn)
