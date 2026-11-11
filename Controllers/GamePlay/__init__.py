@@ -15,6 +15,7 @@ from Models.Gamer import GamerModel
 class BaseGamePlayClass:
     def __init__(self, game_play_id, gamers, game_types, game_score_type):
         self.timer = TimerClass()
+        self._finish_lock = threading.RLock()
         self.game_play_id = game_play_id
         self.gamers = gamers
         for g in self.gamers:
@@ -319,8 +320,10 @@ class BaseGamePlayClass:
             if getattr(gamer, "is_disconnected", False) or str(gamer.user_id) in self.disconnected_user_ids:
                 for sg in self.game_session.gamers:
                     if str(sg.user_id) == str(gamer.user_id):
-                        sg.is_disconnected = True
+                        sg.disconnect()
                         break
+        if any(getattr(sg, "is_disconnected", False) for sg in getattr(self.game_session, "gamers", [])):
+            self.game_session.timer.pause()
         self.game_session.start_game_timer()
 
     def is_user_id_valid(self, user_id):
@@ -345,51 +348,66 @@ class BaseGamePlayClass:
         return False, None
 
     def finish_current_game(self, currnet_game_winner_id):
-        if self.is_game_finished:
-            return
-        if self.game_session is not None:
-            self.game_session.is_game_finished = True
-            try:
-                self.game_session.timer.stop(False)
-            except Exception:
-                pass
-            # ONLY penalize if full disconnect timeout occurred (1 min expired) or detected as AFK (2 consecutive missed turns)
-            afk_uid = getattr(self.game_session, 'afk_user_id', None)
-            dc_uid = getattr(self.game_session, 'dc_timeout_user_id', None)
-            if afk_uid is not None:
-                self.afk_or_dc_penalty_user_id = afk_uid
-            elif dc_uid is not None:
-                self.afk_or_dc_penalty_user_id = dc_uid
-            else:
-                for sg in getattr(self.game_session, 'gamers', []):
-                    if getattr(sg, 'not_played_turns', 0) >= 2:
-                        self.afk_or_dc_penalty_user_id = sg.user_id
-                        break
-
-        def start_new_game_function():
-            if self.is_game_finished or self.current_game_index >= len(self.game_types):
+        with self._finish_lock:
+            if self.is_game_finished:
                 return
-            for gamer_data in self.gamers:
-                self.navigate_to_game(gamer_data.socket_id, is_reconnect=False)
-            self.start_current_game()
+            if self.game_session is not None:
+                self.game_session.is_game_finished = True
+                try:
+                    self.game_session.timer.stop(False)
+                except Exception:
+                    pass
+                # ONLY penalize if full disconnect timeout occurred (1 min expired) or detected as AFK (2 consecutive missed turns)
+                afk_uid = getattr(self.game_session, 'afk_user_id', None)
+                dc_uid = getattr(self.game_session, 'dc_timeout_user_id', None)
+                if afk_uid is not None:
+                    self.afk_or_dc_penalty_user_id = afk_uid
+                elif dc_uid is not None:
+                    self.afk_or_dc_penalty_user_id = dc_uid
+                else:
+                    for sg in getattr(self.game_session, 'gamers', []):
+                        if getattr(sg, 'not_played_turns', 0) >= 2:
+                            self.afk_or_dc_penalty_user_id = sg.user_id
+                            break
 
-        winner_index = self.user_id_to_index(currnet_game_winner_id)
-        if self.current_game_index < len(self.game_winners):
-            if winner_index != -1:  # prevent drow
-                self.gamer_scores[winner_index] += 1
-                self.game_winners[self.current_game_index] = winner_index + 1
+            def start_new_game_function():
+                if self.is_game_finished or self.current_game_index >= len(self.game_types):
+                    return
+                for gamer_data in self.gamers:
+                    self.navigate_to_game(gamer_data.socket_id, is_reconnect=False)
+                self.start_current_game()
+
+            winner_index = self.user_id_to_index(currnet_game_winner_id)
+            if self.current_game_index < len(self.game_winners):
+                if winner_index != -1:  # prevent drow
+                    self.gamer_scores[winner_index] += 1
+                    self.game_winners[self.current_game_index] = winner_index + 1
+                else:
+                    self.game_winners[self.current_game_index] = 0
+            self.current_game_index += 1
+            is_game_finished, winner_id = self.check_is_game_finished()
+            if is_game_finished:
+                self.finish_game_play(winner_id)
             else:
-                self.game_winners[self.current_game_index] = 0
-        self.current_game_index += 1
-        is_game_finished, winner_id = self.check_is_game_finished()
-        if is_game_finished:
-            self.finish_game_play(winner_id)
-        else:
-            for gamer in self.gamers:
-                self.send_game_play_data(gamer.socket_id)
-            self.timer.start(Game_Play_Round_Time, start_new_game_function)
-            for gamer in self.gamers:
-                self.send_timer_value(gamer.socket_id)
+                all_disconnected = len(self.gamers) > 0 and all(
+                    getattr(g, 'is_disconnected', False) or str(g.user_id) in self.disconnected_user_ids
+                    for g in self.gamers
+                )
+                if all_disconnected:
+                    print(f"[BaseGamePlayClass] All players disconnected in game {self.game_play_id}. Finishing series immediately.")
+                    series_winner = 0
+                    if len(self.gamer_scores) >= 2:
+                        if self.gamer_scores[0] > self.gamer_scores[1]:
+                            series_winner = self.gamers[0].user_id
+                        elif self.gamer_scores[1] > self.gamer_scores[0]:
+                            series_winner = self.gamers[1].user_id
+                    self.finish_game_play(series_winner)
+                    return
+                for gamer in self.gamers:
+                    self.send_game_play_data(gamer.socket_id)
+                self.timer.start(Game_Play_Round_Time, start_new_game_function)
+                for gamer in self.gamers:
+                    self.send_timer_value(gamer.socket_id)
 
     def finish_multiplayer_game(self, rank1_id, rank2_id):
         self.game_winners = []
@@ -474,94 +492,97 @@ class BaseGamePlayClass:
                     break
 
     def finish_game_play(self, winner_id, afk_or_dc_user_id=None):
-        from Entities.Database import game_database
-        finished_game_types = []
-        finished_game_winners = []
-        for index, item in enumerate(self.game_types):
-            if self.game_winners[index] != -1:
-                finished_game_types.append(item)
-                finished_game_winners.append(self.game_winners[index])
-        w_idx_lookup = self.user_id_to_index(winner_id) if (winner_id != 0 and winner_id is not None) else -1
-        winner_idx = (w_idx_lookup + 1) if w_idx_lookup != -1 else 0
-        penalty_user = afk_or_dc_user_id or self.afk_or_dc_penalty_user_id
-        try:
-            self.score_manager.finish_game(
-                winner_idx,
-                finished_game_types,
-                finished_game_winners,
-                gamer_scores=self.gamer_scores,
-                afk_or_dc_user_id=penalty_user
-            )
-        except Exception as e:
-            print(f"[BaseGamePlayClass] Error in score_manager.finish_game: {e}")
-        for gamer in self.gamers:
-            if not str(gamer.user_id).startswith("bot_"):
-                try:
-                    game_database.users_manager.update_user(gamer.user_id, open_game_id="")
-                except Exception as e:
-                    print(f"[BaseGamePlayClass] Error clearing open_game_id for {gamer.user_id}: {e}")
-        try:
-            game_database.game_play_history_manager.update_game_play_history(
-                self.game_play_id, self.game_winners, self.gamer_scores, winner_id=winner_id
-            )
-        except Exception as e:
-            print(f"[BaseGamePlayClass] Error updating game_play_history: {e}")
-        self.is_game_finished = True
-        self.game_winner_id = winner_id
-
-        from Entities.SocketIOManagerClass import send_private_command
-        last_xp = getattr(self.score_manager, 'last_awarded_xp', {})
-        last_score = getattr(self.score_manager, 'last_awarded_score', {})
-        last_coin = getattr(self.score_manager, 'last_awarded_coin', {})
-
-        client_winner = winner_idx
-        if self.game_session is not None and winner_id not in (0, None, "0", ""):
-            session_gid = self.game_session.find_gamer_id_from_user_id(winner_id)
-            if session_gid > 0:
-                client_winner = session_gid
-
-        rank1_val = None
-        rank2_val = None
-        if self.game_session is not None and hasattr(self.game_session, "game_controller"):
-            rank1_val = getattr(self.game_session.game_controller, "rank1", None)
-            rank2_val = getattr(self.game_session.game_controller, "rank2", None)
-
-        for gamer in self.gamers:
-            self.send_game_play_data(gamer.socket_id)
-            if not gamer.socket_id:
-                continue
+        with self._finish_lock:
+            if self.is_game_finished:
+                return
+            self.is_game_finished = True
+            from Entities.Database import game_database
+            finished_game_types = []
+            finished_game_winners = []
+            for index, item in enumerate(self.game_types):
+                if self.game_winners[index] != -1:
+                    finished_game_types.append(item)
+                    finished_game_winners.append(self.game_winners[index])
+            w_idx_lookup = self.user_id_to_index(winner_id) if (winner_id != 0 and winner_id is not None) else -1
+            winner_idx = (w_idx_lookup + 1) if w_idx_lookup != -1 else 0
+            penalty_user = afk_or_dc_user_id or self.afk_or_dc_penalty_user_id
             try:
-                earned = last_xp.get(gamer.user_id, 0)
-                s_earned = last_score.get(gamer.user_id, 0)
-                c_earned = last_coin.get(gamer.user_id, 0)
-                finish_payload = {
-                    "Winner": client_winner,
-                    "winner": client_winner,
-                    "game_winner_id": winner_id,
-                    "series_scores": self.gamer_scores,
-                    "xp_earned": earned,
-                    "score_earned": s_earned,
-                    "coin_earned": c_earned,
-                }
-                if rank1_val is not None:
-                    finish_payload["rank1"] = rank1_val
-                if rank2_val is not None:
-                    finish_payload["rank2"] = rank2_val
-                safe_run_async(
-                    send_private_command(
-                        command=make_command_json(
-                            id=commands.Finish_Game,
-                            data=finish_payload
-                        ),
-                        socket_id=gamer.socket_id,
-                        game_id=self.game_play_id
-                    )
+                self.score_manager.finish_game(
+                    winner_idx,
+                    finished_game_types,
+                    finished_game_winners,
+                    gamer_scores=self.gamer_scores,
+                    afk_or_dc_user_id=penalty_user
                 )
             except Exception as e:
-                print(f"[BaseGamePlayClass] Error sending Finish_Game: {e}")
+                print(f"[BaseGamePlayClass] Error in score_manager.finish_game: {e}")
+            for gamer in self.gamers:
+                if not str(gamer.user_id).startswith("bot_"):
+                    try:
+                        game_database.users_manager.update_user(gamer.user_id, open_game_id="")
+                    except Exception as e:
+                        print(f"[BaseGamePlayClass] Error clearing open_game_id for {gamer.user_id}: {e}")
+            try:
+                game_database.game_play_history_manager.update_game_play_history(
+                    self.game_play_id, self.game_winners, self.gamer_scores, winner_id=winner_id
+                )
+            except Exception as e:
+                print(f"[BaseGamePlayClass] Error updating game_play_history: {e}")
+            self.game_winner_id = winner_id
 
-        from Entities.SocketIOClass.game import delete_game
-        delete_game(self.game_play_id)
+            from Entities.SocketIOManagerClass import send_private_command
+            last_xp = getattr(self.score_manager, 'last_awarded_xp', {})
+            last_score = getattr(self.score_manager, 'last_awarded_score', {})
+            last_coin = getattr(self.score_manager, 'last_awarded_coin', {})
+
+            client_winner = winner_idx
+            if self.game_session is not None and winner_id not in (0, None, "0", ""):
+                session_gid = self.game_session.find_gamer_id_from_user_id(winner_id)
+                if session_gid > 0:
+                    client_winner = session_gid
+
+            rank1_val = None
+            rank2_val = None
+            if self.game_session is not None and hasattr(self.game_session, "game_controller"):
+                rank1_val = getattr(self.game_session.game_controller, "rank1", None)
+                rank2_val = getattr(self.game_session.game_controller, "rank2", None)
+
+            for gamer in self.gamers:
+                self.send_game_play_data(gamer.socket_id)
+                if not gamer.socket_id:
+                    continue
+                try:
+                    earned = last_xp.get(gamer.user_id, last_xp.get(str(gamer.user_id), 0))
+                    s_earned = last_score.get(gamer.user_id, last_score.get(str(gamer.user_id), 0))
+                    c_earned = last_coin.get(gamer.user_id, last_coin.get(str(gamer.user_id), 0))
+                    finish_payload = {
+                        "Winner": client_winner,
+                        "winner": client_winner,
+                        "game_winner_id": winner_id,
+                        "series_scores": self.gamer_scores,
+                        "xp_earned": earned,
+                        "score_earned": s_earned,
+                        "coin_earned": c_earned,
+                    }
+                    if rank1_val is not None:
+                        finish_payload["rank1"] = rank1_val
+                    if rank2_val is not None:
+                        finish_payload["rank2"] = rank2_val
+                    safe_run_async(
+                        send_private_command(
+                            command=make_command_json(
+                                id=commands.Finish_Game,
+                                data=finish_payload
+                            ),
+                            socket_id=gamer.socket_id,
+                            game_id=self.game_play_id
+                        )
+                    )
+                except Exception as e:
+                    print(f"[BaseGamePlayClass] Error sending Finish_Game: {e}")
+
+            from Entities.SocketIOClass.game import delete_game
+            delete_game(self.game_play_id)
 
     def user_id_to_index(self, user_id):
         for index, gamer in enumerate(self.gamers):

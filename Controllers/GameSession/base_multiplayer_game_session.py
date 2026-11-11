@@ -87,23 +87,24 @@ class BaseMultiplayerGameSession(BaseGameSession):
         return gamer_id
 
     def finish_reconnect_time(self, user_id):
-        if self.is_game_finished:
-            return
-        self.dc_timeout_user_id = user_id
-        safe_run_async(self.send_command(commands.Finish_Reconnect_Time, {"user_id": user_id}))
-        gamer_id = self.find_gamer_id_from_user_id(user_id)
-        was_turn = (getattr(self.game_controller, "current_turn", 0) == gamer_id)
-        self.game_controller.finish_reconnect_time(gamer_id)
-        if gamer_id > 0:
-            safe_run_async(self.send_command(commands.Surrender, {"gamer_id": gamer_id}))
-        if self.check_finish_game():
-            self.timer.stop(False)
-            return
-        if was_turn:
-            self.timer.stop(False)
-            self.send_current_turn()
-        else:
-            self.timer.resume()
+        with self._finish_lock:
+            if self.is_game_finished:
+                return
+            self.dc_timeout_user_id = user_id
+            safe_run_async(self.send_command(commands.Finish_Reconnect_Time, {"user_id": user_id}))
+            gamer_id = self.find_gamer_id_from_user_id(user_id)
+            was_turn = (getattr(self.game_controller, "current_turn", 0) == gamer_id)
+            self.game_controller.finish_reconnect_time(gamer_id)
+            if gamer_id > 0:
+                safe_run_async(self.send_command(commands.Surrender, {"gamer_id": gamer_id}))
+            if self.check_finish_game():
+                self.timer.stop(False)
+                return
+            if was_turn:
+                self.timer.stop(False)
+                self.send_current_turn()
+            else:
+                self.timer.resume()
 
     def check_finish_game(self):
         from Entities.SocketIOManagerClass import send_command
@@ -131,15 +132,16 @@ class BaseMultiplayerGameSession(BaseGameSession):
         return False
 
     def finish_game(self, winner_gamer_id):
-        if self.is_game_finished:
-            return
-        if self.game_score_type in (GameScoreTypesEnum.RANK, GameScoreTypesEnum.CLASSIC_RANK):
-            print("finish from rank/classic_rank")
-            super().finish_game(self.game_controller.rank1 if self.game_controller.rank1 is not None else winner_gamer_id)
-            return
-        print("finish from normal")
-        self.is_game_finished = True
-        self.timer.stop(False)
+        with self._finish_lock:
+            if self.is_game_finished:
+                return
+            if self.game_score_type in (GameScoreTypesEnum.RANK, GameScoreTypesEnum.CLASSIC_RANK):
+                print("finish from rank/classic_rank")
+                super().finish_game(self.game_controller.rank1 if self.game_controller.rank1 is not None else winner_gamer_id)
+                return
+            print("finish from normal")
+            self.is_game_finished = True
+            self.timer.stop(False)
         for g in self.gamers:
             try:
                 g.timer.stop()

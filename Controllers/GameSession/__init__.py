@@ -56,6 +56,7 @@ class BaseGameSession:
         self.dc_timeout_user_id = None
         self.afk_user_id = None
         self.is_first_turn = True
+        self._finish_lock = threading.RLock()
 
 
 
@@ -414,29 +415,35 @@ class BaseGameSession:
 
 
     def finish_reconnect_time(self, user_id):
-        if self.is_game_finished:
-            return
-        self.dc_timeout_user_id = user_id
+        with self._finish_lock:
+            if self.is_game_finished:
+                return
+            self.dc_timeout_user_id = user_id
 
-        safe_run_async(
+            safe_run_async(
+                self.send_command(commands.Finish_Reconnect_Time, {"user_id": user_id}))
 
-            self.send_command(commands.Finish_Reconnect_Time, {"user_id": user_id}))
+            gamer_id = self.find_gamer_id_from_user_id(user_id)
 
-        gamer_id = self.find_gamer_id_from_user_id(user_id)
-
-        self.game_controller.finish_reconnect_time(gamer_id)
-
-        if len(self.gamers) <= 2:  # this timer stop will stop in 2 player games and will resume on 4 players
-
-            # Test : remove this
-
-            self.timer.stop(False)
-
-        else:
-
-            self.timer.resume()
-
-        self.check_finish_game()
+            if len(self.gamers) <= 2:  # this timer stop will stop in 2 player games and will resume on 4 players
+                self.timer.stop(False)
+                from Entities.Games.base_game_class import get_opponent_id
+                opponent_id = get_opponent_id(gamer_id)
+                opponent = self.find_gamer_from_gamer_id(opponent_id)
+                # If opponent is ALSO disconnected, both players have abandoned the match
+                if opponent is not None and getattr(opponent, "is_disconnected", False):
+                    self.game_controller.finish_reconnect_time(gamer_id)
+                    self.game_controller.leaver_id = 0
+                    self.game_controller.is_game_finished = True
+                    self.finish_game(0)
+                    return
+                else:
+                    self.game_controller.finish_reconnect_time(gamer_id)
+                    self.check_finish_game()
+            else:
+                self.game_controller.finish_reconnect_time(gamer_id)
+                self.timer.resume()
+                self.check_finish_game()
 
 
 
@@ -532,13 +539,12 @@ class BaseGameSession:
 
 
     def finish_game(self, winner_gamer_id):
+        with self._finish_lock:
+            if self.is_game_finished:
+                return
 
-        if self.is_game_finished:
-
-            return
-
-        self.is_game_finished = True
-        self.timer.stop(False)
+            self.is_game_finished = True
+            self.timer.stop(False)
 
         for g in self.gamers:
             try:

@@ -230,7 +230,7 @@ class RewardManagerClass:
             except Exception as e:
                 print(f"[RewardManager] Error updating user {uid}: {e}")
 
-        # Update Rank History
+        # Update User History (only for RANK and CLASSIC_RANK; LOBBY and NORMAL are strictly excluded)
         if self.game_score_type == GameScoreTypesEnum.RANK and len(self.players_idis) >= 2:
             try:
                 user1_history, user2_history = self.get_history_map(winner_gamer_id)
@@ -240,6 +240,16 @@ class RewardManagerClass:
                     game_database.user_history_manager.update_user_history(self.players_idis[1], user2_history)
             except Exception as e:
                 print(f"[RewardManager] Error updating rank history: {e}")
+        elif self.game_score_type == GameScoreTypesEnum.CLASSIC_RANK:
+            try:
+                classic_histories = self.get_classic_rank_history_map(winner_gamer_id, game_types)
+                for idx, h_data in classic_histories.items():
+                    if idx < len(self.players_idis):
+                        uid = self.players_idis[idx]
+                        if not str(uid).startswith("bot_"):
+                            game_database.user_history_manager.update_user_history(uid, h_data)
+            except Exception as e:
+                print(f"[RewardManager] Error updating classic rank history: {e}")
 
     def finish_multiplayer_game(self, rank1_gamer_id, rank2_gamer_id, game_types):
         self.game_types = game_types
@@ -260,8 +270,7 @@ class RewardManagerClass:
                 user_data = None
             users_data.append(user_data)
 
-        is_rank = (self.game_score_type == GameScoreTypesEnum.MultiRANK)
-        if is_rank:
+        if self.game_score_type == GameScoreTypesEnum.MultiRANK:
             try:
                 histories = self.get_multiplayer_history_map(rank1_gamer_id, rank2_gamer_id)
                 for idx, uid in enumerate(self.players_idis[:4]):
@@ -269,6 +278,16 @@ class RewardManagerClass:
                         game_database.user_history_manager.update_user_history_multiplayer(uid, histories[idx])
             except Exception as e:
                 print(f"[RewardManager] Error updating multiplayer history: {e}")
+        elif self.game_score_type == GameScoreTypesEnum.CLASSIC_RANK:
+            try:
+                classic_histories = self.get_classic_rank_history_map(rank1_gamer_id, game_types)
+                for idx, h_data in classic_histories.items():
+                    if idx < len(self.players_idis):
+                        uid = self.players_idis[idx]
+                        if not str(uid).startswith("bot_"):
+                            game_database.user_history_manager.update_user_history(uid, h_data)
+            except Exception as e:
+                print(f"[RewardManager] Error updating classic rank multiplayer history: {e}")
 
         total_players = min(4, len(self.players_idis))
         now = datetime.now()
@@ -374,28 +393,62 @@ class RewardManagerClass:
         is_rank = self.game_score_type == GameScoreTypesEnum.RANK
         if is_rank:
             if total_game_winner == 0:
-                user1_history = {"draw_rank": 1}
-                user2_history = {"draw_rank": 1}
+                user1_history["draw_rank"] = 1
+                user2_history["draw_rank"] = 1
             else:
                 if total_game_winner == 1:
-                    user1_history = {"win_rank": 1}
-                    user2_history = {"lose_rank": 1}
+                    user1_history["win_rank"] = 1
+                    user2_history["lose_rank"] = 1
                 else:
-                    user2_history = {"win_rank": 1}
-                    user1_history = {"lose_rank": 1}
+                    user2_history["win_rank"] = 1
+                    user1_history["lose_rank"] = 1
             for index, game_type in enumerate(self.game_types):
                 if index >= len(self.game_winners):
                     continue
-                if self.game_winners[index] == 1:
-                    user1_history[f"{game_type.lower()}_win"] = 1
-                    user2_history[f"{game_type.lower()}_lose"] = 1
-                elif self.game_winners[index] == 2:
-                    user2_history[f"{game_type.lower()}_win"] = 1
-                    user1_history[f"{game_type.lower()}_lose"] = 1
+                sub_w = self.game_winners[index]
+                if sub_w == -1:
+                    continue
+                gt_lower = str(game_type).lower()
+                if sub_w == 1:
+                    user1_history[f"{gt_lower}_win"] = user1_history.get(f"{gt_lower}_win", 0) + 1
+                    user2_history[f"{gt_lower}_lose"] = user2_history.get(f"{gt_lower}_lose", 0) + 1
+                elif sub_w == 2:
+                    user2_history[f"{gt_lower}_win"] = user2_history.get(f"{gt_lower}_win", 0) + 1
+                    user1_history[f"{gt_lower}_lose"] = user1_history.get(f"{gt_lower}_lose", 0) + 1
                 else:
-                    user1_history[f"{game_type.lower()}_draw"] = 1
-                    user2_history[f"{game_type.lower()}_draw"] = 1
+                    user1_history[f"{gt_lower}_draw"] = user1_history.get(f"{gt_lower}_draw", 0) + 1
+                    user2_history[f"{gt_lower}_draw"] = user2_history.get(f"{gt_lower}_draw", 0) + 1
         return user1_history, user2_history
+
+    def get_classic_rank_history_map(self, winner_gamer_id, game_types=None):
+        histories = {}
+        g_types = game_types or self.game_types
+        g_type = g_types[0] if g_types else ""
+        gt_lower = str(g_type).lower()
+
+        total_players = min(4, len(self.players_idis))
+        for idx in range(total_players):
+            uid = self.players_idis[idx]
+            if str(uid).startswith("bot_") or str(uid).startswith("test_bot"):
+                continue
+            gamer_num = idx + 1
+            h = {}
+            is_win = (winner_gamer_id == gamer_num) or (winner_gamer_id is not None and str(winner_gamer_id) == str(uid))
+            if winner_gamer_id == 0:
+                h["draw_classic_rank"] = 1
+                if gt_lower:
+                    h[f"{gt_lower}_draw"] = 1
+            elif is_win:
+                h["win_classic_rank"] = 1
+                if gt_lower:
+                    h[f"{gt_lower}_win"] = 1
+            else:
+                h["lose_classic_rank"] = 1
+                if gt_lower:
+                    h[f"{gt_lower}_lose"] = 1
+            histories[idx] = h
+
+        return histories
 
     def get_multiplayer_history_map(self, rank1_gamer_id, rank2_gamer_id):
         user1_history = {}
@@ -403,14 +456,34 @@ class RewardManagerClass:
         user3_history = {}
         user4_history = {}
         histories = [user1_history, user2_history, user3_history, user4_history]
+        total_players = min(4, len(self.players_idis))
+
         for index, game_type in enumerate(self.game_types):
-            for p_idx in range(min(4, len(self.players_idis))):
+            gt_lower = str(game_type).lower()
+            for p_idx in range(total_players):
                 uid = self.players_idis[p_idx]
+                if str(uid).startswith("bot_") or str(uid).startswith("test_bot"):
+                    continue
                 g_num = p_idx + 1
-                if rank1_gamer_id == g_num or (rank1_gamer_id is not None and str(rank1_gamer_id) == str(uid)):
-                    histories[p_idx][f"{game_type.lower()}_rank1"] = 1
-                elif rank2_gamer_id == g_num or (rank2_gamer_id is not None and str(rank2_gamer_id) == str(uid)):
-                    histories[p_idx][f"{game_type.lower()}_rank2"] = 1
+                is_r1 = (rank1_gamer_id == g_num) or (rank1_gamer_id is not None and str(rank1_gamer_id) == str(uid))
+                is_r2 = (rank2_gamer_id == g_num) or (rank2_gamer_id is not None and str(rank2_gamer_id) == str(uid))
+
+                if rank1_gamer_id == 0:
+                    histories[p_idx]["draw_multi_rank"] = histories[p_idx].get("draw_multi_rank", 0) + 1
+                    histories[p_idx][f"{gt_lower}_draw"] = histories[p_idx].get(f"{gt_lower}_draw", 0) + 1
+                elif is_r1:
+                    histories[p_idx]["win_multi_rank"] = histories[p_idx].get("win_multi_rank", 0) + 1
+                    histories[p_idx]["rank1_multi_rank"] = histories[p_idx].get("rank1_multi_rank", 0) + 1
+                    histories[p_idx][f"{gt_lower}_win"] = histories[p_idx].get(f"{gt_lower}_win", 0) + 1
+                    histories[p_idx][f"{gt_lower}_rank1"] = histories[p_idx].get(f"{gt_lower}_rank1", 0) + 1
+                elif is_r2:
+                    histories[p_idx]["lose_multi_rank"] = histories[p_idx].get("lose_multi_rank", 0) + 1
+                    histories[p_idx]["rank2_multi_rank"] = histories[p_idx].get("rank2_multi_rank", 0) + 1
+                    histories[p_idx][f"{gt_lower}_lose"] = histories[p_idx].get(f"{gt_lower}_lose", 0) + 1
+                    histories[p_idx][f"{gt_lower}_rank2"] = histories[p_idx].get(f"{gt_lower}_rank2", 0) + 1
                 else:
-                    histories[p_idx][f"{game_type.lower()}_rankn"] = 1
+                    histories[p_idx]["lose_multi_rank"] = histories[p_idx].get("lose_multi_rank", 0) + 1
+                    histories[p_idx]["rankn_multi_rank"] = histories[p_idx].get("rankn_multi_rank", 0) + 1
+                    histories[p_idx][f"{gt_lower}_lose"] = histories[p_idx].get(f"{gt_lower}_lose", 0) + 1
+                    histories[p_idx][f"{gt_lower}_rankn"] = histories[p_idx].get(f"{gt_lower}_rankn", 0) + 1
         return user1_history, user2_history, user3_history, user4_history
