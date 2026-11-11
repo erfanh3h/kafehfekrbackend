@@ -57,8 +57,7 @@ class UserHistoryCollectionManager:
     def read_user_global_history(self, user_id):
         try:
             query = {'_id': user_id}
-            selection_items = {k: 1 for k in self.mode_keys}
-            user_Data = self.collection.find_one(query, selection_items)
+            user_Data = self.collection.find_one(query)
             return user_Data
         except:
             return None
