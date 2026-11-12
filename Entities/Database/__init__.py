@@ -6,6 +6,7 @@ from Entities.Database.game_history_collection import GameHistoryCollectionManag
 from Entities.Database.game_play_history_collection import GamePlayHistoryCollectionManager
 from Entities.Database.user_history_collection import UserHistoryCollectionManager
 from Entities.Database.users_collection import UsersCollectionManager
+from Entities.Database.questions_collection import QuestionsCollectionManager
 
 
 class DataBaseManager:
@@ -18,6 +19,7 @@ class DataBaseManager:
         self.game_play_history_manager = GamePlayHistoryCollectionManager(self.base_db['game_play_history'])
         self.game_history_manager = GameHistoryCollectionManager(self.base_db['game_history'])
         self.config_manager = ConfigCollectionManager(self.base_db['config'])
+        self.questions_manager = QuestionsCollectionManager(self.base_db['questions'])
 
 
 game_database = DataBaseManager()

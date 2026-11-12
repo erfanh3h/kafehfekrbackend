@@ -24,6 +24,7 @@ class GameTypesEnum(Enum):
     RISK = "Risk"
     UNO = "Uno"
     BACKGAMMON = "BackGammon"
+    QUIZ = "Quiz"
 
     @classmethod
     def all(cls) -> List[Enum]:
@@ -31,7 +32,7 @@ class GameTypesEnum(Enum):
 
     @classmethod
     def multi_players_games(cls, ) -> List[Enum]:
-        return [cls.LUDO, cls.RISK, cls.UNO]
+        return [cls.LUDO, cls.RISK, cls.UNO, cls.QUIZ]
 
     @classmethod
     def two_players_games(cls, ) -> List[Enum]:

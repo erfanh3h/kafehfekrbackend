@@ -168,8 +168,8 @@ class LobbySession:
             game_type = lobby_data.get('game_type', None)
             if game_type is None:
                 return
-            if lobby_count != 2 and GameTypesEnum.is_in_two_players(
-                    game_type):  # prevent more than 2 players for non-multiplayer games
+            is_multiplayer = any(m.value == game_type for m in GameTypesEnum.multi_players_games())
+            if lobby_count != 2 and not is_multiplayer:  # prevent more than 2 players for strictly 2-player games
                 lobby_count = 2
             await self.create_lobby(user_id, game_type, lobby_name, lobby_password, lobby_count)
         if data['id'] == commands.Lobby_Request_Data:

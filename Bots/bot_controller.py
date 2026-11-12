@@ -245,9 +245,9 @@ class ClassicRankBot:
 
         elif cmd_id == "CurrentTurn":
             my_role = self.game_logic.my_player_num or self.my_role or 2
-            if isinstance(payload, dict) and ("current_round" in payload or "current_turn" in payload or "dices" in payload):
+            if isinstance(payload, dict) and ("current_round" in payload or "current_turn" in payload or "dices" in payload or "question" in payload):
                 self.game_logic.handle_server_command(cmd_id, payload)
-                rnd = payload.get("current_round", payload.get("current_turn", 1))
+                rnd = payload.get("current_round", payload.get("current_turn", payload.get("turn", 1)))
                 print(f"[ClassicRankBot:{self.bot_name}] Simultaneous Turn (Round {rnd}) [My Role: Player {my_role}]")
                 await self._take_turn()
             else:
