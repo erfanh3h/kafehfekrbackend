@@ -292,16 +292,22 @@ class RewardManagerClass:
         total_players = min(4, len(self.players_idis))
         now = datetime.now()
 
+        is_total_draw = rank1_gamer_id in (0, None, "0", "")
+
         for idx, uid in enumerate(self.players_idis[:total_players]):
             gamer_num = idx + 1
-            is_r1 = (rank1_gamer_id == gamer_num) or (rank1_gamer_id is not None and str(rank1_gamer_id) == str(uid))
-            is_r2 = (rank2_gamer_id == gamer_num) or (rank2_gamer_id is not None and str(rank2_gamer_id) == str(uid))
+            is_r1 = (not is_total_draw) and ((rank1_gamer_id == gamer_num) or (str(rank1_gamer_id) == str(uid)))
+            is_r2 = (not is_total_draw) and (rank2_gamer_id not in (0, None, "0", "")) and ((rank2_gamer_id == gamer_num) or (str(rank2_gamer_id) == str(uid)))
 
             u_data = users_data[idx] if idx < len(users_data) else None
             daily_win_update = None
 
             if self.game_score_type == GameScoreTypesEnum.MultiRANK:
-                if is_r1:
+                if is_total_draw:
+                    d_score = 0
+                    d_xp = 15
+                    d_coin = 0
+                elif is_r1:
                     d_score = multi_rank_rank1_score  # +12
                     d_xp = multi_rank_rank1_xp        # +50
                     d_coin = multi_rank_rank1_coin    # +25
@@ -336,14 +342,16 @@ class RewardManagerClass:
                 g_type = game_types[0] if game_types else ""
                 diff = gametype_to_difficulty(g_type)
                 if diff == GameDifficultyEnum.Easy:
-                    r1_xp, r2_xp, rn_xp = 15, 8, 4
+                    r1_xp, r2_xp, rn_xp, draw_xp = 15, 8, 4, 6
                 elif diff == GameDifficultyEnum.Normal:
-                    r1_xp, r2_xp, rn_xp = 25, 14, 7
+                    r1_xp, r2_xp, rn_xp, draw_xp = 25, 14, 7, 10
                 else:
-                    r1_xp, r2_xp, rn_xp = 40, 20, 10
+                    r1_xp, r2_xp, rn_xp, draw_xp = 40, 20, 10, 15
 
                 d_score, d_coin = 0, 0
-                if is_r1:
+                if is_total_draw:
+                    d_xp = draw_xp
+                elif is_r1:
                     d_xp = r1_xp
                 elif is_r2:
                     d_xp = r2_xp
@@ -353,7 +361,9 @@ class RewardManagerClass:
             else:
                 # LOBBY / NORMAL Multiplayer: Social EXP only, STRICTLY 0 Coins and 0 Score
                 d_score, d_coin = 0, 0
-                if is_r1:
+                if is_total_draw:
+                    d_xp = 10
+                elif is_r1:
                     d_xp = 20
                 elif is_r2:
                     d_xp = 12
@@ -465,10 +475,10 @@ class RewardManagerClass:
                 if str(uid).startswith("bot_") or str(uid).startswith("test_bot"):
                     continue
                 g_num = p_idx + 1
-                is_r1 = (rank1_gamer_id == g_num) or (rank1_gamer_id is not None and str(rank1_gamer_id) == str(uid))
-                is_r2 = (rank2_gamer_id == g_num) or (rank2_gamer_id is not None and str(rank2_gamer_id) == str(uid))
+                is_r1 = (rank1_gamer_id == g_num) or (rank1_gamer_id not in (0, None, "0", "") and str(rank1_gamer_id) == str(uid))
+                is_r2 = (rank2_gamer_id == g_num) or (rank2_gamer_id not in (0, None, "0", "") and str(rank2_gamer_id) == str(uid))
 
-                if rank1_gamer_id == 0:
+                if rank1_gamer_id in (0, None, "0", ""):
                     histories[p_idx]["draw_multi_rank"] = histories[p_idx].get("draw_multi_rank", 0) + 1
                     histories[p_idx][f"{gt_lower}_draw"] = histories[p_idx].get(f"{gt_lower}_draw", 0) + 1
                 elif is_r1:

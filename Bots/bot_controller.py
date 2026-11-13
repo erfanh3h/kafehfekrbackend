@@ -69,6 +69,7 @@ class ClassicRankBot:
         self.behavior = HumanBehavior()
         self.sio: Optional[socketio.AsyncClient] = None
         self._simultaneous_task: Optional[asyncio.Task] = None
+        self._quiz_turn_task: Optional[asyncio.Task] = None
         self._pending_tasks: list[asyncio.Task] = []
         self.is_active = False
         self.my_role = 2  # default player 2, updated via GameData/UserData
@@ -238,14 +239,22 @@ class ClassicRankBot:
                 await self.behavior.simulate_thinking(level=self.game_logic.level, is_critical=False, legal_moves_count=1)
                 await self.emit("user_command", init_move)
             elif hasattr(self.game_logic, "should_act_on_reconnect") and self.game_logic.should_act_on_reconnect():
-                await self._take_turn()
+                if self.game_logic.game_type == "Quiz":
+                    self._schedule_quiz_turn()
+                else:
+                    await self._take_turn()
             elif getattr(self.game_logic, "is_simultaneous", False):
                 if self._simultaneous_task is None or self._simultaneous_task.done():
                     self._simultaneous_task = asyncio.create_task(self._simultaneous_play_loop())
 
         elif cmd_id == "CurrentTurn":
             my_role = self.game_logic.my_player_num or self.my_role or 2
-            if isinstance(payload, dict) and ("current_round" in payload or "current_turn" in payload or "dices" in payload or "question" in payload):
+            if self.game_logic.game_type == "Quiz":
+                self.game_logic.handle_server_command(cmd_id, payload)
+                rnd = payload.get("turn", payload.get("current_turn", 1)) if isinstance(payload, dict) else 1
+                print(f"[ClassicRankBot:{self.bot_name}] Quiz Question {rnd} [My Role: Player {my_role}]")
+                self._schedule_quiz_turn()
+            elif isinstance(payload, dict) and ("current_round" in payload or "current_turn" in payload or "dices" in payload or "question" in payload):
                 self.game_logic.handle_server_command(cmd_id, payload)
                 rnd = payload.get("current_round", payload.get("current_turn", payload.get("turn", 1)))
                 print(f"[ClassicRankBot:{self.bot_name}] Simultaneous Turn (Round {rnd}) [My Role: Player {my_role}]")
@@ -277,6 +286,7 @@ class ClassicRankBot:
             await self._take_turn()
 
         elif cmd_id == "FinishTurnRound":
+            self._cancel_quiz_turn()
             self.game_logic.handle_server_command(cmd_id, payload)
 
         elif cmd_id == "FinishRound":
@@ -289,6 +299,7 @@ class ClassicRankBot:
         elif cmd_id == "Surrender":
             print(f"[ClassicRankBot:{self.bot_name}] Opponent surrendered! Stopping bot.")
             self.is_active = False
+            self._cancel_quiz_turn()
             await asyncio.sleep(1.0)
             await self.disconnect()
 
@@ -296,6 +307,7 @@ class ClassicRankBot:
             winner = payload.get("Winner", 0) if isinstance(payload, dict) else payload
             print(f"[ClassicRankBot:{self.bot_name}] Match Concluded! Final Winner: Player {winner}")
             self.is_active = False
+            self._cancel_quiz_turn()
             self.game_logic.on_game_finished(winner)
 
             bot_won = (int(winner) == int(self.my_role))
@@ -319,6 +331,32 @@ class ClassicRankBot:
             self.game_logic.handle_server_command(cmd_id, payload)
             if hasattr(self.game_logic, "should_continue_turn") and self.game_logic.should_continue_turn():
                 await self._take_turn(is_continuation=True)
+
+    def _cancel_quiz_turn(self):
+        if self._quiz_turn_task and not self._quiz_turn_task.done():
+            self._quiz_turn_task.cancel()
+        self._quiz_turn_task = None
+
+    def _schedule_quiz_turn(self):
+        self._cancel_quiz_turn()
+        self._quiz_turn_task = asyncio.create_task(self._take_quiz_turn())
+
+    async def _take_quiz_turn(self):
+        try:
+            delay = round(random.uniform(2.5, 6.8), 2)
+            await asyncio.sleep(delay)
+            if not self.is_active or not self.sio or not self.sio.connected:
+                return
+            move = self.game_logic.compute_next_move()
+            if move is None:
+                return
+            cmd_dict = self.game_logic.build_move_command(move)
+            cmd_id = cmd_dict.get("id", "SelectPeace")
+            cmd_data = cmd_dict.get("data", {"option": move})
+            print(f"[ClassicRankBot:{self.bot_name}] Answering Quiz -> {move} (Command: {cmd_id})")
+            await self.emit("user_command", {"id": cmd_id, "data": cmd_data})
+        except asyncio.CancelledError:
+            return
 
     async def _take_turn(self, is_continuation: bool = False):
         """Simulates human thinking time (Level 2) and plays move."""
@@ -368,6 +406,7 @@ class ClassicRankBot:
 
     async def disconnect(self):
         """Cleanly disconnects socket client and cancels pending tasks."""
+        self._cancel_quiz_turn()
         if self._simultaneous_task and not self._simultaneous_task.done():
             self._simultaneous_task.cancel()
         for task in self._pending_tasks:
