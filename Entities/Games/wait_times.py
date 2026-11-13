@@ -41,5 +41,8 @@ Uno_Turn_Time = 20
 Quiz_Turn_Time = 15
 Quiz_Sleep_Turn_Time = 4
 Quoridor_Turn_Time = 30
+Coup_Turn_Time = 25
+Coup_Response_Time = 12
+Coup_Choice_Time = 15
 
 
