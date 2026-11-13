@@ -40,4 +40,6 @@ BackGammon_Out_Of_Move_time = 4
 Uno_Turn_Time = 20
 Quiz_Turn_Time = 15
 Quiz_Sleep_Turn_Time = 4
+Quoridor_Turn_Time = 30
+
 

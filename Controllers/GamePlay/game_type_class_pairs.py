@@ -21,6 +21,7 @@ from Controllers.GameSession.ludo_game_session import LudoGameSession
 from Controllers.GameSession.yinsh_game_session import YinshGameSession
 from Controllers.GameSession.uno_game_session import UnoGameSession
 from Controllers.GameSession.quiz_game_session import QuizGameSession
+from Controllers.GameSession.quoridor_game_session import QuoridorGameSession
 
 game_type_class_pairs = {GameTypesEnum.TIC_TAC_TOE.value: TicTacToeGameSession,
                          GameTypesEnum.CHECKERS.value: CheckersGameSession, GameTypesEnum.CHESS.value: ChessGameSession,
@@ -39,6 +40,7 @@ game_type_class_pairs = {GameTypesEnum.TIC_TAC_TOE.value: TicTacToeGameSession,
                          GameTypesEnum.RISK.value: RiskGameSession,
                          GameTypesEnum.UNO.value: UnoGameSession,
                          GameTypesEnum.BACKGAMMON.value: BackGammonGameSession,
-                         GameTypesEnum.QUIZ.value: QuizGameSession}
+                         GameTypesEnum.QUIZ.value: QuizGameSession,
+                         GameTypesEnum.QUORIDOR.value: QuoridorGameSession}
 
 

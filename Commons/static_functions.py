@@ -46,7 +46,7 @@ def gametype_to_difficulty(game_type):
         if val_norm == gt.value.lower().replace("_", "").replace("-", ""):
             return GameDifficultyEnum.Easy
 
-    hard_types = (GameTypesEnum.CHESS, GameTypesEnum.CHECKERS, GameTypesEnum.OTHELLO, GameTypesEnum.BACKGAMMON, GameTypesEnum.YINSH, GameTypesEnum.MILL)
+    hard_types = (GameTypesEnum.CHESS, GameTypesEnum.CHECKERS, GameTypesEnum.OTHELLO, GameTypesEnum.BACKGAMMON, GameTypesEnum.YINSH, GameTypesEnum.MILL, GameTypesEnum.QUORIDOR)
     for gt in hard_types:
         if val_norm == gt.value.lower().replace("_", "").replace("-", ""):
             return GameDifficultyEnum.Hard
