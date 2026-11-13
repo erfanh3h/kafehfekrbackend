@@ -330,7 +330,7 @@ class ClassicRankBot:
         else:
             self.game_logic.handle_server_command(cmd_id, payload)
             if hasattr(self.game_logic, "should_continue_turn") and self.game_logic.should_continue_turn():
-                await self._take_turn(is_continuation=(cmd_id not in ("CoupState", "CoupEvent", "UserData")))
+                await self._take_turn(is_continuation=(cmd_id not in ("CoupState", "CoupEvent", "MonopolyState", "MonopolyEvent", "UserData")))
 
     def _cancel_quiz_turn(self):
         if self._quiz_turn_task and not self._quiz_turn_task.done():

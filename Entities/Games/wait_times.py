@@ -44,5 +44,6 @@ Quoridor_Turn_Time = 30
 Coup_Turn_Time = 25
 Coup_Response_Time = 12
 Coup_Choice_Time = 15
-
-
+Monopoly_Turn_Time = 28
+Monopoly_Response_Time = 14
+Monopoly_Manage_Time = 25

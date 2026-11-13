@@ -23,6 +23,7 @@ from Controllers.GameSession.uno_game_session import UnoGameSession
 from Controllers.GameSession.quiz_game_session import QuizGameSession
 from Controllers.GameSession.quoridor_game_session import QuoridorGameSession
 from Controllers.GameSession.coup_game_session import CoupGameSession
+from Controllers.GameSession.monopoly_game_session import MonopolyGameSession
 
 game_type_class_pairs = {GameTypesEnum.TIC_TAC_TOE.value: TicTacToeGameSession,
                          GameTypesEnum.CHECKERS.value: CheckersGameSession, GameTypesEnum.CHESS.value: ChessGameSession,
@@ -43,6 +44,7 @@ game_type_class_pairs = {GameTypesEnum.TIC_TAC_TOE.value: TicTacToeGameSession,
                          GameTypesEnum.BACKGAMMON.value: BackGammonGameSession,
                          GameTypesEnum.QUIZ.value: QuizGameSession,
                          GameTypesEnum.QUORIDOR.value: QuoridorGameSession,
-                         GameTypesEnum.COUP.value: CoupGameSession}
+                         GameTypesEnum.COUP.value: CoupGameSession,
+                         GameTypesEnum.MONOPOLY.value: MonopolyGameSession}
 
 

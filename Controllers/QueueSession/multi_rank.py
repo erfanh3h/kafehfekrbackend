@@ -21,6 +21,7 @@ class MultiRankQueueSession(BaseQueueSession):
         self.uno_queuers: list[QueuerModel] = []
         self.quiz_queuers: list[QueuerModel] = []
         self.coup_queuers: list[QueuerModel] = []
+        self.monopoly_queuers: list[QueuerModel] = []
         self._lock = threading.Lock()
 
     @staticmethod
@@ -36,6 +37,8 @@ class MultiRankQueueSession(BaseQueueSession):
             return GameTypesEnum.QUIZ.value
         if raw in ("coup", "کودتا"):
             return GameTypesEnum.COUP.value
+        if raw in ("monopoly", "مونوپولی", "منوپولی"):
+            return GameTypesEnum.MONOPOLY.value
         return str(game_type)
 
     def _get_queue_list(self, game_type):
@@ -50,6 +53,8 @@ class MultiRankQueueSession(BaseQueueSession):
             return self.quiz_queuers, GameTypesEnum.QUIZ.value
         if norm == GameTypesEnum.COUP.value:
             return self.coup_queuers, GameTypesEnum.COUP.value
+        if norm == GameTypesEnum.MONOPOLY.value:
+            return self.monopoly_queuers, GameTypesEnum.MONOPOLY.value
         return None, norm
 
     @staticmethod
@@ -64,13 +69,13 @@ class MultiRankQueueSession(BaseQueueSession):
         return distinct
 
     def find_gamer_from_user_id(self, user_id):
-        for queuer in list(self.ludo_queuers) + list(self.risk_queuers) + list(self.uno_queuers) + list(self.quiz_queuers) + list(self.coup_queuers):
+        for queuer in list(self.ludo_queuers) + list(self.risk_queuers) + list(self.uno_queuers) + list(self.quiz_queuers) + list(self.coup_queuers) + list(self.monopoly_queuers):
             if str(queuer.user_id) == str(user_id):
                 return queuer
         return None
 
     def find_gamer_from_socket_id(self, socket_id):
-        for queuer in list(self.ludo_queuers) + list(self.risk_queuers) + list(self.uno_queuers) + list(self.quiz_queuers) + list(self.coup_queuers):
+        for queuer in list(self.ludo_queuers) + list(self.risk_queuers) + list(self.uno_queuers) + list(self.quiz_queuers) + list(self.coup_queuers) + list(self.monopoly_queuers):
             if queuer.socket_id == socket_id:
                 return queuer
         return None
@@ -90,6 +95,8 @@ class MultiRankQueueSession(BaseQueueSession):
                         self.quiz_queuers.remove(existing_q)
                     if existing_q in self.coup_queuers:
                         self.coup_queuers.remove(existing_q)
+                    if existing_q in self.monopoly_queuers:
+                        self.monopoly_queuers.remove(existing_q)
             else:
                 try:
                     from Entities.SocketIOClass import Socket_Server
@@ -105,6 +112,8 @@ class MultiRankQueueSession(BaseQueueSession):
                                 self.quiz_queuers.remove(existing_q)
                             if existing_q in self.coup_queuers:
                                 self.coup_queuers.remove(existing_q)
+                            if existing_q in self.monopoly_queuers:
+                                self.monopoly_queuers.remove(existing_q)
                     else:
                         return False
                 except Exception:
@@ -188,6 +197,8 @@ class MultiRankQueueSession(BaseQueueSession):
                     self.quiz_queuers.remove(queuer_data)
                 if queuer_data in self.coup_queuers:
                     self.coup_queuers.remove(queuer_data)
+                if queuer_data in self.monopoly_queuers:
+                    self.monopoly_queuers.remove(queuer_data)
 
         for queuer_data in queuers:
             safe_run_async(
@@ -204,6 +215,7 @@ class MultiRankQueueSession(BaseQueueSession):
         uno_match = None
         quiz_match = None
         coup_match = None
+        monopoly_match = None
         with self._lock:
             distinct_ludo = self._distinct_queuers(self.ludo_queuers)
             if len(distinct_ludo) >= MULTI_RANK_REQUIRED_PLAYERS:
@@ -234,6 +246,11 @@ class MultiRankQueueSession(BaseQueueSession):
                 coup_match = distinct_coup[:MULTI_RANK_REQUIRED_PLAYERS]
                 matched_uids = {str(q.user_id) for q in coup_match}
                 self.coup_queuers = [q for q in self.coup_queuers if str(q.user_id) not in matched_uids]
+            distinct_monopoly = self._distinct_queuers(self.monopoly_queuers)
+            if len(distinct_monopoly) >= MULTI_RANK_REQUIRED_PLAYERS:
+                monopoly_match = distinct_monopoly[:MULTI_RANK_REQUIRED_PLAYERS]
+                matched_uids = {str(q.user_id) for q in monopoly_match}
+                self.monopoly_queuers = [q for q in self.monopoly_queuers if str(q.user_id) not in matched_uids]
 
         started_any = False
         if ludo_match is not None:
@@ -280,6 +297,14 @@ class MultiRankQueueSession(BaseQueueSession):
                 daemon=True,
             ).start()
             self.broadcast_queue_status(GameTypesEnum.COUP.value)
+        if monopoly_match is not None:
+            started_any = True
+            threading.Thread(
+                target=self.start_new_game,
+                args=(monopoly_match, GameTypesEnum.MONOPOLY.value),
+                daemon=True,
+            ).start()
+            self.broadcast_queue_status(GameTypesEnum.MONOPOLY.value)
 
         return started_any
 
@@ -296,6 +321,7 @@ class MultiRankQueueSession(BaseQueueSession):
             GameTypesEnum.UNO.value,
             GameTypesEnum.QUIZ.value,
             GameTypesEnum.COUP.value,
+            GameTypesEnum.MONOPOLY.value,
         ):
             return False
         if not self.can_user_join_queue(user_data.user_id, user_data.socket_id):
@@ -308,6 +334,7 @@ class MultiRankQueueSession(BaseQueueSession):
             self.uno_queuers = [q for q in self.uno_queuers if str(q.user_id) != str(user_data.user_id)]
             self.quiz_queuers = [q for q in self.quiz_queuers if str(q.user_id) != str(user_data.user_id)]
             self.coup_queuers = [q for q in self.coup_queuers if str(q.user_id) != str(user_data.user_id)]
+            self.monopoly_queuers = [q for q in self.monopoly_queuers if str(q.user_id) != str(user_data.user_id)]
             if norm_type == GameTypesEnum.LUDO.value:
                 self.ludo_queuers.append(user_data)
             elif norm_type == GameTypesEnum.RISK.value:
@@ -318,6 +345,8 @@ class MultiRankQueueSession(BaseQueueSession):
                 self.quiz_queuers.append(user_data)
             elif norm_type == GameTypesEnum.COUP.value:
                 self.coup_queuers.append(user_data)
+            elif norm_type == GameTypesEnum.MONOPOLY.value:
+                self.monopoly_queuers.append(user_data)
 
         self.broadcast_queue_status(norm_type)
         self._try_matchmake_once()
@@ -350,6 +379,11 @@ class MultiRankQueueSession(BaseQueueSession):
                 if socket_id == user_data.socket_id:
                     self.coup_queuers.remove(user_data)
                     affected_types.append(GameTypesEnum.COUP.value)
+                    break
+            for user_data in list(self.monopoly_queuers):
+                if socket_id == user_data.socket_id:
+                    self.monopoly_queuers.remove(user_data)
+                    affected_types.append(GameTypesEnum.MONOPOLY.value)
                     break
         for gt in affected_types:
             self.broadcast_queue_status(gt)
