@@ -391,8 +391,14 @@ class ClassicRankBot:
         cmd_id = cmd_dict.get("id", "user_command")
         cmd_data = cmd_dict.get("data", move)
 
+        payload = {"id": cmd_id, "data": cmd_data}
+        if isinstance(cmd_dict, dict):
+            for k, v in cmd_dict.items():
+                if k not in ("id", "data"):
+                    payload[k] = v
+
         print(f"[ClassicRankBot:{self.bot_name}] Playing move -> {move} (Command: {cmd_id})")
-        await self.emit("user_command", {"id": cmd_id, "data": cmd_data})
+        await self.emit("user_command", payload)
 
     async def _simultaneous_play_loop(self):
         """Loop for simultaneous games like Sudoku."""

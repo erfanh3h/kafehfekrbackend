@@ -16,6 +16,45 @@ def get_peace_of_coordinate(x, y):
     return peace_number
 
 
+def _extract_piece_data(data):
+    piece_id = None
+    number = None
+    if isinstance(data, int):
+        return data, 0
+    if isinstance(data, dict):
+        for k in ("piece_id", "peace_id", "index", "cell_id"):
+            if k in data and data[k] is not None:
+                piece_id = data[k]
+                break
+        for k in ("number", "value", "num"):
+            if k in data and data[k] is not None:
+                number = data[k]
+                break
+        inner = data.get("data")
+        if isinstance(inner, dict):
+            if piece_id is None:
+                for k in ("piece_id", "peace_id", "index", "cell_id"):
+                    if k in inner and inner[k] is not None:
+                        piece_id = inner[k]
+                        break
+            if number is None:
+                for k in ("number", "value", "num"):
+                    if k in inner and inner[k] is not None:
+                        number = inner[k]
+                        break
+        elif isinstance(inner, int) and piece_id is None:
+            piece_id = inner
+    try:
+        piece_id = int(piece_id) if piece_id is not None else None
+    except (ValueError, TypeError):
+        piece_id = None
+    try:
+        number = int(number) if number is not None else 0
+    except (ValueError, TypeError):
+        number = 0
+    return piece_id, number
+
+
 class SudokuGameClass(BaseGameClass):
     def __init__(self, send_data_function, send_private_data_function):
         super().__init__(send_data_function)
@@ -80,12 +119,17 @@ class SudokuGameClass(BaseGameClass):
     async def recieve_data(self, command_id, data, gamer_id):
         #print(command_id, data, gamer_id)
         if command_id == commands.Select_Peace:
-            piece_id = data['piece_id']
+            piece_id, number = _extract_piece_data(data)
+            if piece_id is None or piece_id < 0 or piece_id >= 81:
+                return False
+            if number < 0 or number > 9:
+                return False
             row_index, column_index = get_coordinate_of_peace(piece_id)
-            number = data['number']
             self.submit_piece((column_index, row_index), gamer_id, number)
         elif command_id == commands.Remove_Peace:
-            piece_id = data['piece_id']
+            piece_id, _ = _extract_piece_data(data)
+            if piece_id is None or piece_id < 0 or piece_id >= 81:
+                return False
             row_index, column_index = get_coordinate_of_peace(piece_id)
             self.submit_piece((column_index, row_index), gamer_id, 0)
         elif command_id == commands.Solve:
@@ -111,13 +155,15 @@ class SudokuGameClass(BaseGameClass):
         self.is_game_finished = True
 
     def check_authority(self, data, gamer_id: int):
-        piece_id = data['piece_id']
+        if self.is_game_finished:
+            return False
+        piece_id, _ = _extract_piece_data(data)
+        if piece_id is None or piece_id < 0 or piece_id >= 81:
+            return False
         row_index, column_index = get_coordinate_of_peace(piece_id)
         if gamer_id == 1 and self.player1_board[row_index][column_index].is_base_number:
             return False
         if gamer_id == 2 and self.player2_board[row_index][column_index].is_base_number:
-            return False
-        if self.is_game_finished:
             return False
         return True
 
