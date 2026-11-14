@@ -32,6 +32,19 @@ def add_new_game(game_id, queuers, game_types, game_score_type):
     game_play.start_game_timer()
     games[game_id] = game_play
     game_idies.append(game_id)
+    try:
+        first_gt = str(game_types[0]) if game_types else ""
+        for q in (queuers or []):
+            uid = getattr(q, "user_id", None)
+            if uid and not str(uid).startswith("bot_") and hasattr(game_database, "presence_manager"):
+                game_database.presence_manager.update_activity(
+                    user_id=str(uid),
+                    status="in_game",
+                    current_game_id=str(game_id),
+                    current_game_type=first_gt,
+                )
+    except Exception as e:
+        print(f"[add_new_game] Error updating social presence: {e}")
 
 
 # start_new_test_game()
@@ -68,6 +81,13 @@ def delete_game(game_id):
                 if uid and not str(uid).startswith("bot_"):
                     try:
                         game_database.users_manager.update_user(uid, open_game_id="")
+                        if hasattr(game_database, "presence_manager"):
+                            game_database.presence_manager.update_activity(
+                                user_id=str(uid),
+                                status="online",
+                                current_game_id="",
+                                current_game_type="",
+                            )
                     except Exception as e:
                         print(f"[delete_game] Error clearing open_game_id for {uid}: {e}")
     except Exception as e:

@@ -227,6 +227,20 @@ class RewardManagerClass:
                     game_database.users_manager.update_user(uid, **update_kwargs)
                 else:
                     game_database.users_manager.update_user(uid, open_game_id="")
+                # Clan contribution tracking (Ranked/Classic Rank modes with anti-farming protection)
+                is_ranked_mode = self.game_score_type in (GameScoreTypesEnum.RANK, GameScoreTypesEnum.CLASSIC_RANK)
+                if is_ranked_mode and hasattr(game_database, "clans_manager"):
+                    opp_ids = [str(other) for other in self.players_idis if str(other) != str(uid) and not str(other).startswith("bot_")]
+                    gamer_num = idx + 1
+                    is_win_match = (winner_gamer_id == gamer_num)
+                    game_database.clans_manager.record_member_match_contribution(
+                        user_id=str(uid),
+                        is_win=is_win_match,
+                        xp_earned=max(0, p_xp),
+                        score_earned=max(0, p_score),
+                        opponent_ids=opp_ids,
+                        is_ranked=True,
+                    )
             except Exception as e:
                 print(f"[RewardManager] Error updating user {uid}: {e}")
 
@@ -394,6 +408,17 @@ class RewardManagerClass:
                     game_database.users_manager.update_user(uid, **update_kwargs)
                 else:
                     game_database.users_manager.update_user(uid, open_game_id="")
+                is_ranked_multi = self.game_score_type in (GameScoreTypesEnum.MultiRANK, GameScoreTypesEnum.CLASSIC_RANK)
+                if is_ranked_multi and hasattr(game_database, "clans_manager"):
+                    opp_ids = [str(other) for other in self.players_idis[:total_players] if str(other) != str(uid) and not str(other).startswith("bot_")]
+                    game_database.clans_manager.record_member_match_contribution(
+                        user_id=str(uid),
+                        is_win=bool(is_r1),
+                        xp_earned=max(0, d_xp),
+                        score_earned=max(0, d_score),
+                        opponent_ids=opp_ids,
+                        is_ranked=True,
+                    )
             except Exception as e:
                 print(f"[RewardManager] Error updating multiplayer user {uid}: {e}")
 

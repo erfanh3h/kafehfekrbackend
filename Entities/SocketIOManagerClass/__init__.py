@@ -69,3 +69,11 @@ async def send_global_lobby_command(command, namespace="/lobby"):
 async def send_lobby_reaction(player_id, reaction_id, lobby_id, namespace="/lobby"):
     await Socket_Server.emit('reaction', {"playerId": player_id, "reactionId": reaction_id}, room=lobby_id,
                              namespace=namespace)
+
+
+async def send_social_user_command(command, user_id, namespace="/social"):
+    await Socket_Server.emit("command", command, room=f"user:{user_id}", namespace=namespace)
+
+
+async def send_social_clan_command(command, clan_id, namespace="/social"):
+    await Socket_Server.emit("command", command, room=f"clan:{clan_id}", namespace=namespace)

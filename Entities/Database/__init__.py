@@ -1,3 +1,13 @@
+from Entities.Database.social import (
+    FriendsCollectionManager,
+    ClansCollectionManager,
+    ClanMessagesCollectionManager,
+    DirectMessagesCollectionManager,
+    NotificationsCollectionManager,
+    InvitationsCollectionManager,
+    ReportsCollectionManager,
+    PresenceCollectionManager,
+)
 import os
 import pymongo
 
@@ -19,6 +29,32 @@ class DataBaseManager:
         self.game_play_history_manager = GamePlayHistoryCollectionManager(self.base_db['game_play_history'])
         self.game_history_manager = GameHistoryCollectionManager(self.base_db['game_history'])
         self.config_manager = ConfigCollectionManager(self.base_db['config'])
+        self.friends_manager = FriendsCollectionManager(
+            self.base_db["friendships"],
+            self.base_db["friend_requests"],
+            self.base_db["user_blocks"],
+        )
+        self.clans_manager = ClansCollectionManager(
+            self.base_db["clans"],
+            self.base_db["clan_members"],
+            self.base_db["clan_join_requests"],
+            self.base_db["clan_invitations"],
+            self.base_db["clan_challenges"],
+            self.base_db["clan_audit_logs"],
+        )
+        self.clan_messages_manager = ClanMessagesCollectionManager(self.base_db["clan_messages"])
+        self.direct_messages_manager = DirectMessagesCollectionManager(
+            self.base_db["direct_conversations"],
+            self.base_db["direct_messages"],
+        )
+        self.notifications_manager = NotificationsCollectionManager(
+            self.base_db["social_notifications"],
+            self.base_db["notification_preferences"],
+        )
+        self.invitations_manager = InvitationsCollectionManager(self.base_db["game_invitations"])
+        self.reports_manager = ReportsCollectionManager(self.base_db["social_reports"])
+        self.presence_manager = PresenceCollectionManager(self.base_db["user_presence"])
+
         self.questions_manager = QuestionsCollectionManager(self.base_db['questions'])
 
 
