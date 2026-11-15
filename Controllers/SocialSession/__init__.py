@@ -657,6 +657,93 @@ class SocialSessionManager:
             )
             return
 
+        # 9. Clan Friendly Challenge Start (2-4 players)
+        if cmd_id == commands.Social_Clan_Challenge_Start:
+            challenge_id = str(payload.get("challenge_id", "")).strip()
+            mem = game_database.clans_manager.get_user_membership(uid)
+            if not mem:
+                await self._send_error(socket_id, "شما عضو هیچ کلنی نیستید.", namespace_obj)
+                return
+            cid = str(mem["clan_id"])
+            ch = game_database.clans_manager.challenges.find_one({"_id": challenge_id})
+            if not ch or str(ch.get("clan_id", "")) != cid:
+                await self._send_error(socket_id, "چالش دوستانه یافت نشد.", namespace_obj)
+                return
+            if str(ch.get("status", "open")) != "open":
+                await self._send_error(socket_id, "این چالش بسته شده یا قبلاً شروع شده است.", namespace_obj)
+                return
+
+            p_count = max(2, min(int(ch.get("player_count", 2) or 2), 4))
+            participants = list(ch.get("participants", []) or [])
+            p_ids = [str(p.get("user_id", "")) for p in participants if p.get("user_id")]
+            if uid != str(ch.get("creator_id", "")) and len(p_ids) < p_count:
+                await self._send_error(socket_id, "فقط سازنده چالش می‌تواند بازی را زودتر از تکمیل ظرفیت شروع کند.", namespace_obj)
+                return
+            if len(p_ids) < 2:
+                await self._send_error(socket_id, "برای شروع بازی حداقل ۲ بازیکن لازم است.", namespace_obj)
+                return
+
+            selected_pids = p_ids[:p_count]
+            from Models.Queuer import QueuerModel
+            from Entities.SocketIOClass.game import add_new_game
+            from Entities.RewardManagerClass.game_score_types import GameScoreTypesEnum
+
+            queuers = []
+            for pid in selected_pids:
+                pu = game_database.users_manager.read_user(pid)
+                if not pu:
+                    await self._send_error(socket_id, "یکی از شرکت‌کنندگان در دسترس نیست.", namespace_obj)
+                    return
+                if str(pu.get("open_game_id", "") or ""):
+                    await self._send_error(socket_id, f"بازیکن «{pu.get('username', 'هم‌کلنی')}» در حال حاضر در بازی دیگری است.", namespace_obj)
+                    return
+                queuers.append(
+                    QueuerModel(
+                        user_id=pid,
+                        username=str(pu.get("username", "بازیکن")),
+                        socket_id="",
+                        user_image=int(pu.get("image", 0) or 0),
+                        user_coin=int(pu.get("coin", 0) or 0),
+                        user_score=int(pu.get("score", 0) or 0),
+                        user_xp=int(pu.get("xp", 0) or 0),
+                    )
+                )
+
+            game_type = str(ch.get("game_type", "Ludo") or "Ludo")
+            created_game_id = f"frg_{create_random_name()}"
+            for pid in selected_pids:
+                game_database.users_manager.update_user(pid, open_game_id=created_game_id)
+            add_new_game(created_game_id, queuers, [game_type], GameScoreTypesEnum.LOBBY)
+
+            game_database.clans_manager.challenges.update_one(
+                {"_id": challenge_id},
+                {"$set": {"status": "started", "game_id": created_game_id}},
+            )
+            try:
+                if hasattr(game_database, "clan_messages_manager"):
+                    game_database.clan_messages_manager.collection.update_many(
+                        {"clan_id": cid, "metadata.challenge_id": challenge_id},
+                        {"$set": {"metadata.status": "started"}},
+                    )
+            except Exception:
+                pass
+
+            acc_payload = {
+                "invite_id": challenge_id,
+                "status": "accepted",
+                "from_user_id": str(ch.get("creator_id", uid)),
+                "game_type": game_type,
+                "game_id": created_game_id,
+            }
+            for pid in selected_pids:
+                await namespace_obj.emit(
+                    "command",
+                    make_command_json(id=commands.Social_Game_Invite_Result, data=acc_payload),
+                    room=f"user_{pid}",
+                    namespace="/social",
+                )
+            return
+
     async def _send_error(self, socket_id: str, message: str, namespace_obj) -> None:
         await namespace_obj.emit(
             "command",
