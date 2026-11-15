@@ -295,6 +295,117 @@ class SpectatorController:
         await SpectatorRoomManager.emit_to_spectator(sid, state_cmd, namespace=namespace)
         return state_cmd
 
+    async def handle_list_live_games(
+        self,
+        viewer_id: str,
+        sid: str,
+        payload: dict | None = None,
+        namespace: str = "/social",
+    ) -> dict:
+        uid = str(viewer_id or "").strip()
+        req = payload if isinstance(payload, dict) else {}
+        scope = str(req.get("scope", "all") or "all").strip().lower()
+        game_type_filter = str(req.get("game_type", "") or "").strip()
+
+        friend_ids = set()
+        clan_member_ids = set()
+        try:
+            if hasattr(game_database, "friends_manager") and hasattr(game_database.friends_manager, "get_friend_ids"):
+                friend_ids = set(str(x) for x in (game_database.friends_manager.get_friend_ids(uid) or []))
+        except Exception:
+            pass
+        try:
+            if hasattr(game_database, "clans_manager") and hasattr(game_database.clans_manager, "get_user_membership"):
+                mem = game_database.clans_manager.get_user_membership(uid)
+                if mem and mem.get("clan_id") and hasattr(game_database.clans_manager, "get_clan_members"):
+                    c_members = game_database.clans_manager.get_clan_members(str(mem["clan_id"])) or []
+                    clan_member_ids = set(str(m.get("user_id", "")) for m in c_members if isinstance(m, dict) and m.get("user_id"))
+        except Exception:
+            pass
+
+        items = []
+        seen_ids = set()
+        try:
+            from Entities.SocketIOClass.game import games
+            for gid, gp in list(games.items()):
+                if gp is None:
+                    continue
+                is_fin = bool(
+                    getattr(gp, "is_game_finished", False)
+                    or getattr(gp, "is_finished", False)
+                    or getattr(gp, "is_game_terminated", False)
+                )
+                if is_fin:
+                    continue
+                pids = SpectatorStateSerializer.extract_participant_ids(gp)
+                if uid in pids:
+                    continue
+                g_session = SpectatorStateSerializer.resolve_active_game_session(gp)
+                g_type = SpectatorStateSerializer.resolve_game_type(gp, g_session)
+                if game_type_filter and g_type.lower() != game_type_filter.lower():
+                    continue
+                has_friend = any(pid in friend_ids for pid in pids)
+                has_clanmate = any(pid in clan_member_ids for pid in pids)
+                if scope == "friends" and not has_friend:
+                    continue
+                if scope == "clan" and not has_clanmate:
+                    continue
+                spec_cnt = self.session_manager.get_spectator_count(str(gid))
+                allowed, _, _ = SpectatorAccessManager.check_can_spectate(
+                    viewer_id=uid,
+                    game_id=str(gid),
+                    game_play=gp,
+                    current_spectator_count=spec_cnt,
+                    active_player_game_id=None,
+                )
+                if not allowed:
+                    continue
+                profiles = self._load_public_profiles(pids)
+                players_list = []
+                for q in list(getattr(gp, "queuers", []) or []):
+                    qid = str(getattr(q, "user_id", "") or "")
+                    prof = profiles.get(qid, {})
+                    players_list.append({
+                        "user_id": qid,
+                        "username": str(prof.get("username", getattr(q, "username", "بازیکن")) or "بازیکن"),
+                        "image": int(prof.get("image", getattr(q, "user_image", 0)) or 0),
+                        "score": int(prof.get("score", getattr(q, "user_score", 0)) or 0),
+                        "clan": prof.get("clan"),
+                        "is_friend": qid in friend_ids,
+                        "is_clanmate": qid in clan_member_ids,
+                    })
+                seen_ids.add(str(gid))
+                items.append({
+                    "game_id": str(gid),
+                    "game_type": g_type,
+                    "spectator_count": spec_cnt,
+                    "has_friend": has_friend,
+                    "has_clanmate": has_clanmate,
+                    "players": players_list,
+                })
+        except Exception:
+            pass
+
+        items.sort(
+            key=lambda x: (
+                1 if x.get("has_friend") else 0,
+                1 if x.get("has_clanmate") else 0,
+                int(x.get("spectator_count", 0)),
+            ),
+            reverse=True,
+        )
+        resp_cmd = make_command_json(
+            id=commands.LiveGamesList,
+            data={
+                "items": items[:40],
+                "total": len(items),
+                "scope": scope,
+                "game_type": game_type_filter,
+            },
+        )
+        await SpectatorRoomManager.emit_to_spectator(sid, resp_cmd, namespace=namespace)
+        return resp_cmd
+
     async def handle_disconnect(self, sid: str) -> None:
         await self.session_manager.remove_spectator_by_sid(sid)
 

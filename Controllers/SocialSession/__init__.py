@@ -634,6 +634,16 @@ class SocialSessionManager:
             )
             return
 
+        if cmd_id == getattr(commands, "RequestLiveGames", "RequestLiveGames"):
+            from Controllers.Spectator.spectator_controller import spectator_controller
+            await spectator_controller.handle_list_live_games(
+                viewer_id=uid,
+                sid=socket_id,
+                payload=payload,
+                namespace="/social",
+            )
+            return
+
         # 9. Clan Friendly Challenge Start (2-4 players)
         if cmd_id == commands.Social_Clan_Challenge_Start:
             challenge_id = str(payload.get("challenge_id", "")).strip()

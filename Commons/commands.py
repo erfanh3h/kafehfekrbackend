@@ -137,6 +137,7 @@ Social_Spectate_Data = "SocialSpectateData"
 RequestSpectate = "RequestSpectate"
 LeaveSpectate = "LeaveSpectate"
 RequestSpectatorState = "RequestSpectatorState"
+RequestLiveGames = "RequestLiveGames"
 
 # Live Spectator Mode Commands (Server -> Client)
 SpectateAccepted = "SpectateAccepted"
@@ -144,6 +145,7 @@ SpectateRejected = "SpectateRejected"
 SpectatorGameState = "SpectatorGameState"
 SpectatorGameEnded = "SpectatorGameEnded"
 SpectatorCountUpdated = "SpectatorCountUpdated"
+LiveGamesList = "LiveGamesList"
 
 Social_Error = "SocialError"
 Social_Ack = "SocialAck"
