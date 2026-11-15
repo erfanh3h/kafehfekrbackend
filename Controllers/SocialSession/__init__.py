@@ -120,6 +120,11 @@ class SocialSessionManager:
             await self.broadcast_presence_to_peers(uid, pres, namespace_obj)
 
     async def disconnect_user(self, socket_id: str, namespace_obj) -> None:
+        try:
+            from Controllers.Spectator.spectator_controller import spectator_controller
+            await spectator_controller.handle_disconnect(socket_id)
+        except Exception:
+            pass
         uid = self.socket_to_user.pop(socket_id, None)
         if not uid:
             return
@@ -136,6 +141,11 @@ class SocialSessionManager:
 
         sockets = self.user_to_sockets.get(uid, set())
         sockets.discard(socket_id)
+        try:
+            from Controllers.Spectator.spectator_controller import spectator_controller
+            await spectator_controller.handle_disconnect(socket_id)
+        except Exception:
+            pass
         if not sockets:
             self.user_to_sockets.pop(uid, None)
             self.user_clan_room.pop(uid, None)
@@ -567,92 +577,59 @@ class SocialSessionManager:
             )
             return
 
-        # 8. Safe Spectator Join / Snapshot
-        if cmd_id == commands.Social_Spectate_Join:
-            target_uid = str(payload.get("target_user_id", "")).strip()
+        # 8. Live Spectator Mode Commands (RequestSpectate, LeaveSpectate, RequestSpectatorState + legacy aliases)
+        if cmd_id in (
+            commands.RequestSpectate,
+            commands.Social_Spectate_Join,
+            getattr(commands, "Social_Spectate_Request", "SocialSpectateRequest"),
+        ):
+            from Controllers.Spectator.spectator_controller import spectator_controller
+            target_uid = str(payload.get("target_user_id", payload.get("player_id", ""))).strip()
             req_game_id = str(payload.get("game_id", "")).strip()
             if not req_game_id and target_uid:
                 tu = game_database.users_manager.read_user(target_uid) or {}
                 req_game_id = str(tu.get("open_game_id", "") or "")
-            if not req_game_id:
-                await self._send_error(socket_id, "مسابقه فعالی برای تماشا یافت نشد.", namespace_obj)
-                return
+            spec_payload = dict(payload)
+            if req_game_id:
+                spec_payload["game_id"] = req_game_id
+            if target_uid and "player_id" not in spec_payload:
+                spec_payload["player_id"] = target_uid
 
-            from Entities.SocketIOClass.game import games
-            game_obj = games.get(req_game_id)
-            if game_obj is None:
-                await self._send_error(socket_id, "این مسابقه به پایان رسیده است.", namespace_obj)
-                return
+            async def _on_pres_change(viewer_uid: str, pres_doc: dict):
+                if isinstance(pres_doc, dict):
+                    await self.broadcast_presence_to_peers(viewer_uid, pres_doc, namespace_obj)
 
-            # Authorization check: viewer must be a friend or clanmate of at least one participant
-            participant_ids = [str( getattr(g, "user_id", "") ) for g in getattr(game_obj, "gamers", [])]
-            authorized = False
-            my_friends = set(game_database.friends_manager.get_friend_ids(uid))
-            my_mem = game_database.clans_manager.get_user_membership(uid)
-            my_cid = str(my_mem["clan_id"]) if my_mem else ""
-            for pid in participant_ids:
-                if not pid or pid.startswith("bot_"):
-                    continue
-                if game_database.friends_manager.is_blocked(uid, pid):
-                    authorized = False
-                    break
-                if pid in my_friends:
-                    authorized = True
-                elif my_cid:
-                    pmem = game_database.clans_manager.get_user_membership(pid)
-                    if pmem and str(pmem.get("clan_id")) == my_cid:
-                        authorized = True
+            await spectator_controller.handle_request_spectate(
+                viewer_id=uid,
+                sid=socket_id,
+                payload=spec_payload,
+                namespace="/social",
+                presence_callback=_on_pres_change,
+            )
+            return
 
-            if not authorized:
-                await self._send_error(socket_id, "فقط مسابقات دوستان و هم‌کلنی‌های خود را می‌توانید تماشا کنید.", namespace_obj)
-                return
+        if cmd_id in (commands.LeaveSpectate, commands.Social_Spectate_Leave):
+            from Controllers.Spectator.spectator_controller import spectator_controller
 
-            g_session = getattr(game_obj, "game_session", None)
-            active_gtype = ""
-            if g_session is not None and hasattr(g_session, "game_type"):
-                active_gtype = str(getattr(g_session.game_type, "value", g_session.game_type))
-            elif getattr(game_obj, "game_types", None):
-                active_gtype = str(game_obj.game_types[0])
+            async def _on_pres_leave(viewer_uid: str, pres_doc: dict):
+                if isinstance(pres_doc, dict):
+                    await self.broadcast_presence_to_peers(viewer_uid, pres_doc, namespace_obj)
 
-            gt_lower = active_gtype.lower()
-            if gt_lower in PRIVATE_STATE_GAMES or gt_lower not in SAFE_SPECTATOR_GAMES:
-                await self._send_error(
-                    socket_id,
-                    f"بازی «{active_gtype}» دارای اطلاعات مخفی بازیکنان است و امکان تماشای زنده آن وجود ندارد.",
-                    namespace_obj,
-                )
-                return
+            await spectator_controller.handle_leave_spectate(
+                viewer_id=uid,
+                sid=socket_id,
+                payload=payload,
+                namespace="/social",
+                presence_callback=_on_pres_leave,
+            )
+            return
 
-            gamers_info = []
-            for g in getattr(game_obj, "gamers", []):
-                gamers_info.append(
-                    {
-                        "user_id": str(getattr(g, "user_id", "")),
-                        "username": str(getattr(g, "username", "بازیکن")),
-                        "gamer_id": int(getattr(g, "gamer_id", 1)),
-                        "image": int(getattr(g, "user_image", 0) or 0),
-                        "score": int(getattr(g, "game_score", 0) or 0),
-                    }
-                )
-            board_state = {}
-            if g_session is not None and hasattr(g_session, "get_game_data"):
-                try:
-                    board_state = g_session.get_game_data()
-                except Exception:
-                    board_state = {}
-
-            await namespace_obj.emit(
-                "command",
-                make_command_json(
-                    id=commands.Social_Spectate_Data,
-                    data={
-                        "game_id": req_game_id,
-                        "game_type": active_gtype,
-                        "gamers": gamers_info,
-                        "game_data": board_state,
-                    },
-                ),
-                to=socket_id,
+        if cmd_id == commands.RequestSpectatorState:
+            from Controllers.Spectator.spectator_controller import spectator_controller
+            await spectator_controller.handle_request_spectator_state(
+                viewer_id=uid,
+                sid=socket_id,
+                payload=payload,
                 namespace="/social",
             )
             return

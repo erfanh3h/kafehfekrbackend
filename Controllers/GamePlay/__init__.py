@@ -80,6 +80,11 @@ class BaseGamePlayClass:
         for user_id in user_idis:
             if not str(user_id).startswith("bot_"):
                 game_database.users_manager.update_user(user_id, open_game_id=self.game_play_id)
+        try:
+            from Controllers.Spectator.spectator_session_manager import spectator_session_manager
+            spectator_session_manager.sync_live_match_metadata(self, is_running=True)
+        except Exception:
+            pass
 
     def join_game_limit_time(self):
         if not self.is_game_started:
@@ -325,6 +330,11 @@ class BaseGamePlayClass:
         if any(getattr(sg, "is_disconnected", False) for sg in getattr(self.game_session, "gamers", [])):
             self.game_session.timer.pause()
         self.game_session.start_game_timer()
+        try:
+            from Controllers.Spectator.spectator_session_manager import spectator_session_manager
+            safe_run_async(spectator_session_manager.on_subgame_started(self))
+        except Exception as e:
+            print(f"[BaseGamePlayClass] Error syncing spectator subgame start: {e}")
 
     def is_user_id_valid(self, user_id):
         for user_data in self.gamers:
@@ -474,6 +484,25 @@ class BaseGamePlayClass:
                     )
                 except Exception as e:
                     print(f"[BaseGamePlayClass] Error sending multiplayer Finish_Game: {e}")
+        try:
+            from Controllers.Spectator.spectator_session_manager import spectator_session_manager
+            safe_run_async(
+                spectator_session_manager.on_game_ended(
+                    self.game_play_id,
+                    game_play=self,
+                    final_payload={
+                        "rank1": rank1_gid,
+                        "rank2": rank2_gid,
+                        "Winner": rank1_gid,
+                        "winner": rank1_gid,
+                        "game_winner_id": rank1_id,
+                        "series_scores": self.gamer_scores,
+                    },
+                    reason="finished",
+                )
+            )
+        except Exception as e:
+            print(f"[BaseGamePlayClass] Error notifying spectators on multiplayer finish: {e}")
         from Entities.SocketIOClass.game import delete_game
         try:
             delete_game(self.game_play_id)
@@ -581,6 +610,23 @@ class BaseGamePlayClass:
                 except Exception as e:
                     print(f"[BaseGamePlayClass] Error sending Finish_Game: {e}")
 
+            try:
+                from Controllers.Spectator.spectator_session_manager import spectator_session_manager
+                safe_run_async(
+                    spectator_session_manager.on_game_ended(
+                        self.game_play_id,
+                        game_play=self,
+                        final_payload={
+                            "Winner": client_winner,
+                            "winner": client_winner,
+                            "game_winner_id": winner_id,
+                            "series_scores": self.gamer_scores,
+                        },
+                        reason="finished",
+                    )
+                )
+            except Exception as e:
+                print(f"[BaseGamePlayClass] Error notifying spectators on finish_game_play: {e}")
             from Entities.SocketIOClass.game import delete_game
             delete_game(self.game_play_id)
 

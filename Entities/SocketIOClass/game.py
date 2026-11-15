@@ -93,6 +93,20 @@ def delete_game(game_id):
     except Exception as e:
         print(f"[delete_game] Error inspecting game {game_id}: {e}")
     try:
+        from Commons.static_functions import safe_run_async
+        from Controllers.Spectator.spectator_session_manager import spectator_session_manager
+        if spectator_session_manager.get_spectator_count(str(game_id)) > 0:
+            safe_run_async(spectator_session_manager.on_game_ended(str(game_id), game_play=games.get(game_id)))
+    except Exception:
+        pass
+    try:
+        from Controllers.Spectator.spectator_session_manager import spectator_session_manager
+        from Commons.static_functions import safe_run_async
+        if spectator_session_manager.get_spectator_count(game_id) > 0:
+            safe_run_async(spectator_session_manager.on_game_ended(game_id, reason="ended"))
+    except Exception:
+        pass
+    try:
         if game_id in games:
             del games[game_id]
     except Exception:
@@ -102,6 +116,7 @@ def delete_game(game_id):
             game_idies.remove(game_id)
     except Exception:
         pass
+
 
 
 class GameSocketNameSpace(socketio.AsyncNamespace):

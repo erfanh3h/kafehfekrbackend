@@ -3,13 +3,22 @@ from datetime import datetime
 
 def create_game_play_history_json(game_play_id, user_idis, game_types, game_score_type, users_info=None) -> dict:
     u_ids = [str(u) for u in user_idis] if isinstance(user_idis, (list, tuple)) else [str(user_idis)]
+    g_types = [str(getattr(gt, "value", gt)) for gt in (game_types if isinstance(game_types, (list, tuple)) else [game_types])]
+    first_game_type = g_types[0] if g_types else ""
     create_dict = {
         '_id': str(game_play_id),
         'user_ids': u_ids,
-        'game_types': list(game_types) if isinstance(game_types, (list, tuple)) else [str(game_types)],
+        'game_types': g_types,
+        'current_game_type': first_game_type,
+        'current_game_index': 0,
         'game_score_type': str(game_score_type),
         'is_finished': False,
+        'is_running': True,
+        'allow_spectators': True,
+        'visibility': 'everyone',
+        'spectator_count': 0,
         'start_date': datetime.now(),
+        'updated_at': datetime.utcnow(),
         'users_info': users_info or [],
         'winner_id': "",
         'winner_list': [],
@@ -63,6 +72,9 @@ class GamePlayHistoryCollectionManager:
             update_data = {
                 "finish_date": now,
                 "is_finished": True,
+                "is_running": False,
+                "spectator_count": 0,
+                "updated_at": datetime.utcnow(),
                 "winner_list": list(winner_list) if isinstance(winner_list, (list, tuple)) else [],
                 "user_scores": scores,
             }

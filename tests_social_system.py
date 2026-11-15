@@ -303,6 +303,42 @@ def _install_backend_stubs():
         jwt_mod.decode = lambda token, key, algorithms=None: {"id": "stub_user", "device_id": "dev1"}
         sys.modules["jwt"] = jwt_mod
 
+    if "jose" not in sys.modules:
+        jose_mod = types.ModuleType("jose")
+        jose_mod.jwt = sys.modules["jwt"]
+        jose_mod.JWTError = Exception
+        sys.modules["jose"] = jose_mod
+
+    if "fastapi" not in sys.modules:
+        fa_mod = types.ModuleType("fastapi")
+        fa_mod.Depends = lambda x=None: x
+        fa_mod.HTTPException = Exception
+        fa_mod.status = types.SimpleNamespace(HTTP_401_UNAUTHORIZED=401, HTTP_404_NOT_FOUND=404)
+        sec_mod = types.ModuleType("fastapi.security")
+        sec_mod.OAuth2PasswordBearer = lambda **kw: None
+        fa_mod.security = sec_mod
+        sys.modules["fastapi"] = fa_mod
+        sys.modules["fastapi.security"] = sec_mod
+
+    if "passlib" not in sys.modules:
+        pl_mod = types.ModuleType("passlib")
+        ctx_mod = types.ModuleType("passlib.context")
+        ctx_mod.CryptContext = lambda **kw: types.SimpleNamespace(verify=lambda a, b: True, hash=lambda a: a)
+        pl_mod.context = ctx_mod
+        sys.modules["passlib"] = pl_mod
+        sys.modules["passlib.context"] = ctx_mod
+
+    if "pydantic" not in sys.modules:
+        pyd_mod = types.ModuleType("pydantic")
+
+        class BaseModel:
+            def __init__(self, **kw):
+                for k, v in kw.items():
+                    setattr(self, k, v)
+
+        pyd_mod.BaseModel = BaseModel
+        sys.modules["pydantic"] = pyd_mod
+
 
 _install_backend_stubs()
 
@@ -345,6 +381,170 @@ class CafeFekrBackendSocialTests(unittest.TestCase):
         self.assertGreater(updated_clan["clan_xp"], 0)
         self.assertEqual(updated_clan["total_wins"], 1)
 
+    def test_03_spectator_serializer_sanitizes_and_protects_hidden_state(self):
+        from Controllers.Spectator.spectator_state_serializer import SpectatorStateSerializer
+
+        # Safe games allowed, hidden-info games blocked
+        for safe_game in ("Ludo", "Chess", "Monopoly", "Backgammon", "Risk", "Checkers", "FourInRow", "Othello", "XOGame", "DotsAndBoxes"):
+            ok, _ = SpectatorStateSerializer.is_game_spectatable(safe_game)
+            self.assertTrue(ok, f"Expected {safe_game} to be spectatable")
+
+        for hidden_game in ("BattleShip", "Uno", "Coup", "FekrBekr", "Sudoku", "MSweeper", "MNumbers", "Quiz", "RPC"):
+            ok, _ = SpectatorStateSerializer.is_game_spectatable(hidden_game)
+            self.assertFalse(ok, f"Expected {hidden_game} to be blocked from spectating")
+
+        # Deep recursive sanitization strips forbidden keys without mutating source
+        raw_state = {
+            "turn": 1,
+            "board": [0, 1, 2],
+            "secret": "hidden_code",
+            "ships": [[1, 2], [3, 4]],
+            "players": [
+                {"id": "u1", "score": 10, "hand": ["cardA", "cardB"], "token": "jwt_xyz"},
+                {"id": "u2", "score": 20, "private_cards": ["ace"], "device_id": "dev_999"},
+            ],
+        }
+        original_copy = copy.deepcopy(raw_state)
+        sanitized = SpectatorStateSerializer.sanitize_dict(raw_state)
+
+        self.assertEqual(raw_state, original_copy)
+        self.assertNotIn("secret", sanitized)
+        self.assertNotIn("ships", sanitized)
+        self.assertNotIn("hand", sanitized["players"][0])
+        self.assertNotIn("token", sanitized["players"][0])
+        self.assertNotIn("private_cards", sanitized["players"][1])
+        self.assertNotIn("device_id", sanitized["players"][1])
+        self.assertEqual(sanitized["turn"], 1)
+        self.assertEqual(sanitized["players"][0]["score"], 10)
+
+        # Public command envelope sanitization
+        pub_cmd = {"id": commands.Current_Turn, "data": {"turn_id": 2, "secret_answer": "42"}}
+        clean_cmd = SpectatorStateSerializer.sanitize_live_command("Chess", pub_cmd)
+        self.assertIsNotNone(clean_cmd)
+        self.assertEqual(clean_cmd["id"], commands.Current_Turn)
+        self.assertEqual(clean_cmd["data"]["turn_id"], 2)
+        self.assertNotIn("secret_answer", clean_cmd["data"])
+
+        # Private/disallowed commands are never forwarded to spectators
+        priv_cmd = {"id": 999999, "data": {"hand": [1, 2, 3]}}
+        self.assertIsNone(SpectatorStateSerializer.sanitize_live_command("Chess", priv_cmd))
+        self.assertIsNone(SpectatorStateSerializer.sanitize_live_command("Uno", pub_cmd))
+
+    def test_04_spectator_access_and_lifecycle_flow(self):
+        import asyncio
+        from Entities.SocketIOClass import Socket_Server
+        from Entities.SocketIOClass.game import games
+        from Controllers.Spectator import spectator_controller, spectator_session_manager, SpectatorAccessManager
+
+        MAX_SPECTATORS_PER_GAME = SpectatorAccessManager.MAX_SPECTATORS_PER_GAME
+
+        u3 = {"_id": "u3", "username": "WatcherOne", "coin": 200, "score": 900, "xp": 300, "image": 3}
+        u4 = {"_id": "u4", "username": "BlockedWatcher", "coin": 200, "score": 900, "xp": 300, "image": 4}
+        game_database.base_db["users"].insert_one(u3)
+        game_database.base_db["users"].insert_one(u4)
+
+        # Build a mock active Chess game between u1 and u2
+        g_1 = types.SimpleNamespace(
+            user_id="u1", gamer_id=1, username="Erfan", score=1200, xp=800, image=1, is_ai=False
+        )
+        g_2 = types.SimpleNamespace(
+            user_id="u2", gamer_id=2, username="Niloofar", score=1100, xp=600, image=2, is_ai=False
+        )
+        fake_controller = types.SimpleNamespace(
+            get_game_data=lambda: {"turn": 1, "pieces": ["K", "Q"], "secret_seed": "do_not_leak"},
+            turn_id=1,
+            round_number=1,
+        )
+        fake_session = types.SimpleNamespace(
+            game_type=types.SimpleNamespace(value="Chess"),
+            game_controller=fake_controller,
+            turn_id=1,
+        )
+        fake_gameplay = types.SimpleNamespace(
+            id="game_live_1",
+            game_play_id="game_live_1",
+            gamers=[g_1, g_2],
+            game_session=fake_session,
+            game_types=[types.SimpleNamespace(value="Chess")],
+            current_game_index=0,
+        )
+        games.clear()
+        games["game_live_1"] = fake_gameplay
+        spectator_session_manager.game_spectators.clear()
+        spectator_session_manager.sid_registry.clear()
+        spectator_session_manager.user_spectating_game.clear()
+        Socket_Server.emitted.clear()
+
+        async def run_flow():
+            # 1. Active participant u1 cannot spectate while playing in an active match
+            res1 = await spectator_controller.handle_request_spectate("u1", "sid_u1", {"game_id": "game_live_1"})
+            self.assertEqual(res1["id"], commands.SpectateRejected)
+            self.assertEqual(res1["data"]["reason"], "is_participant")
+
+            # 2. Blocked user u4 cannot spectate u1's game
+            game_database.friends_manager.block_user("u1", "u4", "test block")
+            res2 = await spectator_controller.handle_request_spectate("u4", "sid_u4", {"game_id": "game_live_1"})
+            self.assertEqual(res2["id"], commands.SpectateRejected)
+            self.assertEqual(res2["data"]["reason"], "blocked")
+
+            # 3. Privacy check: if u1 sets allow_spectators='friends', non-friend u3 is rejected
+            game_database.base_db["users"].update_one(
+                {"_id": "u1"}, {"$set": {"privacy.allow_spectators": "friends"}}
+            )
+            res3 = await spectator_controller.handle_request_spectate("u3", "sid_u3", {"game_id": "game_live_1"})
+            self.assertEqual(res3["id"], commands.SpectateRejected)
+            self.assertEqual(res3["data"]["reason"], "friends_only")
+
+            # 4. Make u1 allow everyone -> u3 joins as spectator and receives sanitized snapshot
+            game_database.base_db["users"].update_one(
+                {"_id": "u1"}, {"$set": {"privacy.allow_spectators": "everyone"}}
+            )
+            res4 = await spectator_controller.handle_request_spectate("u3", "sid_u3", {"game_id": "game_live_1"})
+            self.assertEqual(res4["id"], commands.SpectateAccepted)
+            self.assertEqual(spectator_session_manager.get_spectator_count("game_live_1"), 1)
+            snap = res4["data"]
+            self.assertEqual(snap["game_id"], "game_live_1")
+            self.assertEqual(snap["game_type"], "Chess")
+            self.assertNotIn("secret_seed", snap["board_state"])
+
+            # 5. Live public command broadcast reaches spectators in spectate_game_live_1 room
+            Socket_Server.emitted.clear()
+            await spectator_session_manager.on_game_command(
+                "game_live_1", {"id": commands.Current_Turn, "data": {"turn_id": 2, "secret": "hidden"}}, fake_gameplay
+            )
+            self.assertEqual(len(Socket_Server.emitted), 1)
+            _, fwd_payload, fwd_kw = Socket_Server.emitted[0]
+            self.assertEqual(fwd_payload["id"], commands.SpectatorGameState)
+            self.assertEqual(fwd_kw.get("room"), "spectate_game_live_1")
+            self.assertNotIn("secret", fwd_payload["data"]["command"]["data"])
+
+            # 6. Spectator capacity limit enforcement
+            users_map = spectator_session_manager.game_spectators["game_live_1"]
+            for idx in range(MAX_SPECTATORS_PER_GAME):
+                users_map[f"du_{idx}"] = {f"dummy_sid_{idx}"}
+            u5 = {"_id": "u5", "username": "LateWatcher", "coin": 100, "score": 500, "xp": 100, "image": 1}
+            game_database.base_db["users"].insert_one(u5)
+            res6 = await spectator_controller.handle_request_spectate("u5", "sid_u5", {"game_id": "game_live_1"})
+            self.assertEqual(res6["id"], commands.SpectateRejected)
+            self.assertEqual(res6["data"]["reason"], "spectator_limit_reached")
+
+            # Clean up dummy spectators
+            for idx in range(MAX_SPECTATORS_PER_GAME):
+                users_map.pop(f"du_{idx}", None)
+
+            # 7. Ending the game notifies spectators and cleans up session
+            Socket_Server.emitted.clear()
+            await spectator_session_manager.on_game_ended(
+                "game_live_1", game_play=fake_gameplay, final_payload={"winner": "u1"}, reason="finished"
+            )
+            end_events = [p for _, p, _ in Socket_Server.emitted if p.get("id") == commands.SpectatorGameEnded]
+            self.assertEqual(len(end_events), 1)
+            self.assertEqual(spectator_session_manager.get_spectator_count("game_live_1"), 0)
+
+        asyncio.run(run_flow())
+        games.clear()
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)
+

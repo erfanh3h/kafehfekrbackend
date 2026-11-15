@@ -129,6 +129,22 @@ Social_Game_Invite_Received = "SocialGameInviteReceived"
 Social_Game_Invite_Respond = "SocialGameInviteRespond"
 Social_Game_Invite_Result = "SocialGameInviteResult"
 Social_Spectate_Join = "SocialSpectateJoin"
+Social_Spectate_Request = "SocialSpectateRequest"
 Social_Spectate_Leave = "SocialSpectateLeave"
 Social_Spectate_Data = "SocialSpectateData"
+
+# Live Spectator Mode Commands (Client -> Server)
+RequestSpectate = "RequestSpectate"
+LeaveSpectate = "LeaveSpectate"
+RequestSpectatorState = "RequestSpectatorState"
+
+# Live Spectator Mode Commands (Server -> Client)
+SpectateAccepted = "SpectateAccepted"
+SpectateRejected = "SpectateRejected"
+SpectatorGameState = "SpectatorGameState"
+SpectatorGameEnded = "SpectatorGameEnded"
+SpectatorCountUpdated = "SpectatorCountUpdated"
+
 Social_Error = "SocialError"
+Social_Ack = "SocialAck"
+

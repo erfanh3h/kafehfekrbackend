@@ -18,6 +18,12 @@ async def send_command(command, game_id, namespace="/game", skip_ids=None):
     if skip_ids is None:
         skip_ids = []
     await Socket_Server.emit('command', command, skip_sid=skip_ids, room=game_id, namespace=namespace)
+    if namespace == "/game" and game_id:
+        try:
+            from Controllers.Spectator.spectator_session_manager import spectator_session_manager
+            await spectator_session_manager.on_game_command(game_id, command)
+        except Exception as e:
+            print(f"[SocketIOManager] Spectator forward error: {e}")
 
 
 async def send_reaction(player_id, reaction_id, game_id, namespace="/game", skip_ids=None):
@@ -25,6 +31,12 @@ async def send_reaction(player_id, reaction_id, game_id, namespace="/game", skip
         skip_ids = []
     await Socket_Server.emit('reaction', {"playerId": player_id, "reactionId": reaction_id}, skip_sid=skip_ids,
                              room=game_id, namespace=namespace)
+    if namespace == "/game" and game_id:
+        try:
+            from Controllers.Spectator.spectator_session_manager import spectator_session_manager
+            await spectator_session_manager.on_game_reaction(game_id, player_id, reaction_id)
+        except Exception as e:
+            print(f"[SocketIOManager] Spectator reaction forward error: {e}")
 
 
 async def send_private_command(command, socket_id, game_id, namespace="/game"):
