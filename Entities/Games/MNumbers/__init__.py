@@ -14,6 +14,8 @@ class MNumbersGameClass(BaseGameClass):
         self.symbol_1 = 1
         self.symbol_2 = 2
         self.current_turn = 1
+        self.first_selected_index = -1
+        self.is_waiting_turn_result = False
         self.init_board()
 
     def init_board(self):
@@ -28,21 +30,56 @@ class MNumbersGameClass(BaseGameClass):
     def get_game_data(self):
         board_data = []
         for index in range(0, len(self.board)):
-            # check peace equiped or not
-            if self.board[index].equipped_user != 0:
+            # check peace equiped or currently revealed as 1st turn selection
+            if self.board[index].equipped_user != 0 or index == self.first_selected_index:
                 board_data.append(self.board[index].to_json())
             else:
                 board_data.append(self.board[index].to_empty_json())
 
-        data = {"board": board_data, "scores": [self.player1_score, self.player2_score],
-                "current_turn": self.current_turn}
+        data = {
+            "board": board_data,
+            "scores": [self.player1_score, self.player2_score],
+            "current_turn": self.current_turn,
+            "first_selected_index": self.first_selected_index,
+        }
         return data
 
     async def recieve_data(self, command_id, data, gamer_id):
         #print(command_id, data, gamer_id)
         if command_id == commands.Select_Peace:
-            first_peace_index = data['index1']
-            second_peace_index = data['index2']
+            if not isinstance(data, dict):
+                return False
+
+            if "index1" in data and "index2" in data and data["index2"] is not None:
+                first_peace_index = int(data["index1"])
+                second_peace_index = int(data["index2"])
+                self.first_selected_index = -1
+            else:
+                raw_idx = data.get("index", data.get("index1"))
+                if raw_idx is None:
+                    return False
+                selected_index = int(raw_idx)
+
+                # Step 1: Select and immediately reveal the 1st piece (locked until turn ends)
+                if self.first_selected_index == -1:
+                    self.first_selected_index = selected_index
+                    await self.send_data_function(
+                        commands.Peace_Selected,
+                        {
+                            "user": gamer_id,
+                            "step": 1,
+                            "is_first": True,
+                            "index1": selected_index,
+                            "value1": self.board[selected_index].value,
+                        },
+                    )
+                    return False
+
+                # Step 2: Select the 2nd piece and evaluate the pair
+                first_peace_index = self.first_selected_index
+                second_peace_index = selected_index
+                self.first_selected_index = -1
+
             is_correct = self.check_match_two(first_peace_index, second_peace_index)
             if is_correct:
                 self.submit_peaces_for_user(first_peace_index, second_peace_index, gamer_id)
@@ -56,23 +93,55 @@ class MNumbersGameClass(BaseGameClass):
                 self.is_game_finished = True
                 # winner = self.get_game_winner()
                 # await self.send_data_function(commands.Finish_Game, {'Winner': winner})
+            return True
+        return False
 
     def check_authority(self, data, gamer_id: int):
         if (self.current_turn == 1 and gamer_id != 1) or (self.current_turn == 2 and gamer_id != 2):
             #print("not turn of : ", gamer_id)
             return False
-        if self.is_game_finished:
+        if self.is_game_finished or self.is_waiting_turn_result:
+            return False
+        if not isinstance(data, dict):
             return False
 
-        first_peace_index = data['index1']
-        second_peace_index = data['index2']
-        if first_peace_index == second_peace_index:
+        # Legacy / Bot pair submission (index1 + index2 together)
+        if "index1" in data and "index2" in data and data["index2"] is not None:
+            if self.first_selected_index != -1:
+                return False
+            raw1 = data.get("index1")
+            raw2 = data.get("index2")
+            if isinstance(raw1, bool) or isinstance(raw2, bool):
+                return False
+            try:
+                first_peace_index = int(raw1)
+                second_peace_index = int(raw2)
+            except (TypeError, ValueError):
+                return False
+            if first_peace_index == second_peace_index:
+                return False
+            if not (0 <= first_peace_index < len(self.board)) or not (0 <= second_peace_index < len(self.board)):
+                return False
+            if self.is_peace_have_selection(first_peace_index):
+                return False
+            if self.is_peace_have_selection(second_peace_index):
+                return False
+            return True
+
+        # Step-by-step piece selection (index or index1)
+        raw_idx = data.get("index", data.get("index1"))
+        if raw_idx is None or isinstance(raw_idx, bool):
             return False
-        if not (0 <= first_peace_index < len(self.board)) or not (0 <= second_peace_index < len(self.board)):
+        try:
+            idx = int(raw_idx)
+        except (TypeError, ValueError):
             return False
-        if self.is_peace_have_selection(first_peace_index):
+        if not (0 <= idx < len(self.board)):
             return False
-        if self.is_peace_have_selection(second_peace_index):
+        if self.is_peace_have_selection(idx):
+            return False
+        # 1st piece is locked and cannot be deselected or re-picked during the turn
+        if self.first_selected_index != -1 and idx == self.first_selected_index:
             return False
         return True
 
@@ -86,6 +155,8 @@ class MNumbersGameClass(BaseGameClass):
         return winner
 
     def change_turn(self):
+        self.first_selected_index = -1
+        self.is_waiting_turn_result = False
         if self.current_turn == 1:
             self.current_turn = self.symbol_2
         else:

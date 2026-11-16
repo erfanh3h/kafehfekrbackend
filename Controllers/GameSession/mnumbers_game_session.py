@@ -30,8 +30,9 @@ class MNumbersGameSession(BaseGameSession):
             selection_data = data['data']
             is_selection_correct = self.game_controller.check_authority(selection_data, gamer_id)
             if is_selection_correct:
-                await self.game_controller.recieve_data(data['id'], selection_data, gamer_id)
-                self.timer.stop()
+                turn_completed = await self.game_controller.recieve_data(data['id'], selection_data, gamer_id)
+                if turn_completed:
+                    self.timer.stop()
 
     def send_current_turn(self):
         from Entities.SocketIOManagerClass import send_command
@@ -55,4 +56,5 @@ class MNumbersGameSession(BaseGameSession):
                                  game_id=self.game_id))
             self.finish_game(winner_id)
             return
-        self.timer.start(MNumbers_Show_Result_Time, wait_get_data)
+        self.game_controller.is_waiting_turn_result = True
+        self.timer.start(MNumbers_Show_Result_Time, wait_get_data, is_user_turn=False)

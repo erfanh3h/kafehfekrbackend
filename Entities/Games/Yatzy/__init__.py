@@ -63,7 +63,7 @@ class YatzyGameClass(BaseGameClass):
             else:
                 pre_dices = self.player2_current_dices
                 current_dice_count = self.player2_rolled_dice_time
-            if current_dice_count == 3:
+            if current_dice_count >= 4:
                 return
             new_roll_data = roll_dices(5)
             result = []

@@ -2,7 +2,7 @@
 Yatzy (پنج تاس / یاتزی) Game Logic for Cafe Fekr Bot.
 Matches exact rules and socket protocol of kafehfekrbackend/Entities/Games/Yatzy:
 - 12 simultaneous rounds (60s per round, 5s wait between rounds).
-- Each round starts with 5 rolled dice from server (rolled_dice_times = 1 -> up to 2 re-rolls).
+- Each round starts with 5 rolled dice from server (rolled_dice_times = 1 -> up to 3 re-rolls).
 - RollDice command: {"id": "RollDice", "data": {"selected_indexes": [0..4]}} (indices in selected_indexes are KEPT/HELD).
 - RollResult event: {"dices": [d0, d1, d2, d3, d4]} sent privately after RollDice.
 - SelectPeace command: {"id": "SelectPeace", "data": {"index": 0..11}} locks a category for the round.
@@ -133,7 +133,7 @@ class YatzyGameLogic(BaseGameLogic):
                 dices = payload.get("dices", [])
                 if isinstance(dices, list) and len(dices) == 5:
                     self.current_dices = [int(x) for x in dices]
-            self.rolled_dice_times = min(3, self.rolled_dice_times + 1)
+            self.rolled_dice_times = min(4, self.rolled_dice_times + 1)
             return True
 
         elif cmd_id == "PeaceSelected":
@@ -196,7 +196,7 @@ class YatzyGameLogic(BaseGameLogic):
         if not open_cats:
             return []
         moves: List[Dict[str, Any]] = [{"action": "select", "index": i} for i in open_cats]
-        if self.rolled_dice_times < 3:
+        if self.rolled_dice_times < 4:
             moves.append({"action": "roll", "selected_indexes": []})
         return moves
 
@@ -247,7 +247,7 @@ class YatzyGameLogic(BaseGameLogic):
         - 45% chance to roll again if rolls remain (holding matching dice).
         - Picks among positive-scoring categories with casual randomness, or first open category.
         """
-        if self.rolled_dice_times < 3 and random.random() < 0.45:
+        if self.rolled_dice_times < 4 and random.random() < 0.45:
             held = self._choose_held_dice_indices()
             if len(held) < 5:
                 return {"action": "roll", "selected_indexes": held}
@@ -274,7 +274,7 @@ class YatzyGameLogic(BaseGameLogic):
         scored_cats = [(i, calculate_category_score(self.current_dices, i)) for i in open_cats]
         best_cat, best_score = max(scored_cats, key=lambda x: x[1])
 
-        if self.rolled_dice_times < 3 and best_score < 22:
+        if self.rolled_dice_times < 4 and best_score < 22:
             held = self._choose_held_dice_indices()
             if len(held) < 5:
                 return {"action": "roll", "selected_indexes": held}
@@ -291,7 +291,7 @@ class YatzyGameLogic(BaseGameLogic):
         scored_cats = [(i, calculate_category_score(self.current_dices, i)) for i in open_cats]
         best_cat, best_score = max(scored_cats, key=lambda x: x[1])
 
-        if self.rolled_dice_times < 3 and best_score < 25:
+        if self.rolled_dice_times < 4 and best_score < 25:
             held = self._choose_held_dice_indices()
             if len(held) < 5:
                 return {"action": "roll", "selected_indexes": held}
@@ -324,7 +324,7 @@ class YatzyGameLogic(BaseGameLogic):
     def format_state(self) -> str:
         dices_str = " ".join(f"[{d}]" for d in self.current_dices)
         lines = [
-            f"\n  ==================== YATZY (Round {self.current_round}/12 | Roll {self.rolled_dice_times}/3) ====================",
+            f"\n  ==================== YATZY (Round {self.current_round}/12 | Roll {self.rolled_dice_times}/4) ====================",
             f"  Current Dice: {dices_str} | Scores -> P1: {self.player1_score} | P2: {self.player2_score}",
             "  -------------------------------------------------------------------------",
         ]
