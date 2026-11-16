@@ -4,8 +4,8 @@ from Models.User import UserModel
 
 class GamerModel(UserModel):
     def __init__(self, user_id: str, username: str, user_image: int, user_coin: int, user_score: int,
-                 finish_reconnect_time_function=None, socket_id='', team_id: int = 0):
-        super().__init__(user_id, username, user_image, user_coin, user_score)
+                 finish_reconnect_time_function=None, socket_id='', team_id: int = 0, profile_frame: int = 1):
+        super().__init__(user_id, username, user_image, user_coin, user_score, profile_frame=profile_frame)
         self.socket_id = socket_id
         self.gamer_id: int = 0
         self.timer = UserDisconnectTimerClass(user_id=user_id)
@@ -46,4 +46,6 @@ class GamerModel(UserModel):
         return {'gamer_id': self.gamer_id, 'name': self.username, 'user_id': self.user_id,
                 'remain_dc_time': self.timer.max_time, 'is_disconnected': self.is_disconnected,
                 'not_played_turns': self.not_played_turns, 'user_image': self.user_image,
-                'score': self.user_score, 'user_score': self.user_score}
+                'score': self.user_score, 'user_score': self.user_score,
+                'profile_frame': getattr(self, 'profile_frame', 1),
+                'avatar_frame': getattr(self, 'avatar_frame', 1)}

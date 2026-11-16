@@ -320,7 +320,8 @@ class BaseGamePlayClass:
         for gamer in self.gamers:
             self.game_session.add_gamer(
                 GamerModel(user_id=gamer.user_id, username=gamer.username, user_image=gamer.user_image,
-                           user_score=gamer.user_score, user_coin=gamer.user_coin))
+                           user_score=gamer.user_score, user_coin=gamer.user_coin,
+                           profile_frame=getattr(gamer, "profile_frame", 1)))
             self.game_session.join_gamer(gamer.user_id, gamer.socket_id)
             if getattr(gamer, "is_disconnected", False) or str(gamer.user_id) in self.disconnected_user_ids:
                 for sg in self.game_session.gamers:

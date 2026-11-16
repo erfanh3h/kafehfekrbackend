@@ -36,6 +36,7 @@ class QueueSocketNameSpace(socketio.AsyncNamespace):
             user_image=user_data.get("image", 1),
             user_coin=user_data.get("coin", 1000),
             user_score=user_data.get("score", 1000),
+            profile_frame=int(user_data.get("profile_frame", user_data.get("avatar_frame", 1)) or 1),
         )
 
         # Determine if user is attempting to reconnect to an active pre-game

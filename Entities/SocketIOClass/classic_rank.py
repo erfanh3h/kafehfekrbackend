@@ -50,11 +50,13 @@ class ClassicRankSocketNameSpace(socketio.AsyncNamespace):
             user_image = user_data.get("image", 0)
             user_coin = user_data.get("coin", 0)
             user_score = user_data.get("score", 0)
+            profile_frame = int(user_data.get("profile_frame", user_data.get("avatar_frame", 1)) or 1)
         else:
             username = auth.get("username", "کاربر")
             user_image = int(auth.get("user_image", 0))
             user_coin = 0
             user_score = 0
+            profile_frame = int(auth.get("profile_frame", auth.get("avatar_frame", 1)) or 1)
 
         queuer_data = QueuerModel(
             user_id=user_id,
@@ -64,6 +66,7 @@ class ClassicRankSocketNameSpace(socketio.AsyncNamespace):
             user_coin=user_coin,
             user_score=user_score,
             is_rdy=True,
+            profile_frame=profile_frame,
         )
         await classic_rank_session.start_classic_rank_match(queuer_data, game_type, socket_id)
 

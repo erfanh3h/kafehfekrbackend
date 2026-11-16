@@ -30,6 +30,7 @@ class LobbySocketNameSpace(socketio.AsyncNamespace):
             user_coin=user_data.get("coin", 0),
             user_score=user_data.get("score", 0),
             is_rdy=False,
+            profile_frame=int(user_data.get("profile_frame", user_data.get("avatar_frame", 1)) or 1),
         )
         await lobby_session.join_queuers_list(queuer_data)
 

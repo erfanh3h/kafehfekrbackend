@@ -4,8 +4,8 @@ from Models.User import UserModel
 
 class QueuerModel(UserModel):
     def __init__(self, user_id: str, username: str, user_image: int, user_coin: int, user_score: int, socket_id='',
-                 is_rdy=True):
-        super().__init__(user_id, username, user_image, user_coin, user_score)
+                 is_rdy=True, profile_frame: int = 1):
+        super().__init__(user_id, username, user_image, user_coin, user_score, profile_frame=profile_frame)
         self.socket_id = socket_id
         self.user_score = user_score
         self.is_rdy = is_rdy
@@ -36,13 +36,16 @@ class QueuerModel(UserModel):
 
     def to_json(self):
         return {'name': self.username, 'user_id': self.user_id, 'image': self.user_image,
-                'score': self.user_score, 'user_score': self.user_score}
+                'score': self.user_score, 'user_score': self.user_score,
+                'profile_frame': self.profile_frame, 'avatar_frame': self.avatar_frame}
 
     def to_lobby_json(self):
         return {'name': self.username, 'user_id': self.user_id, 'image': self.user_image, 'is_rdy': self.is_rdy,
-                'score': self.user_score, 'user_score': self.user_score}
+                'score': self.user_score, 'user_score': self.user_score,
+                'profile_frame': self.profile_frame, 'avatar_frame': self.avatar_frame}
 
     def to_queue_json(self):
         return {'name': self.username, 'user_id': self.user_id, 'image': self.user_image,
                 'selected_game': self.selected_game, 'banned_games': self.banned_games,
-                'score': self.user_score, 'user_score': self.user_score}
+                'score': self.user_score, 'user_score': self.user_score,
+                'profile_frame': self.profile_frame, 'avatar_frame': self.avatar_frame}

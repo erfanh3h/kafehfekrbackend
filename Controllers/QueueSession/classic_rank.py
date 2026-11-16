@@ -47,6 +47,7 @@ class ClassicRankSession:
             user_coin=1000,
             user_score=bot_score,
             is_rdy=True,
+            profile_frame=random.randint(1, 20),
         )
 
         game_id = static_functions.create_random_game_id()
