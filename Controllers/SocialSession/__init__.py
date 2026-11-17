@@ -93,6 +93,7 @@ class SocialSessionManager:
             current_game_id=open_gid,
             socket_id=socket_id,
             add_socket=True,
+            reset_sockets=was_offline,
         )
 
         # Send initial social sync payload to the connected client
@@ -116,8 +117,7 @@ class SocialSessionManager:
             namespace="/social",
         )
 
-        if was_offline:
-            await self.broadcast_presence_to_peers(uid, pres, namespace_obj)
+        await self.broadcast_presence_to_peers(uid, pres, namespace_obj)
 
     async def disconnect_user(self, socket_id: str, namespace_obj) -> None:
         try:
@@ -158,6 +158,7 @@ class SocialSessionManager:
                 current_game_id=open_gid,
                 socket_id=socket_id,
                 add_socket=False,
+                clear_sockets=True,
             )
             await self.broadcast_presence_to_peers(uid, pres, namespace_obj)
         else:
@@ -283,6 +284,7 @@ class SocialSessionManager:
             partner_id = str(payload.get("partner_id", "")).strip()
             if partner_id:
                 game_database.direct_messages_manager.mark_conversation_read(uid, partner_id)
+                total_unread_dms = game_database.direct_messages_manager.get_total_unread_count(uid)
                 await namespace_obj.emit(
                     "command",
                     make_command_json(
@@ -290,6 +292,19 @@ class SocialSessionManager:
                         data={"reader_id": uid, "partner_id": partner_id},
                     ),
                     room=f"user_{partner_id}",
+                    namespace="/social",
+                )
+                await namespace_obj.emit(
+                    "command",
+                    make_command_json(
+                        id=commands.Social_DM_Read,
+                        data={
+                            "reader_id": uid,
+                            "partner_id": partner_id,
+                            "total_unread_dms": total_unread_dms,
+                        },
+                    ),
+                    room=f"user_{uid}",
                     namespace="/social",
                 )
             return
@@ -326,6 +341,7 @@ class SocialSessionManager:
                 "sender_id": uid,
                 "sender_name": str(u_doc.get("username", "بازیکن")),
                 "sender_image": int(u_doc.get("image", 0) or 0),
+                "sender_profile_frame": int(u_doc.get("profile_frame", 1) or 1),
                 "sender_role": str(mem.get("role", "member")),
                 "text": text,
                 "msg_type": "text",
@@ -358,7 +374,7 @@ class SocialSessionManager:
             await namespace_obj.emit(
                 "command",
                 make_command_json(
-                    id=commands.Social_Clan_Chat_Delete,
+                    id="SocialClanChatDeleted",
                     data={"clan_id": cid, "message_id": msg_id, "deleted_by": uid},
                 ),
                 room=f"clan_{cid}",
@@ -533,7 +549,7 @@ class SocialSessionManager:
                     user_image=int(from_u.get("image", 0) or 0),
                     user_coin=int(from_u.get("coin", 0) or 0),
                     user_score=int(from_u.get("score", 0) or 0),
-                    user_xp=int(from_u.get("xp", 0) or 0),
+                    profile_frame=int(from_u.get("profile_frame", 1) or 1),
                 )
                 q2 = QueuerModel(
                     user_id=uid,
@@ -542,7 +558,7 @@ class SocialSessionManager:
                     user_image=int(u_doc.get("image", 0) or 0),
                     user_coin=int(u_doc.get("coin", 0) or 0),
                     user_score=int(u_doc.get("score", 0) or 0),
-                    user_xp=int(u_doc.get("xp", 0) or 0),
+                    profile_frame=int(u_doc.get("profile_frame", 1) or 1),
                 )
                 created_game_id = f"frg_{create_random_name()}"
                 game_database.users_manager.update_user(from_id, open_game_id=created_game_id)
@@ -692,7 +708,7 @@ class SocialSessionManager:
                         user_image=int(pu.get("image", 0) or 0),
                         user_coin=int(pu.get("coin", 0) or 0),
                         user_score=int(pu.get("score", 0) or 0),
-                        user_xp=int(pu.get("xp", 0) or 0),
+                        profile_frame=int(pu.get("profile_frame", 1) or 1),
                     )
                 )
 

@@ -12,8 +12,11 @@ import logging
 
 import socketio
 import uvicorn
-from fastapi import FastAPI
+from fastapi import FastAPI, Header, HTTPException, Request
 
+from Commons.static_functions import make_command_json
+from Controllers.SocialSession import social_session
+from Entities.Security import SECRET_KEY
 from Entities.SocketIOClass import Socket_Server
 from Entities.Database import game_database
 
@@ -27,6 +30,74 @@ async def health_check():
 @health_app.get("/")
 async def root():
     return {"status": "ok", "service": "backend"}
+
+
+@health_app.post("/internal/social/emit")
+async def internal_social_emit(request: Request, x_internal_secret: str = Header(default="")):
+    if x_internal_secret != SECRET_KEY:
+        raise HTTPException(status_code=403, detail="Forbidden")
+    body = await request.json()
+    room_updates_before = body.get("room_updates_before", []) or []
+    room_updates = body.get("room_updates", []) or []
+    events = body.get("events", []) or []
+
+    async def _apply_room_updates(updates):
+        for upd in updates:
+            if not isinstance(upd, dict):
+                continue
+            uid = str(upd.get("user_id", "")).strip()
+            if not uid:
+                continue
+            sids = list(social_session.user_to_sockets.get(uid, set()))
+            join_cid = str(upd.get("join_clan", "")).strip()
+            leave_cid = str(upd.get("leave_clan", "")).strip()
+            if leave_cid:
+                for sid in sids:
+                    try:
+                        await Socket_Server.leave_room(sid, f"clan_{leave_cid}", namespace="/social")
+                    except Exception:
+                        pass
+                if social_session.user_clan_room.get(uid) == leave_cid:
+                    social_session.user_clan_room.pop(uid, None)
+            if join_cid:
+                old_cid = social_session.user_clan_room.get(uid, "")
+                if old_cid and old_cid != join_cid:
+                    for sid in sids:
+                        try:
+                            await Socket_Server.leave_room(sid, f"clan_{old_cid}", namespace="/social")
+                        except Exception:
+                            pass
+                social_session.user_clan_room[uid] = join_cid
+                for sid in sids:
+                    try:
+                        await Socket_Server.enter_room(sid, f"clan_{join_cid}", namespace="/social")
+                    except Exception:
+                        pass
+
+    await _apply_room_updates(room_updates_before)
+
+    emitted = 0
+    for ev in events:
+        if not isinstance(ev, dict):
+            continue
+        room = str(ev.get("room", "")).strip()
+        cmd_id = str(ev.get("command_id", "")).strip()
+        data = ev.get("data", {})
+        if not room or not cmd_id:
+            continue
+        try:
+            await Socket_Server.emit(
+                "command",
+                make_command_json(id=cmd_id, data=data),
+                room=room,
+                namespace="/social",
+            )
+            emitted += 1
+        except Exception as exc:
+            print(f"[internal_social_emit] Emit error for {cmd_id} -> {room}: {exc}")
+
+    await _apply_room_updates(room_updates)
+    return {"ok": True, "emitted": emitted}
 
 app = socketio.ASGIApp(Socket_Server, other_asgi_app=health_app)
 # logging.basicConfig(level=logging.DEBUG)
