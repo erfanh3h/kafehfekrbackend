@@ -100,6 +100,7 @@ class SocialSessionManager:
         unread_notifs = game_database.notifications_manager.get_unread_count(uid)
         unread_dms = game_database.direct_messages_manager.get_total_unread_count(uid)
         active_invites = game_database.invitations_manager.get_incoming_invitations(uid)
+        incoming_friend_reqs = game_database.friends_manager.get_incoming_requests(uid)
         await namespace_obj.emit(
             "command",
             make_command_json(
@@ -110,6 +111,7 @@ class SocialSessionManager:
                     "status": pres.get("status", "online"),
                     "unread_notifications": unread_notifs,
                     "unread_dms": unread_dms,
+                    "incoming_friend_requests": len(incoming_friend_reqs),
                     "active_invitations_count": len(active_invites),
                 },
             ),
