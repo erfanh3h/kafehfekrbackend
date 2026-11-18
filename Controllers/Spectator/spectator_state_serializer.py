@@ -301,6 +301,16 @@ class SpectatorStateSerializer:
             for idx, (uid_s, sg) in enumerate(raw_session_gamers.items()):
                 session_gamer_by_uid[str(uid_s)] = (idx + 1, sg)
 
+        # Inspect controller for left/eliminated players (multiplayer Ludo/Risk/Monopoly/etc.)
+        controller = getattr(game_session, "game_controller", None) if game_session is not None else None
+        active_indexes = getattr(controller, "active_player_indexes", None) if controller is not None else None
+        if isinstance(active_indexes, (list, tuple, set)):
+            active_index_set = {int(x) for x in active_indexes if str(x).isdigit() or isinstance(x, int)}
+        else:
+            active_index_set = None
+        leaver_gid = getattr(controller, "leaver_id", None) if controller is not None else None
+        dc_user_ids = set(str(x) for x in (getattr(game_play, "disconnected_user_ids", None) or set()))
+
         raw_gamers = getattr(game_play, "gamers", None)
         gamers_list = []
 
@@ -322,6 +332,7 @@ class SpectatorStateSerializer:
                     is_dc = bool(getattr(g, "is_disconnected", False))
 
                 gamer_id = idx + 1
+                remain_dc_time = 0
                 sg_tuple = session_gamer_by_uid.get(uid_str)
                 sg_obj = sg_tuple[1] if sg_tuple else None
                 if sg_obj is not None:
@@ -329,13 +340,36 @@ class SpectatorStateSerializer:
                         gamer_id = int(sg_obj.get("gamer_id", sg_obj.get("id", gamer_id)) or gamer_id)
                         not_played = int(sg_obj.get("not_played_turns", sg_obj.get("not_played", 0)) or 0)
                         sg_score = int(sg_obj.get("game_score", sg_obj.get("score", 0)) or 0)
+                        is_dc = is_dc or bool(sg_obj.get("is_disconnected", False))
+                        remain_dc_time = int(sg_obj.get("remain_dc_time", 0) or 0)
                     else:
                         gamer_id = int(getattr(sg_obj, "gamer_id", getattr(sg_obj, "id", gamer_id)) or gamer_id)
                         not_played = int(getattr(sg_obj, "not_played_turns", 0) or 0)
                         sg_score = int(getattr(sg_obj, "game_score", 0) or 0)
+                        is_dc = is_dc or bool(getattr(sg_obj, "is_disconnected", False))
+                        sg_timer = getattr(sg_obj, "timer", None)
+                        if sg_timer is not None and not getattr(sg_timer, "is_canceled", True):
+                            remain_dc_time = max(0, int(getattr(sg_timer, "max_time", 0) or 0))
                 else:
                     not_played = 0
                     sg_score = 0
+
+                if uid_str in dc_user_ids:
+                    is_dc = True
+
+                is_left = False
+                if active_index_set is not None and len(active_index_set) > 0 and gamer_id not in active_index_set:
+                    is_left = True
+                if leaver_gid is not None and str(leaver_gid) == str(gamer_id):
+                    is_left = True
+                if controller is not None and hasattr(controller, "players"):
+                    c_players = getattr(controller, "players", None)
+                    if isinstance(c_players, dict):
+                        cp = c_players.get(gamer_id) or c_players.get(str(gamer_id))
+                        if isinstance(cp, dict) and (cp.get("bankrupt") is True or cp.get("is_alive") is False or cp.get("eliminated") is True):
+                            is_left = True
+                        elif cp is not None and (getattr(cp, "bankrupt", False) or getattr(cp, "is_alive", True) is False):
+                            is_left = True
 
                 pub = user_profiles.get(uid_str, {}) if isinstance(user_profiles, dict) else {}
                 username = str(pub.get("username") or base_name or f"بازیکن {gamer_id}")
@@ -364,6 +398,9 @@ class SpectatorStateSerializer:
                     "xp": xp,
                     "not_played": not_played,
                     "is_disconnected": is_dc,
+                    "is_left": is_left,
+                    "is_eliminated": is_left,
+                    "remain_dc_time": remain_dc_time,
                 })
         else:
             # Fallback if `game_play` only defines `users` list and `users_info` dict
@@ -434,6 +471,18 @@ class SpectatorStateSerializer:
         raw_score_type = getattr(game_play, "game_score_type", 0)
         score_type_val = getattr(raw_score_type, "value", raw_score_type)
 
+        # Detect any currently disconnected (non-left) player whose reconnect pause timer is active
+        disconnected_player = None
+        for g in gamers:
+            if bool(g.get("is_disconnected", False)) and not bool(g.get("is_left", False)) and int(g.get("remain_dc_time", 0) or 0) > 0:
+                disconnected_player = {
+                    "user_id": str(g.get("user_id", "")),
+                    "gamer_id": int(g.get("gamer_id", g.get("id", 0))),
+                    "username": str(g.get("username", g.get("name", "بازیکن"))),
+                    "remaining_time": int(g.get("remain_dc_time", 60)),
+                }
+                break
+
         reconnect_payload = {
             "gamers": gamers,
             "game_data": board_state,
@@ -443,6 +492,7 @@ class SpectatorStateSerializer:
             "turn_time": timer_data.get("turn_time", 30) if isinstance(timer_data, dict) else 30,
             "scores": scores_map,
             "is_spectator": True,
+            "disconnected_player": disconnected_player,
         }
 
         return {
@@ -462,6 +512,7 @@ class SpectatorStateSerializer:
             "board_state": board_state,
             "game_data": board_state,
             "timer_data": timer_data,
+            "disconnected_player": disconnected_player,
             "reconnect_data": reconnect_payload,
             "server_time": datetime.utcnow().isoformat(),
         }

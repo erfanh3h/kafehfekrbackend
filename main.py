@@ -99,6 +99,108 @@ async def internal_social_emit(request: Request, x_internal_secret: str = Header
     await _apply_room_updates(room_updates)
     return {"ok": True, "emitted": emitted}
 
+
+@health_app.get("/internal/user/in-game/{user_id}")
+async def internal_check_user_in_game(user_id: str, x_internal_secret: str = Header(default="")):
+    if x_internal_secret != SECRET_KEY:
+        raise HTTPException(status_code=403, detail="Forbidden")
+    uid = str(user_id or "").strip()
+    if not uid:
+        return {"in_game": False, "game_id": ""}
+    try:
+        from Entities.SocketIOClass.game import games
+        from Controllers.Spectator.spectator_state_serializer import SpectatorStateSerializer
+        for gid, gp in list(games.items()):
+            if gp is None:
+                continue
+            if getattr(gp, "is_game_finished", False) or getattr(gp, "is_finished", False) or getattr(gp, "is_game_terminated", False):
+                continue
+            pids = SpectatorStateSerializer.extract_participant_ids(gp)
+            if uid not in pids:
+                continue
+            # If user already surrendered/left a multiplayer match, they are no longer actively playing
+            g_sess = getattr(gp, "game_session", None)
+            ctrl = getattr(g_sess, "game_controller", None) if g_sess is not None else None
+            active_idx = getattr(ctrl, "active_player_indexes", None) if ctrl is not None else None
+            if isinstance(active_idx, (list, tuple, set)) and len(active_idx) > 0 and g_sess is not None:
+                g_id = g_sess.find_gamer_id_from_user_id(uid) if hasattr(g_sess, "find_gamer_id_from_user_id") else None
+                if g_id is not None and g_id not in active_idx:
+                    continue
+            return {"in_game": True, "game_id": str(gid)}
+    except Exception as exc:
+        print(f"[internal_check_user_in_game] Error: {exc}")
+    return {"in_game": False, "game_id": ""}
+
+
+@health_app.post("/internal/auth/force-logout")
+async def internal_force_logout_user(request: Request, x_internal_secret: str = Header(default="")):
+    if x_internal_secret != SECRET_KEY:
+        raise HTTPException(status_code=403, detail="Forbidden")
+    body = await request.json()
+    uid = str(body.get("user_id", "")).strip()
+    if not uid:
+        return {"ok": False, "kicked": 0}
+
+    from Commons import commands as cmd_const
+    logout_cmd = make_command_json(
+        id=cmd_const.Logout,
+        data={
+            "reason": "new_device_login",
+            "message": "حساب کاربری شما روی دستگاه دیگری وارد شد.",
+        },
+    )
+    kicked = 0
+
+    # 1. Kick all /social sockets for this user
+    social_sids = list(social_session.user_to_sockets.get(uid, set()))
+    for sid in social_sids:
+        try:
+            await Socket_Server.emit("command", logout_cmd, to=sid, namespace="/social")
+        except Exception:
+            pass
+        try:
+            await Socket_Server.disconnect(sid, namespace="/social")
+            kicked += 1
+        except Exception:
+            pass
+
+    # 2. Kick any /game sockets for this user (safety net)
+    try:
+        from Entities.SocketIOClass.game import socketid_userid_pairs
+        for sid, mapped_uid in list(socketid_userid_pairs.items()):
+            if str(mapped_uid) == uid:
+                try:
+                    await Socket_Server.emit("command", logout_cmd, to=sid, namespace="/game")
+                except Exception:
+                    pass
+                try:
+                    await Socket_Server.disconnect(sid, namespace="/game")
+                    kicked += 1
+                except Exception:
+                    pass
+    except Exception:
+        pass
+
+    # 3. Kick any sockets in /lobby, /queue, /multi-queue, /classic-rank, /chat rooms
+    for ns in ("/lobby", "/queue", "/multi-queue", "/classic-rank", "/chat"):
+        try:
+            rooms_map = Socket_Server.manager.rooms.get(ns, {})
+            # Check all sids in the namespace if stored in session or room
+            for room_key in (uid, f"user_{uid}"):
+                sids_in_room = list((rooms_map.get(room_key) or {}).keys()) if isinstance(rooms_map.get(room_key), dict) else []
+                for sid in sids_in_room:
+                    try:
+                        await Socket_Server.emit("command", logout_cmd, to=sid, namespace=ns)
+                        await Socket_Server.disconnect(sid, namespace=ns)
+                        kicked += 1
+                    except Exception:
+                        pass
+        except Exception:
+            pass
+
+    print(f"[internal_force_logout_user] Forced logout for user {uid}: kicked {kicked} socket(s)")
+    return {"ok": True, "kicked": kicked}
+
 app = socketio.ASGIApp(Socket_Server, other_asgi_app=health_app)
 # logging.basicConfig(level=logging.DEBUG)
 if __name__ == '__main__':
