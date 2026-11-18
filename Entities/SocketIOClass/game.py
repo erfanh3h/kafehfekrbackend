@@ -33,16 +33,18 @@ def add_new_game(game_id, queuers, game_types, game_score_type):
     games[game_id] = game_play
     game_idies.append(game_id)
     try:
+        from Controllers.SocialSession import social_session
         first_gt = str(game_types[0]) if game_types else ""
         for q in (queuers or []):
             uid = getattr(q, "user_id", None)
             if uid and not str(uid).startswith("bot_") and hasattr(game_database, "presence_manager"):
-                game_database.presence_manager.update_activity(
+                pres = game_database.presence_manager.update_activity(
                     user_id=str(uid),
                     status="in_game",
                     current_game_id=str(game_id),
                     current_game_type=first_gt,
                 )
+                static_functions.safe_run_async(social_session.broadcast_activity_change(str(uid), pres))
     except Exception as e:
         print(f"[add_new_game] Error updating social presence: {e}")
 
@@ -82,12 +84,15 @@ def delete_game(game_id):
                     try:
                         game_database.users_manager.update_user(uid, open_game_id="")
                         if hasattr(game_database, "presence_manager"):
-                            game_database.presence_manager.update_activity(
+                            from Controllers.SocialSession import social_session
+                            new_st = "online" if str(uid) in social_session.user_to_sockets else "offline"
+                            pres = game_database.presence_manager.update_activity(
                                 user_id=str(uid),
-                                status="online",
+                                status=new_st,
                                 current_game_id="",
                                 current_game_type="",
                             )
+                            static_functions.safe_run_async(social_session.broadcast_activity_change(str(uid), pres))
                     except Exception as e:
                         print(f"[delete_game] Error clearing open_game_id for {uid}: {e}")
     except Exception as e:

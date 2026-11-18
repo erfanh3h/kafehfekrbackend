@@ -53,6 +53,10 @@ class SocialSessionManager:
         self.user_clan_room: dict[str, str] = {}
         # rate limiter per (user_id, action)
         self._rate_buckets: dict[tuple[str, str], list[float]] = {}
+        # deduplication cache: user_id -> (status, game_type, game_id, lobby_id)
+        self._last_broadcast_presence: dict[str, tuple[str, str, str, str]] = {}
+        # throttle timestamps for non-disconnect presence updates
+        self._last_broadcast_ts: dict[str, float] = {}
 
     def _check_rate(self, user_id: str, action: str, max_calls: int = 25, window_sec: float = 60.0) -> bool:
         now = time.time()
@@ -119,7 +123,7 @@ class SocialSessionManager:
             namespace="/social",
         )
 
-        await self.broadcast_presence_to_peers(uid, pres, namespace_obj)
+        await self.broadcast_presence_to_peers(uid, pres, namespace_obj, force=was_offline)
 
     async def disconnect_user(self, socket_id: str, namespace_obj) -> None:
         try:
@@ -162,7 +166,7 @@ class SocialSessionManager:
                 add_socket=False,
                 clear_sockets=True,
             )
-            await self.broadcast_presence_to_peers(uid, pres, namespace_obj)
+            await self.broadcast_presence_to_peers(uid, pres, namespace_obj, force=True)
         else:
             game_database.presence_manager.update_presence(
                 user_id=uid,
@@ -171,8 +175,35 @@ class SocialSessionManager:
                 add_socket=False,
             )
 
-    async def broadcast_presence_to_peers(self, user_id: str, presence_doc: dict, namespace_obj) -> None:
+    def _presence_key(self, pres: dict) -> tuple[str, str, str, str]:
+        st = str(pres.get("status", "offline") or "offline")
+        return (
+            st,
+            str(pres.get("current_game_type", "") or "") if st == "in_game" else "",
+            str(pres.get("current_game_id", "") or "") if st == "in_game" else "",
+            str(pres.get("current_lobby_id", "") or "") if st == "in_lobby" else "",
+        )
+
+    async def broadcast_presence_to_peers(
+        self,
+        user_id: str,
+        presence_doc: dict,
+        namespace_obj,
+        force: bool = False,
+    ) -> None:
         uid = str(user_id)
+        new_key = self._presence_key(presence_doc)
+        now_ts = time.time()
+        if not force:
+            if self._last_broadcast_presence.get(uid) == new_key:
+                return
+            # Protect server from rapid oscillation spam (allow offline/online connect transitions immediately)
+            if new_key[0] not in ("offline", "online") and (now_ts - self._last_broadcast_ts.get(uid, 0.0)) < 1.2:
+                return
+
+        self._last_broadcast_presence[uid] = new_key
+        self._last_broadcast_ts[uid] = now_ts
+
         u_doc = game_database.users_manager.read_user(uid) or {}
         priv = u_doc.get("privacy") if isinstance(u_doc.get("privacy"), dict) else {}
         show_game = bool(priv.get("show_current_game", True))
@@ -182,24 +213,42 @@ class SocialSessionManager:
             "user_id": uid,
             "username": str(u_doc.get("username", "بازیکن")),
             "image": int(u_doc.get("image", 0) or 0),
-            "status": str(presence_doc.get("status", "offline")),
-            "current_game_type": str(presence_doc.get("current_game_type", "")) if show_game else "",
-            "current_game_id": str(presence_doc.get("current_game_id", "")) if show_game else "",
-            "current_lobby_id": str(presence_doc.get("current_lobby_id", "")) if show_game else "",
+            "status": new_key[0],
+            "current_game_type": new_key[1] if show_game else "",
+            "current_game_id": new_key[2] if show_game else "",
+            "current_lobby_id": new_key[3] if show_game else "",
             "last_seen": self._serialize_dt(presence_doc.get("last_seen")) if show_last_seen else "",
         }
         cmd = make_command_json(id=commands.Social_Presence_Changed, data=payload)
 
-        # Emit to online friends
+        # Emit to clan room first (single room broadcast) and collect its member IDs to avoid duplicate emits
+        clan_member_ids: set[str] = set()
+        cid = self.user_clan_room.get(uid, "")
+        if not cid:
+            mem = game_database.clans_manager.get_user_membership(uid)
+            cid = str(mem["clan_id"]) if (mem and mem.get("clan_id")) else ""
+        if cid:
+            await namespace_obj.emit("command", cmd, room=f"clan_{cid}", namespace="/social")
+            try:
+                for m in (game_database.clans_manager.get_clan_members(cid) or []):
+                    if isinstance(m, dict) and m.get("user_id"):
+                        clan_member_ids.add(str(m["user_id"]))
+            except Exception:
+                pass
+
+        # Emit to online friends not already covered by the clan room broadcast
         friend_ids = game_database.friends_manager.get_friend_ids(uid)
         for fid in friend_ids:
-            if fid in self.user_to_sockets:
-                await namespace_obj.emit("command", cmd, room=f"user_{fid}", namespace="/social")
+            fid_s = str(fid)
+            if fid_s in self.user_to_sockets and fid_s not in clan_member_ids:
+                await namespace_obj.emit("command", cmd, room=f"user_{fid_s}", namespace="/social")
 
-        # Emit to clan room if member of a clan
-        mem = game_database.clans_manager.get_user_membership(uid)
-        if mem and mem.get("clan_id"):
-            await namespace_obj.emit("command", cmd, room=f"clan_{mem['clan_id']}", namespace="/social")
+    async def broadcast_activity_change(self, user_id: str, presence_doc: dict) -> None:
+        try:
+            from Entities.SocketIOClass import Socket_Server
+            await self.broadcast_presence_to_peers(str(user_id), presence_doc, Socket_Server, force=False)
+        except Exception:
+            pass
 
     async def handle_command(self, socket_id: str, data: dict, namespace_obj) -> None:
         if not isinstance(data, dict):
@@ -216,12 +265,25 @@ class SocialSessionManager:
         if not u_doc:
             return
 
-        # 1. Presence Update
+        # 1. Presence Update (fast-path no-op heartbeat to keep server lightweight)
         if cmd_id == commands.Social_Presence_Update:
+            if not self._check_rate(uid, "presence_update", 30, 60.0):
+                return
             st = str(payload.get("status", "online"))
             g_type = str(payload.get("current_game_type", ""))
             g_id = str(payload.get("current_game_id", ""))
             l_id = str(payload.get("current_lobby_id", ""))
+            desired_key = (
+                st,
+                g_type if st == "in_game" else "",
+                g_id if st == "in_game" else "",
+                l_id if st == "in_lobby" else "",
+            )
+            if self._last_broadcast_presence.get(uid) == desired_key:
+                # Unchanged heartbeat: single lightweight timestamp update, zero peer broadcasts
+                game_database.presence_manager.touch_heartbeat(uid)
+                return
+
             pres = game_database.presence_manager.update_presence(
                 user_id=uid,
                 status=st,
@@ -237,10 +299,11 @@ class SocialSessionManager:
             old_cid = self.user_clan_room.get(uid, "")
             if old_cid and old_cid != new_cid:
                 await namespace_obj.leave_room(socket_id, f"clan_{old_cid}", namespace="/social")
+                self.user_clan_room.pop(uid, None)
             if new_cid and new_cid != old_cid:
                 self.user_clan_room[uid] = new_cid
                 await namespace_obj.enter_room(socket_id, f"clan_{new_cid}", namespace="/social")
-            await self.broadcast_presence_to_peers(uid, pres, namespace_obj)
+            await self.broadcast_presence_to_peers(uid, pres, namespace_obj, force=False)
             return
 
         # 2. Direct Message Send

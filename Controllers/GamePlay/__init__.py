@@ -112,10 +112,17 @@ class BaseGamePlayClass:
 
     def send_game_play_data(self, socket_id):
         is_between = (self.game_session is None or self.game_session.is_game_finished) and not self.is_game_finished
+        spec_cnt = 0
+        try:
+            from Controllers.Spectator.spectator_session_manager import spectator_session_manager
+            spec_cnt = int(spectator_session_manager.get_spectator_count(self.game_play_id))
+        except Exception:
+            spec_cnt = 0
         game_data = {'gamers': [], 'games': self.game_types, 'game_score_type': self.game_score_type.value,
                      'current_game_index': self.current_game_index, 'winners': self.game_winners,
                      'is_game_finished': self.is_game_finished, 'is_between_games': is_between,
                      'scores': self.gamer_scores,
+                     'spectator_count': spec_cnt,
                      'game_winner_id': self.game_winner_id,
                      'xp_awarded': getattr(self.score_manager, 'last_awarded_xp', {}),
                      'score_awarded': getattr(self.score_manager, 'last_awarded_score', {}),

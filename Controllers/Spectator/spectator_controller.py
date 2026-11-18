@@ -295,6 +295,11 @@ class SpectatorController:
         await SpectatorRoomManager.emit_to_spectator(sid, state_cmd, namespace=namespace)
         return state_cmd
 
+    @staticmethod
+    def _normalize_game_mode(mode_val) -> str:
+        raw = getattr(mode_val, "value", mode_val)
+        return str(raw or "").strip().lower().replace("_", "").replace("-", "").replace(" ", "")
+
     async def handle_list_live_games(
         self,
         viewer_id: str,
@@ -306,6 +311,8 @@ class SpectatorController:
         req = payload if isinstance(payload, dict) else {}
         scope = str(req.get("scope", "all") or "all").strip().lower()
         game_type_filter = str(req.get("game_type", "") or "").strip()
+        game_mode_filter = str(req.get("game_mode", req.get("game_score_type", "")) or "").strip()
+        game_mode_norm = self._normalize_game_mode(game_mode_filter)
 
         friend_ids = set()
         clan_member_ids = set()
@@ -341,8 +348,12 @@ class SpectatorController:
                 if uid in pids:
                     continue
                 g_session = SpectatorStateSerializer.resolve_active_game_session(gp)
-                g_type = SpectatorStateSerializer.resolve_game_type(gp, g_session)
+                g_type = SpectatorStateSerializer.resolve_active_game_type(gp, g_session)
                 if game_type_filter and g_type.lower() != game_type_filter.lower():
+                    continue
+                raw_score_type = getattr(gp, "game_score_type", "")
+                g_score_type = str(getattr(raw_score_type, "value", raw_score_type) or "").strip()
+                if game_mode_norm and self._normalize_game_mode(g_score_type) != game_mode_norm:
                     continue
                 has_friend = any(pid in friend_ids for pid in pids)
                 has_clanmate = any(pid in clan_member_ids for pid in pids)
@@ -351,7 +362,7 @@ class SpectatorController:
                 if scope == "clan" and not has_clanmate:
                     continue
                 spec_cnt = self.session_manager.get_spectator_count(str(gid))
-                allowed, _, _ = SpectatorAccessManager.check_can_spectate(
+                allowed, reason_code, _ = SpectatorAccessManager.check_can_spectate(
                     viewer_id=uid,
                     game_id=str(gid),
                     game_play=gp,
@@ -359,16 +370,27 @@ class SpectatorController:
                     active_player_game_id=None,
                 )
                 if not allowed:
-                    continue
+                    # Allow listing active matches whose sub-game session is momentarily starting/between rounds
+                    if reason_code == "session_unavailable" and getattr(gp, "is_game_started", False):
+                        is_safe, _ = SpectatorStateSerializer.is_game_spectatable(g_type)
+                        allow_spec = getattr(gp, "allow_spectators", True)
+                        if not is_safe or allow_spec is False or str(allow_spec).lower() == "none":
+                            continue
+                    else:
+                        continue
                 profiles = self._load_public_profiles(pids)
                 players_list = []
-                for q in list(getattr(gp, "queuers", []) or []):
+                participants = list(getattr(gp, "gamers", None) or getattr(gp, "queuers", None) or [])
+                for q in participants:
                     qid = str(getattr(q, "user_id", "") or "")
                     prof = profiles.get(qid, {})
+                    img_id = int(prof.get("image", getattr(q, "user_image", 0)) or 0)
                     players_list.append({
                         "user_id": qid,
                         "username": str(prof.get("username", getattr(q, "username", "بازیکن")) or "بازیکن"),
-                        "image": int(prof.get("image", getattr(q, "user_image", 0)) or 0),
+                        "image": img_id,
+                        "avatar": img_id,
+                        "profile_frame": int(prof.get("profile_frame", 0) or 0),
                         "score": int(prof.get("score", getattr(q, "user_score", 0)) or 0),
                         "clan": prof.get("clan"),
                         "is_friend": qid in friend_ids,
@@ -378,13 +400,14 @@ class SpectatorController:
                 items.append({
                     "game_id": str(gid),
                     "game_type": g_type,
+                    "game_score_type": g_score_type,
                     "spectator_count": spec_cnt,
                     "has_friend": has_friend,
                     "has_clanmate": has_clanmate,
                     "players": players_list,
                 })
-        except Exception:
-            pass
+        except Exception as e:
+            print(f"[SpectatorController] handle_list_live_games error: {e}")
 
         items.sort(
             key=lambda x: (
@@ -401,6 +424,7 @@ class SpectatorController:
                 "total": len(items),
                 "scope": scope,
                 "game_type": game_type_filter,
+                "game_mode": game_mode_filter,
             },
         )
         await SpectatorRoomManager.emit_to_spectator(sid, resp_cmd, namespace=namespace)

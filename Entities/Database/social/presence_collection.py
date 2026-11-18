@@ -125,6 +125,13 @@ class PresenceCollectionManager:
                 }
         return out
 
+    def touch_heartbeat(self, user_id: str) -> None:
+        now = datetime.now()
+        self.collection.update_one(
+            {"_id": str(user_id)},
+            {"$set": {"last_seen": now, "updated_at": now}},
+        )
+
     def update_activity(self, user_id: str, status: str = "online", current_game_type: str = "", current_game_id: str = "", current_lobby_id: str = "") -> dict:
         return self.update_presence(
             user_id=user_id,

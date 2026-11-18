@@ -33,9 +33,10 @@ SAFE_SPECTATOR_GAMES = {
     "dotsandboxes",
     "yinsh",
     "yatzy",
+    "mnumbers",
 }
 
-# Games with hidden player state (ships, secret codes, hidden mines/numbers, private hands, simultaneous secret choices)
+# Games with hidden player state (ships, secret codes, hidden mines, private hands, simultaneous secret choices)
 # Spectating is disabled by default for these games unless dedicated public-only views exist.
 PRIVATE_STATE_GAMES = {
     "battleship",
@@ -44,7 +45,6 @@ PRIVATE_STATE_GAMES = {
     "fekrbekr",
     "sudoku",
     "msweeper",
-    "mnumbers",
     "quiz",
     "rpc",
 }
