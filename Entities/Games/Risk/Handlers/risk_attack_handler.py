@@ -119,8 +119,23 @@ class RiskAttackHandler:
         self.game.attacks_this_turn = getattr(self.game, "attacks_this_turn", 0) + 1
         return True
 
-    def add_attacker_army(self, count: int, gamer_id: int = None) -> int:
-        # Rule: After attack starts (or once attacker has committed), players can NO LONGER add new army cards to battle!
+    def to_active_dict(self) -> Optional[dict]:
+        if not self.is_attack_active:
+            return None
+        return {
+            "attacker_id": self.source_id + 1,
+            "defender_id": self.target_id,
+            "source_continent": self.source_continent.value,
+            "target_continent": self.target_continent.value,
+            "attacker_army": self.source_army,
+            "defender_army": self.target_army,
+            "attacker_canon_bonus": self.attacker_canon_bonus,
+            "defender_canon_bonus": self.defender_canon_bonus,
+            "battle_started": self.battle_started,
+        }
+
+    def add_attacker_army(self, count: int, gamer_id: int = None, commit: bool = True) -> int:
+        # Rule: After attack starts (or once attacker has finalized commitment), players can NO LONGER add new army cards!
         if not self.is_attack_active or self.battle_started or self.attacker_committed:
             return 0
         p_idx = (gamer_id - 1) if gamer_id is not None else self.source_id
@@ -134,11 +149,12 @@ class RiskAttackHandler:
             player.remove_strategy(RiskStrategyModel.ARMY)
             self.game.discarded_strategies.append(RiskStrategyModel.ARMY)
         self.source_army += actual
-        self.attacker_committed = True
+        if commit:
+            self.attacker_committed = True
         return actual
 
-    def add_defender_army(self, count: int, gamer_id: int = None) -> int:
-        # Rule: After attack starts (or once defender has committed), players can NO LONGER add new army cards to battle!
+    def add_defender_army(self, count: int, gamer_id: int = None, commit: bool = True) -> int:
+        # Rule: After attack starts (or once defender has finalized commitment), players can NO LONGER add new army cards!
         if not self.is_attack_active or self.battle_started or self.defender_committed:
             return 0
         p_idx = (gamer_id - 1) if gamer_id is not None else (self.target_id - 1)
@@ -152,7 +168,8 @@ class RiskAttackHandler:
             player.remove_strategy(RiskStrategyModel.ARMY)
             self.game.discarded_strategies.append(RiskStrategyModel.ARMY)
         self.target_army += actual
-        self.defender_committed = True
+        if commit:
+            self.defender_committed = True
         return actual
 
     def stop_attack(self) -> dict:
@@ -171,6 +188,10 @@ class RiskAttackHandler:
             "defender_army": 0,
             "attacker_losses": 0,
             "defender_losses": 0,
+            "attacker_army_losses": 0,
+            "defender_army_losses": 0,
+            "attacker_continent_losses": 0,
+            "defender_continent_losses": 0,
             "returned_continents_count": 0,
             "conquered": False,
             "battle_continues": False,
@@ -187,6 +208,9 @@ class RiskAttackHandler:
         if not self.is_attack_active:
             return False
         if not (1 <= gamer_id <= len(self.game.players_data)):
+            return False
+        # Ceasefire / Cancel is a defensive reaction card played by the defender
+        if gamer_id != self.target_id:
             return False
         player = self.game.players_data[gamer_id - 1]
         if not player.has_strategy(RiskStrategyModel.CANCEL):
@@ -208,6 +232,10 @@ class RiskAttackHandler:
             "defender_army": 0,
             "attacker_losses": 0,
             "defender_losses": 0,
+            "attacker_army_losses": 0,
+            "defender_army_losses": 0,
+            "attacker_continent_losses": 0,
+            "defender_continent_losses": 0,
             "returned_continents_count": 0,
             "conquered": False,
             "battle_continues": False,
@@ -243,8 +271,10 @@ class RiskAttackHandler:
         atk_dice_count = min(3, max(1, atk_cards + self.source_army))
         def_dice_count = min(2, max(1, def_cards + self.target_army))
 
-        attacker_dice = _roll_sorted_dice(atk_dice_count, bonus=self.attacker_canon_bonus)
-        defender_dice = _roll_sorted_dice(def_dice_count, bonus=self.defender_canon_bonus)
+        atk_canon_used = self.attacker_canon_bonus
+        def_canon_used = self.defender_canon_bonus
+        attacker_dice = _roll_sorted_dice(atk_dice_count, bonus=atk_canon_used)
+        defender_dice = _roll_sorted_dice(def_dice_count, bonus=def_canon_used)
         self.attacker_canon_bonus = 0
         self.defender_canon_bonus = 0
         self.game.current_dice = {"attacker": attacker_dice, "defender": defender_dice}
@@ -301,10 +331,14 @@ class RiskAttackHandler:
             "target_continent": tgt_c,
             "attacker_dice": attacker_dice,
             "defender_dice": defender_dice,
+            "attacker_canon_used": atk_canon_used,
+            "defender_canon_used": def_canon_used,
             "attacker_army": self.source_army,
             "defender_army": self.target_army,
             "attacker_losses": total_atk_loss,
             "defender_losses": total_def_loss,
+            "attacker_army_losses": atk_army_lost,
+            "defender_army_losses": def_army_lost,
             "attacker_continent_losses": actual_atk_c_loss,
             "defender_continent_losses": actual_def_c_loss,
             "returned_continents_count": returned_to_table,

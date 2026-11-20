@@ -368,7 +368,11 @@ class ClassicRankBot:
             return
 
         if is_continuation:
-            await asyncio.sleep(0.55)
+            if hasattr(self.game_logic, "get_continuation_delay"):
+                cont_delay = float(self.game_logic.get_continuation_delay())
+                await asyncio.sleep(max(0.55, cont_delay))
+            else:
+                await asyncio.sleep(0.55)
         else:
             is_critical = self.game_logic.is_critical_turn()
             # 25% chance to send a tactical reaction during tense, critical turns

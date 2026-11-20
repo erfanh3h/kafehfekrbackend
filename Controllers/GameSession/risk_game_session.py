@@ -1,3 +1,4 @@
+import asyncio
 from Controllers.GameSession.base_multiplayer_game_session import BaseMultiplayerGameSession
 from Entities.Games.Risk import RiskGameClass
 from Entities.Games.Risk.Models.models import RiskGameState
@@ -249,6 +250,9 @@ class RiskGameSession(BaseMultiplayerGameSession):
                     'source_continent': src_c,
                     'target_continent': tgt_c,
                     'target_index': tgt_idx,
+                    'attacker_canon_bonus': self.game_controller.attack_handler.attacker_canon_bonus,
+                    'active_attack': self.game_controller.attack_handler.to_active_dict(),
+                    'attacked_this_turn': True,
                     'continents': len(self.game_controller.continents),
                     'strategies': len(self.game_controller.strategies),
                     'game_state': self.game_controller.game_state.value,
@@ -258,14 +262,15 @@ class RiskGameSession(BaseMultiplayerGameSession):
 
         elif cmd_id == commands.AttackerArmy:
             self.timer.stop(False)
-            added = await self.game_controller.recieve_data(cmd_id, data, gamer_id)
+            total_committed = await self.game_controller.recieve_data(cmd_id, data, gamer_id)
             await self._sync_all_private_user_data_async()
             await self.send_command(
                 commands.AttackerArmy,
                 {
                     'gamer_id': gamer_id,
-                    'count': added,
+                    'count': total_committed,
                     'target_index': self.game_controller.attack_handler.target_id,
+                    'active_attack': self.game_controller.attack_handler.to_active_dict(),
                     'players_data': [p.to_global_json() for p in self.game_controller.players_data],
                     'continents': len(self.game_controller.continents),
                     'strategies': len(self.game_controller.strategies),
@@ -316,17 +321,24 @@ class RiskGameSession(BaseMultiplayerGameSession):
             effect_payload["continents"] = len(self.game_controller.continents)
             effect_payload["strategies"] = len(self.game_controller.strategies)
             effect_payload["game_state"] = self.game_controller.game_state.value
+            effect_payload["active_attack"] = self.game_controller.attack_handler.to_active_dict()
+            effect_payload["attacked_this_turn"] = self.game_controller.attacked_this_turn
+            effect_payload["pending_attacker_canon_bonus"] = self.game_controller.pending_attacker_canon_bonus
             effect_payload["is_game_finished"] = is_ended
             effect_payload["winner"] = self.game_controller.get_game_winner() if is_ended else 0
             await self._sync_all_private_user_data_async()
             await self.send_command(getattr(commands, "Strategy_Result", "StrategyResult"), effect_payload)
             if effect.get("attack_canceled") and self.game_controller.attack_handler.last_battle_result:
+                await asyncio.sleep(0.35)
                 await self._broadcast_battle_result(self.game_controller.attack_handler.last_battle_result)
                 return
             if is_ended:
                 self.timer.stop(False)
                 self.timer.start(2, self.check_finish_game)
                 return
+            # Refresh turn timer on active combat tactic plays (e.g., Defender playing Canon/Army during defense)
+            self.timer.stop(False)
+            self.timer.start(Risk_Turn_Time, self.on_turn_timeout)
 
     def finish_reconnect_time(self, user_id):
         if self.is_game_finished:
@@ -478,6 +490,7 @@ class RiskGameSession(BaseMultiplayerGameSession):
             {
                 'gamer_index': p_idx,
                 'gamer_id': gamer_id,
+                'drew_bonus_strategy': bool(draw_result),
                 'new_data': self.game_controller.players_data[p_idx].to_global_json(),
                 'players_data': [p.to_global_json() for p in self.game_controller.players_data],
                 'tokens': list(self.game_controller.tokens),
@@ -486,5 +499,8 @@ class RiskGameSession(BaseMultiplayerGameSession):
             },
         )
         if self.check_finish_game():
+            return
+        await asyncio.sleep(0.55)
+        if self.is_game_finished or self.check_finish_game():
             return
         self.send_current_turn()
