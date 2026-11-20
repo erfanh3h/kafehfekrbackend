@@ -560,6 +560,7 @@ class SocialSessionManager:
             from_id = str(inv.get("from_user_id", ""))
             if action != "accept":
                 game_database.invitations_manager.update_status(invite_id, "rejected")
+                game_database.notifications_manager.delete_by_payload(uid, "invite_id", invite_id)
                 rej_payload = {
                     "invite_id": invite_id,
                     "status": "rejected",
@@ -633,6 +634,7 @@ class SocialSessionManager:
             game_database.invitations_manager.update_status(
                 invite_id, "accepted", {"game_id": created_game_id}
             )
+            game_database.notifications_manager.delete_by_payload(uid, "invite_id", invite_id)
             acc_payload = {
                 "invite_id": invite_id,
                 "status": "accepted",
