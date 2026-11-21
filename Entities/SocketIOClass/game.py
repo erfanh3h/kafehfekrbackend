@@ -131,11 +131,14 @@ class GameSocketNameSpace(socketio.AsyncNamespace):
             await self.disconnect(socket_id, namespace="/game")
             return
         user_id = token_data['id']
+        user_data = game_database.users_manager.read_user(user_id)
+        if not user_data or static_functions.is_user_banned(user_data):
+            await self.emit('command', {'id': commands.Logout, 'data': {'reason': 'banned', 'message': 'حساب کاربری شما توسط مدیریت مسدود شده است.'}}, to=socket_id, namespace="/game")
+            await self.disconnect(socket_id, namespace="/game")
+            return
         user_game_id = auth.get('game_id', '') if isinstance(auth, dict) else ''
-        if not user_game_id:
-            user_data = game_database.users_manager.read_user(user_id)
-            if user_data:
-                user_game_id = user_data.get("open_game_id", "")
+        if not user_game_id and user_data:
+            user_game_id = user_data.get("open_game_id", "")
         if is_game_id_valid(user_game_id) and user_game_id in games:
             game_obj = games[user_game_id]
             if not game_obj.is_user_id_valid(user_id):

@@ -32,6 +32,8 @@ async def get_current_user(token: str):
     if user_token_data is not None:
         from Entities.Database import game_database
         user = game_database.users_manager.read_user(user_token_data['id'])
+        if is_user_banned(user):
+            return None
         return user
     else:
         return None
@@ -55,6 +57,36 @@ def gametype_to_difficulty(game_type):
 
 
 main_loop = None
+
+
+def parse_version(ver_str: str) -> tuple:
+    """Parses a version string like '2.0.1' into a tuple of ints (2, 0, 1)."""
+    try:
+        parts = []
+        for segment in str(ver_str or "").strip().split("."):
+            digits = "".join(ch for ch in segment if ch.isdigit())
+            parts.append(int(digits) if digits else 0)
+        return tuple(parts) if parts else (0,)
+    except Exception:
+        return (0,)
+
+
+def is_version_allowed(current_ver: str, allowed_ver: str) -> bool:
+    """Returns True if current_ver is greater than or equal to allowed_ver."""
+    if not allowed_ver or not str(allowed_ver).strip():
+        return True
+    return parse_version(current_ver) >= parse_version(allowed_ver)
+
+
+def is_user_banned(user_data: dict | None) -> bool:
+    """Returns True if the user account is inactive or flagged as banned."""
+    if not user_data or not isinstance(user_data, dict):
+        return False
+    if user_data.get("is_active") is False:
+        return True
+    if user_data.get("is_banned") is True:
+        return True
+    return False
 
 
 def set_main_loop(loop):
