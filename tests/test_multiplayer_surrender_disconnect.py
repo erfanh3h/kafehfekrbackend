@@ -829,6 +829,15 @@ class TestAllSixMultiplayerGames(unittest.TestCase):
         self.assertFalse(bot.is_active)
         self.assertEqual(len(disconnected), 1)
 
+    def test_bot_is_not_treated_as_banned(self):
+        from Commons.static_functions import is_user_banned
+        self.assertFalse(is_user_banned(None))
+        self.assertFalse(is_user_banned({"_id": "bot_12345", "username": "Bot"}))
+        self.assertFalse(is_user_banned({"is_bot": True, "username": "Bot"}))
+        self.assertTrue(is_user_banned({"_id": "user1", "is_banned": True}))
+        self.assertTrue(is_user_banned({"_id": "user1", "is_active": False}))
+        self.assertFalse(is_user_banned({"_id": "user1", "is_active": True, "is_banned": False}))
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

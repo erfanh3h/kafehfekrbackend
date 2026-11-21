@@ -173,7 +173,15 @@ class BaseGamePlayClass:
                     if gamer.socket_id:
                         safe_run_async(
                             send_private_command(
-                                command=make_command_json(id=commands.Game_Finished, data={}),
+                                command=make_command_json(
+                                    id=commands.Game_Finished,
+                                    data={
+                                        "is_terminated": True,
+                                        "winner": -1,
+                                        "reason": "terminated",
+                                        "message": "اتصال تمام بازیکنان به بازی برقرار نشد و مسابقه لغو گردید."
+                                    }
+                                ),
                                 socket_id=gamer.socket_id,
                                 game_id=self.game_play_id,
                             )

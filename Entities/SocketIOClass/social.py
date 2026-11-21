@@ -16,6 +16,10 @@ class SocialSocketNameSpace(socketio.AsyncNamespace):
             await self.disconnect(socket_id, namespace="/social")
             return
         user_id = str(token_data["id"])
+        is_bot = bool(token_data.get('is_bot')) or str(user_id).startswith("bot_")
+        if is_bot:
+            await self.disconnect(socket_id, namespace="/social")
+            return
         user_data = game_database.users_manager.read_user(user_id)
         if not user_data or is_user_banned(user_data):
             await self.emit("command", {"id": commands.Logout, "data": {"reason": "banned", "message": "حساب کاربری شما توسط مدیریت مسدود شده است."}}, to=socket_id, namespace="/social")

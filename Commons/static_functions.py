@@ -30,8 +30,12 @@ async def get_current_user(token: str):
     from Entities import Security
     user_token_data = await Security.extract_token(token)
     if user_token_data is not None:
+        user_id = user_token_data.get('id')
+        is_bot = bool(user_token_data.get('is_bot')) or str(user_id).startswith("bot_")
+        if is_bot:
+            return {"_id": user_id, "id": user_id, "username": "Bot", "is_active": True, "is_banned": False}
         from Entities.Database import game_database
-        user = game_database.users_manager.read_user(user_token_data['id'])
+        user = game_database.users_manager.read_user(user_id)
         if is_user_banned(user):
             return None
         return user
@@ -81,6 +85,8 @@ def is_version_allowed(current_ver: str, allowed_ver: str) -> bool:
 def is_user_banned(user_data: dict | None) -> bool:
     """Returns True if the user account is inactive or flagged as banned."""
     if not user_data or not isinstance(user_data, dict):
+        return False
+    if str(user_data.get("_id", "")).startswith("bot_") or user_data.get("is_bot") is True:
         return False
     if user_data.get("is_active") is False:
         return True
