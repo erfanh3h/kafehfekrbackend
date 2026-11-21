@@ -73,6 +73,7 @@ class ClassicRankBot:
         self._pending_tasks: list[asyncio.Task] = []
         self.is_active = False
         self.my_role = 2  # default player 2, updated via GameData/UserData
+        self.players_count = 2
         self._last_reaction_time: float = 0.0
 
     async def start(self):
@@ -178,7 +179,9 @@ class ClassicRankBot:
             return
 
         elif cmd_id == "GameData":
-            if isinstance(payload, dict) and "gamers" in payload:
+            if isinstance(payload, dict) and "gamers" in payload and isinstance(payload["gamers"], list):
+                if len(payload["gamers"]) >= 2:
+                    self.players_count = len(payload["gamers"])
                 for gamer in payload["gamers"]:
                     p_uid = gamer.get("user_id") if isinstance(gamer, dict) else ""
                     if p_uid == self.bot_user_id:
@@ -191,6 +194,8 @@ class ClassicRankBot:
 
         elif cmd_id == "UserData":
             if isinstance(payload, list):
+                if len(payload) >= 2:
+                    self.players_count = len(payload)
                 for idx, player in enumerate(payload):
                     p_uid = player.get("user_id") if isinstance(player, dict) else ""
                     if p_uid == self.bot_user_id:
@@ -225,6 +230,8 @@ class ClassicRankBot:
 
         elif cmd_id == "ReconnectData":
             if isinstance(payload, dict) and "gamers" in payload and isinstance(payload["gamers"], list):
+                if len(payload["gamers"]) >= 2:
+                    self.players_count = len(payload["gamers"])
                 for gamer in payload["gamers"]:
                     p_uid = gamer.get("user_id") if isinstance(gamer, dict) else ""
                     if p_uid == self.bot_user_id:
@@ -297,11 +304,17 @@ class ClassicRankBot:
             self.game_logic.on_new_round(payload)
 
         elif cmd_id == "Surrender":
-            print(f"[ClassicRankBot:{self.bot_name}] Opponent surrendered! Stopping bot.")
-            self.is_active = False
-            self._cancel_quiz_turn()
-            await asyncio.sleep(1.0)
-            await self.disconnect()
+            self.game_logic.handle_server_command(cmd_id, payload)
+            surrendered_gid = payload.get("gamer_id") if isinstance(payload, dict) else payload
+            is_self_surrender = (surrendered_gid is not None and int(surrendered_gid) == int(self.my_role))
+            if self.players_count <= 2 or is_self_surrender:
+                print(f"[ClassicRankBot:{self.bot_name}] Match surrender detected! Stopping bot.")
+                self.is_active = False
+                self._cancel_quiz_turn()
+                await asyncio.sleep(1.0)
+                await self.disconnect()
+            else:
+                print(f"[ClassicRankBot:{self.bot_name}] Player {surrendered_gid} surrendered in {self.players_count}P match; continuing play.")
 
         elif cmd_id in ("FinishGame", "GameFinished"):
             winner = payload.get("Winner", 0) if isinstance(payload, dict) else payload

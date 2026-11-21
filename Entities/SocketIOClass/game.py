@@ -82,17 +82,19 @@ def delete_game(game_id):
                 uid = getattr(gamer, 'user_id', None)
                 if uid and not str(uid).startswith("bot_"):
                     try:
-                        game_database.users_manager.update_user(uid, open_game_id="")
-                        if hasattr(game_database, "presence_manager"):
-                            from Controllers.SocialSession import social_session
-                            new_st = "online" if str(uid) in social_session.user_to_sockets else "offline"
-                            pres = game_database.presence_manager.update_activity(
-                                user_id=str(uid),
-                                status=new_st,
-                                current_game_id="",
-                                current_game_type="",
-                            )
-                            static_functions.safe_run_async(social_session.broadcast_activity_change(str(uid), pres))
+                        user_doc = game_database.users_manager.read_user(uid)
+                        if user_doc is None or user_doc.get("open_game_id", "") in ("", game_id):
+                            game_database.users_manager.update_user(uid, open_game_id="")
+                            if hasattr(game_database, "presence_manager"):
+                                from Controllers.SocialSession import social_session
+                                new_st = "online" if str(uid) in social_session.user_to_sockets else "offline"
+                                pres = game_database.presence_manager.update_activity(
+                                    user_id=str(uid),
+                                    status=new_st,
+                                    current_game_id="",
+                                    current_game_type="",
+                                )
+                                static_functions.safe_run_async(social_session.broadcast_activity_change(str(uid), pres))
                     except Exception as e:
                         print(f"[delete_game] Error clearing open_game_id for {uid}: {e}")
     except Exception as e:
@@ -101,14 +103,7 @@ def delete_game(game_id):
         from Commons.static_functions import safe_run_async
         from Controllers.Spectator.spectator_session_manager import spectator_session_manager
         if spectator_session_manager.get_spectator_count(str(game_id)) > 0:
-            safe_run_async(spectator_session_manager.on_game_ended(str(game_id), game_play=games.get(game_id)))
-    except Exception:
-        pass
-    try:
-        from Controllers.Spectator.spectator_session_manager import spectator_session_manager
-        from Commons.static_functions import safe_run_async
-        if spectator_session_manager.get_spectator_count(game_id) > 0:
-            safe_run_async(spectator_session_manager.on_game_ended(game_id, reason="ended"))
+            safe_run_async(spectator_session_manager.on_game_ended(str(game_id), game_play=games.get(game_id), reason="ended"))
     except Exception:
         pass
     try:

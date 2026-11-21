@@ -265,7 +265,15 @@ class RewardManagerClass:
             except Exception as e:
                 print(f"[RewardManager] Error updating classic rank history: {e}")
 
-    def finish_multiplayer_game(self, rank1_gamer_id, rank2_gamer_id, game_types):
+    def finish_multiplayer_game(
+        self,
+        rank1_gamer_id,
+        rank2_gamer_id,
+        game_types,
+        afk_or_dc_user_ids=None,
+        elimination_order_user_ids=None,
+        game_id=None,
+    ):
         self.game_types = game_types
         self.last_awarded_xp = {}
         self.last_awarded_score = {}
@@ -307,17 +315,68 @@ class RewardManagerClass:
         now = datetime.now()
 
         is_total_draw = rank1_gamer_id in (0, None, "0", "")
+        penalty_uid_set = {str(u) for u in (afk_or_dc_user_ids or []) if u not in (None, "", 0, "0")}
+        elim_order = [str(u) for u in (elimination_order_user_ids or []) if u not in (None, "", 0, "0")]
+
+        # Resolve rank1 / rank2 without seat-index vs user-ID collisions
+        player_uid_strs = [str(u) for u in self.players_idis[:total_players]]
+        r1_str = "" if is_total_draw else str(rank1_gamer_id)
+        r1_is_uid = (not is_total_draw) and (r1_str in player_uid_strs)
+        has_r2 = (not is_total_draw) and (rank2_gamer_id not in (0, None, "0", ""))
+        r2_str = str(rank2_gamer_id) if has_r2 else ""
+        r2_is_uid = has_r2 and (r2_str in player_uid_strs)
+
+        def _matches_rank1(idx_val, uid_val):
+            if is_total_draw:
+                return False
+            if r1_is_uid:
+                return str(uid_val) == r1_str
+            return rank1_gamer_id == (idx_val + 1)
+
+        def _matches_rank2(idx_val, uid_val):
+            if not has_r2 or _matches_rank1(idx_val, uid_val):
+                return False
+            if r2_is_uid:
+                return str(uid_val) == r2_str
+            return rank2_gamer_id == (idx_val + 1)
+
+        # Determine true 3rd-place player in 4-player matches (survived longest among non-rank1/rank2 players)
+        rank3_uid = None
+        if not is_total_draw and total_players >= 4:
+            other_losers = []
+            for idx, uid in enumerate(self.players_idis[:total_players]):
+                p_is_r1 = _matches_rank1(idx, uid)
+                p_is_r2 = _matches_rank2(idx, uid)
+                if not p_is_r1 and not p_is_r2:
+                    other_losers.append((idx, str(uid)))
+            if len(other_losers) >= 2:
+                if elim_order:
+                    def _survival_key(item):
+                        _, u_s = item
+                        # Players never eliminated (or eliminated later) survived longer -> 3rd place
+                        return elim_order.index(u_s) if u_s in elim_order else len(elim_order)
+                    best_loser = max(other_losers, key=_survival_key)
+                    rank3_uid = best_loser[1]
+                else:
+                    rank3_uid = other_losers[0][1]
+            elif len(other_losers) == 1:
+                rank3_uid = other_losers[0][1]
 
         for idx, uid in enumerate(self.players_idis[:total_players]):
-            gamer_num = idx + 1
-            is_r1 = (not is_total_draw) and ((rank1_gamer_id == gamer_num) or (str(rank1_gamer_id) == str(uid)))
-            is_r2 = (not is_total_draw) and (rank2_gamer_id not in (0, None, "0", "")) and ((rank2_gamer_id == gamer_num) or (str(rank2_gamer_id) == str(uid)))
+            is_r1 = _matches_rank1(idx, uid)
+            is_r2 = _matches_rank2(idx, uid)
+            is_r3 = (not is_total_draw) and (not is_r1) and (not is_r2) and (rank3_uid is not None and str(uid) == rank3_uid)
+            is_penalty = str(uid) in penalty_uid_set
 
             u_data = users_data[idx] if idx < len(users_data) else None
             daily_win_update = None
 
             if self.game_score_type == GameScoreTypesEnum.MultiRANK:
-                if is_total_draw:
+                if is_penalty:
+                    d_score = -12
+                    d_xp = 0
+                    d_coin = 0
+                elif is_total_draw:
                     d_score = 0
                     d_xp = 15
                     d_coin = 0
@@ -342,15 +401,14 @@ class RewardManagerClass:
                         d_score = -6
                         d_xp = 15
                         d_coin = 0
+                    elif is_r3:
+                        d_score = multi_rank_rank3_score  # -4
+                        d_xp = multi_rank_rank3_xp        # +15
+                        d_coin = multi_rank_rank3_coin    # 0
                     else:
-                        if idx == 2:
-                            d_score = multi_rank_rank3_score  # -4
-                            d_xp = multi_rank_rank3_xp        # +15
-                            d_coin = multi_rank_rank3_coin    # 0
-                        else:
-                            d_score = multi_rank_rankn_score  # -8
-                            d_xp = multi_rank_rankn_xp        # +10
-                            d_coin = multi_rank_rankn_coin    # 0
+                        d_score = multi_rank_rankn_score  # -8
+                        d_xp = multi_rank_rankn_xp        # +10
+                        d_coin = multi_rank_rankn_coin    # 0
 
             elif self.game_score_type == GameScoreTypesEnum.CLASSIC_RANK:
                 g_type = game_types[0] if game_types else ""
@@ -363,7 +421,9 @@ class RewardManagerClass:
                     r1_xp, r2_xp, rn_xp, draw_xp = 40, 20, 10, 15
 
                 d_score, d_coin = 0, 0
-                if is_total_draw:
+                if is_penalty:
+                    d_xp = 0
+                elif is_total_draw:
                     d_xp = draw_xp
                 elif is_r1:
                     d_xp = r1_xp
@@ -375,13 +435,15 @@ class RewardManagerClass:
             else:
                 # LOBBY / NORMAL Multiplayer: Social EXP only, STRICTLY 0 Coins and 0 Score
                 d_score, d_coin = 0, 0
-                if is_total_draw:
+                if is_penalty:
+                    d_xp = 0
+                elif is_total_draw:
                     d_xp = 10
                 elif is_r1:
                     d_xp = 20
                 elif is_r2:
                     d_xp = 12
-                elif idx == 2:
+                elif is_r3:
                     d_xp = 6
                 else:
                     d_xp = 4
@@ -399,21 +461,23 @@ class RewardManagerClass:
                         "score": max(0, u_data.get('score', 0) + d_score),
                         "xp": max(0, u_data.get('xp', 0) + d_xp),
                         "coin": max(0, u_data.get('coin', 0) + d_coin),
-                        "open_game_id": "",
                         "last_time_played": datetime.now()
                     }
+                    if game_id is None or u_data.get("open_game_id", "") in ("", game_id):
+                        update_kwargs["open_game_id"] = ""
                     if daily_win_update is not None:
                         update_kwargs["last_daily_win"] = daily_win_update
 
                     game_database.users_manager.update_user(uid, **update_kwargs)
                 else:
-                    game_database.users_manager.update_user(uid, open_game_id="")
+                    if game_id is None:
+                        game_database.users_manager.update_user(uid, open_game_id="")
                 is_ranked_multi = self.game_score_type in (GameScoreTypesEnum.MultiRANK, GameScoreTypesEnum.CLASSIC_RANK)
                 if is_ranked_multi and hasattr(game_database, "clans_manager"):
                     opp_ids = [str(other) for other in self.players_idis[:total_players] if str(other) != str(uid) and not str(other).startswith("bot_")]
                     game_database.clans_manager.record_member_match_contribution(
                         user_id=str(uid),
-                        is_win=bool(is_r1),
+                        is_win=bool(is_r1 and not is_penalty),
                         xp_earned=max(0, d_xp),
                         score_earned=max(0, d_score),
                         opponent_ids=opp_ids,
@@ -492,6 +556,13 @@ class RewardManagerClass:
         user4_history = {}
         histories = [user1_history, user2_history, user3_history, user4_history]
         total_players = min(4, len(self.players_idis))
+        is_draw = rank1_gamer_id in (0, None, "0", "")
+        player_uid_strs = [str(u) for u in self.players_idis[:total_players]]
+        r1_str = "" if is_draw else str(rank1_gamer_id)
+        r1_is_uid = (not is_draw) and (r1_str in player_uid_strs)
+        has_r2 = (not is_draw) and (rank2_gamer_id not in (0, None, "0", ""))
+        r2_str = str(rank2_gamer_id) if has_r2 else ""
+        r2_is_uid = has_r2 and (r2_str in player_uid_strs)
 
         for index, game_type in enumerate(self.game_types):
             gt_lower = str(game_type).lower()
@@ -500,10 +571,10 @@ class RewardManagerClass:
                 if str(uid).startswith("bot_") or str(uid).startswith("test_bot"):
                     continue
                 g_num = p_idx + 1
-                is_r1 = (rank1_gamer_id == g_num) or (rank1_gamer_id not in (0, None, "0", "") and str(rank1_gamer_id) == str(uid))
-                is_r2 = (rank2_gamer_id == g_num) or (rank2_gamer_id not in (0, None, "0", "") and str(rank2_gamer_id) == str(uid))
+                is_r1 = (not is_draw) and (str(uid) == r1_str if r1_is_uid else (rank1_gamer_id == g_num))
+                is_r2 = has_r2 and (not is_r1) and (str(uid) == r2_str if r2_is_uid else (rank2_gamer_id == g_num))
 
-                if rank1_gamer_id in (0, None, "0", ""):
+                if is_draw:
                     histories[p_idx]["draw_multi_rank"] = histories[p_idx].get("draw_multi_rank", 0) + 1
                     histories[p_idx][f"{gt_lower}_draw"] = histories[p_idx].get(f"{gt_lower}_draw", 0) + 1
                 elif is_r1:

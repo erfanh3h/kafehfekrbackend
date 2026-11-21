@@ -81,6 +81,7 @@ class LudoGameClass(BaseGameClass):
         self.start_pieces = []  # 1 start portal spot for each user
         self.players_count = players_count
         self.players_out_pieces = []
+        self.eliminated_order = []
         self.init_board()
         self.current_turn = 0
         self.current_dice = 0
@@ -359,38 +360,45 @@ class LudoGameClass(BaseGameClass):
             return True
         return False
 
-    async def surrender(self, gamer_id):
-        if not self.active_player_indexes.__contains__(gamer_id):
+    def _apply_surrender_sync(self, gamer_id):
+        if gamer_id not in self.active_player_indexes:
             return False
+        was_turn = (self.current_turn == gamer_id)
         self.active_player_indexes.remove(gamer_id)
-        self.players_out_pieces[gamer_id - 1] = 4
+        if gamer_id not in self.eliminated_order:
+            self.eliminated_order.append(gamer_id)
+        if 0 <= gamer_id - 1 < len(self.players_out_pieces):
+            self.players_out_pieces[gamer_id - 1] = 4
         if 0 <= gamer_id - 1 < len(self.start_pieces):
             self.start_pieces[gamer_id - 1].clear()
         for piece in self.board:
             if piece.is_gamer_id_spot(gamer_id):
                 piece.clear()
+        if was_turn:
+            self.current_dice = 0
+            self.current_turn_player_rolled = False
+            self.has_more_dice = False
+            self.current_available_indexes.clear()
+        if len(self.active_player_indexes) == 0:
+            self.is_game_finished = True
+            return True
         if len(self.active_player_indexes) == 1:
             last_survivor = self.active_player_indexes[0]
             if self.rank1 is None:
                 self.rank1 = last_survivor
                 if self.rank2 is None:
                     self.rank2 = gamer_id
-            elif self.rank2 is None:
+            elif self.rank2 is None and self.rank1 != last_survivor:
                 self.rank2 = last_survivor
             self.is_game_finished = True
             return True
-        if self.current_turn == gamer_id:
-            return True
-        return False
+        return was_turn
+
+    async def surrender(self, gamer_id):
+        return self._apply_surrender_sync(gamer_id)
 
     def finish_reconnect_time(self, gamer_id):
-        import asyncio
-        try:
-            loop = asyncio.get_running_loop()
-            loop.create_task(self.surrender(gamer_id))
-        except RuntimeError:
-            loop = asyncio.new_event_loop()
-            loop.run_until_complete(self.surrender(gamer_id))
+        return self._apply_surrender_sync(gamer_id)
 
     def check_authority(self, data, gamer_id: int):
         if self.current_turn != gamer_id:

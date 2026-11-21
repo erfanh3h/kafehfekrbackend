@@ -6,6 +6,7 @@ class BaseMultiPlayerGameClass(BaseGameClass):
     def __init__(self, send_data_function, players_count):
         super().__init__(send_data_function)
         self.active_player_indexes = []
+        self.eliminated_order = []
         self.rank1 = None
         self.rank2 = None
         self.players_count = players_count
@@ -27,15 +28,23 @@ class BaseMultiPlayerGameClass(BaseGameClass):
     def check_game_ended(self):
         if self.rank1 is not None and self.rank2 is not None:
             return True
+        if self.rank1 is not None and len(self.active_player_indexes) <= 1:
+            if len(self.active_player_indexes) == 1 and self.rank2 is None:
+                self.rank2 = self.active_player_indexes[0]
+            return True
         return False
 
     def _apply_surrender_sync(self, gamer_id):
         if gamer_id not in self.active_player_indexes:
             return False
-        if len(self.active_player_indexes) == 2:
-            if self.rank2 is None:
-                self.rank2 = gamer_id
+        if not hasattr(self, "eliminated_order") or self.eliminated_order is None:
+            self.eliminated_order = []
+        if gamer_id not in self.eliminated_order:
+            self.eliminated_order.append(gamer_id)
         self.active_player_indexes.remove(gamer_id)
+        if len(self.active_player_indexes) == 0:
+            self.is_game_finished = True
+            return True
         if len(self.active_player_indexes) == 1:
             last_survivor = self.active_player_indexes[0]
             if self.rank1 is None:
@@ -54,4 +63,4 @@ class BaseMultiPlayerGameClass(BaseGameClass):
         return self._apply_surrender_sync(gamer_id)
 
     def finish_reconnect_time(self, gamer_id):
-        self._apply_surrender_sync(gamer_id)
+        return self._apply_surrender_sync(gamer_id)

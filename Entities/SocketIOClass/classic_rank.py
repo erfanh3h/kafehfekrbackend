@@ -33,7 +33,8 @@ class ClassicRankSocketNameSpace(socketio.AsyncNamespace):
         from Entities.SocketIOClass.game import games
         for g_id, game_play in list(games.items()):
             if not getattr(game_play, "is_game_finished", False) and not getattr(game_play, "is_game_terminated", False):
-                if game_play.is_user_id_valid(user_id):
+                is_active_fn = getattr(game_play, "is_user_active_in_game", game_play.is_user_id_valid)
+                if is_active_fn(user_id):
                     uid_str = str(user_id)
                     active_sid = getattr(game_play, "active_user_sockets", {}).get(uid_str, "")
                     if active_sid and uid_str not in getattr(game_play, "disconnected_user_ids", set()):

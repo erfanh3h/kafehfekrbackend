@@ -116,25 +116,25 @@ class QuizGameSession(BaseMultiplayerGameSession):
                 )
             )
             self.timer.start(Quiz_Turn_Time, self.on_turn_timer_expired, is_user_turn=True)
+            self._sync_timer_pause_state()
+
+    def _on_player_eliminated(self, gamer_id: int, reason: str, state_changed: bool, was_turn: bool):
+        with self._round_lock:
+            if (
+                not self.is_game_finished
+                and self.game_controller is not None
+                and not self.game_controller.is_game_finished
+                and not self.game_controller.is_turn_round_finished
+                and self.game_controller.all_active_answered()
+            ):
+                self.timer.stop(False)
+                self.reveal_turn_results()
+            else:
+                self._sync_timer_pause_state()
 
     async def command_received(self, data, socket_id):
         cmd_id = data.get("id") if isinstance(data, dict) else None
         gamer_id = await super().command_received(data, socket_id)
-
-        if cmd_id == commands.Surrender:
-            # In 3-4P Quiz, remaining active players might have all already answered this question
-            with self._round_lock:
-                if (
-                    not self.is_game_finished
-                    and self.game_controller is not None
-                    and not self.game_controller.is_game_finished
-                    and not self.game_controller.is_turn_round_finished
-                    and self.game_controller.all_active_answered()
-                ):
-                    self.timer.stop(False)
-                    self.reveal_turn_results()
-            return
-
         if gamer_id is None:
             return
 
@@ -195,6 +195,7 @@ class QuizGameSession(BaseMultiplayerGameSession):
                 )
             )
             self.timer.start(Quiz_Sleep_Turn_Time, self.on_reveal_timer_expired, is_user_turn=False)
+            self._sync_timer_pause_state()
 
     def on_reveal_timer_expired(self):
         with self._round_lock:
@@ -205,44 +206,6 @@ class QuizGameSession(BaseMultiplayerGameSession):
                 self.start_question_turn()
             else:
                 self.check_finish_game()
-
-    def finish_reconnect_time(self, user_id):
-        with self._finish_lock, self._round_lock:
-            if self.is_game_finished or self.game_controller is None:
-                return
-            self.dc_timeout_user_id = user_id
-            safe_run_async(self.send_command(commands.Finish_Reconnect_Time, {"user_id": user_id}))
-            gamer_id = self.find_gamer_id_from_user_id(user_id)
-
-            if len(self.gamers) <= 2:
-                self.timer.stop(False)
-                from Entities.Games.base_game_class import get_opponent_id
-
-                opponent_id = get_opponent_id(gamer_id)
-                opponent = self.find_gamer_from_gamer_id(opponent_id)
-                if opponent is not None and getattr(opponent, "is_disconnected", False):
-                    self.game_controller.finish_reconnect_time(gamer_id)
-                    self.game_controller.leaver_id = 0
-                    self.game_controller.is_game_finished = True
-                    self.finish_game(0)
-                    return
-                self.game_controller.finish_reconnect_time(gamer_id)
-                if gamer_id > 0:
-                    safe_run_async(self.send_command(commands.Surrender, {"gamer_id": gamer_id}))
-                self.check_finish_game()
-                return
-
-            self.game_controller.finish_reconnect_time(gamer_id)
-            if gamer_id > 0:
-                safe_run_async(self.send_command(commands.Surrender, {"gamer_id": gamer_id}))
-            if self.check_finish_game():
-                self.timer.stop(False)
-                return
-            if not self.game_controller.is_turn_round_finished and self.game_controller.all_active_answered():
-                self.timer.stop(False)
-                self.reveal_turn_results()
-            else:
-                self.timer.resume()
 
     def check_finish_game(self):
         with self._round_lock:

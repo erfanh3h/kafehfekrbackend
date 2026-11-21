@@ -413,23 +413,47 @@ class MonopolyGameClass(BaseMultiPlayerGameClass):
         self.jail_cards[loser_id] = 0
         self.bankrupt[loser_id] = True
         self.in_jail[loser_id] = False
-        self.debt = None
-        self.pending_tile_id = -1
+
+        # Only clear debt if loser is the debtor; if loser is the creditor, forgive debt and restore phase
+        if self.debt is not None:
+            if int(self.debt.get("player_id", 0)) == loser_id:
+                self.debt = None
+            elif int(self.debt.get("creditor_id", 0)) == loser_id:
+                ret_phase = str(self.debt.get("return_phase", "manage"))
+                self.debt = None
+                if self.phase == "debt":
+                    self.phase = ret_phase
+
+        # Only clear pending_tile_id if the current turn player went bankrupt
+        if self.current_turn == loser_id:
+            self.pending_tile_id = -1
 
         if loser_id not in self.eliminated_order:
             self.eliminated_order.append(loser_id)
 
-        if len(self.active_player_indexes) == 2:
-            if self.rank2 is None:
-                self.rank2 = loser_id
         self.active_player_indexes.remove(loser_id)
+
+        if len(self.active_player_indexes) == 0:
+            self.debt = None
+            self.pending_tile_id = -1
+            self.auction = None
+            self.pending_trade = None
+            self.is_game_finished = True
+            self.phase = "finished"
+            return
 
         if len(self.active_player_indexes) == 1:
             survivor = self.active_player_indexes[0]
             if self.rank1 is None:
                 self.rank1 = survivor
-            if self.rank2 is None:
-                self.rank2 = loser_id
+                if self.rank2 is None:
+                    self.rank2 = loser_id
+            elif self.rank2 is None and self.rank1 != survivor:
+                self.rank2 = survivor
+            self.debt = None
+            self.pending_tile_id = -1
+            self.auction = None
+            self.pending_trade = None
             self.is_game_finished = True
             self.phase = "finished"
             return
@@ -1301,23 +1325,57 @@ class MonopolyGameClass(BaseMultiPlayerGameClass):
         if gamer_id not in self.active_player_indexes:
             return False
         was_turn = (self.current_turn == gamer_id)
-        was_auction_bidder = (self.phase == "auction" and self.auction and self.auction.get("current_bidder") == gamer_id)
-        was_trade_party = (self.phase == "trade" and self.pending_trade and gamer_id in (self.pending_trade.get("from_player"), self.pending_trade.get("to_player")))
+        was_in_auction = (self.phase == "auction" and self.auction is not None)
+        was_auction_current = bool(was_in_auction and int(self.auction.get("current_bidder", 0)) == gamer_id)
+        was_auction_highest = bool(was_in_auction and int(self.auction.get("highest_bidder", 0)) == gamer_id)
+        was_auction_eligible = bool(was_in_auction and gamer_id in (self.auction.get("eligible") or []))
+        was_trade_party = bool(
+            self.phase == "trade"
+            and self.pending_trade is not None
+            and gamer_id in (self.pending_trade.get("from_player"), self.pending_trade.get("to_player"))
+        )
+        was_debt_party = bool(
+            self.phase == "debt"
+            and self.debt is not None
+            and gamer_id in (self.debt.get("player_id"), self.debt.get("creditor_id"))
+        )
 
         self._apply_bankruptcy(gamer_id, 0)
+        auction_state_changed = False
         if not self.is_game_finished:
-            if was_auction_bidder and self.auction:
+            if self.phase == "auction" and self.auction is not None:
                 if gamer_id not in self.auction["passed"]:
                     self.auction["passed"].append(gamer_id)
-                self._advance_auction_bidder()
-            elif was_trade_party and self.pending_trade:
+                if was_auction_highest:
+                    self.auction["highest_bidder"] = 0
+                    self.auction["current_bid"] = 0
+                    auction_state_changed = True
+                elig = self.auction.get("eligible") or []
+                passed = set(self.auction.get("passed") or [])
+                remaining = [pid for pid in elig if pid not in passed and pid in self.active_player_indexes]
+                highest_b = int(self.auction.get("highest_bidder", 0))
+                if (
+                    was_auction_current
+                    or not remaining
+                    or (len(remaining) == 1 and highest_b == remaining[0])
+                ):
+                    self._advance_auction_bidder()
+                    auction_state_changed = True
+            elif was_trade_party and self.pending_trade is not None:
                 ret_p = str(self.pending_trade.get("return_phase", "manage"))
                 self.pending_trade = None
                 self.phase = ret_p
             if was_turn and self.current_turn not in self.active_player_indexes:
                 self._advance_to_next_player()
         self._bump_seq()
-        return True
+        return bool(
+            self.is_game_finished
+            or was_turn
+            or auction_state_changed
+            or was_auction_eligible
+            or was_trade_party
+            or was_debt_party
+        )
 
     def get_game_winner(self):
         if self.rank1 is not None:

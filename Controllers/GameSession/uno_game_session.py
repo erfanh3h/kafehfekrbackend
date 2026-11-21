@@ -104,6 +104,7 @@ class UnoGameSession(BaseMultiplayerGameSession):
         )
         self._sync_all_private_user_data()
         self.timer.start(Uno_Turn_Time, self.on_turn_timeout)
+        self._sync_timer_pause_state()
 
     def send_current_turn(self):
         if self.is_game_finished or self.check_finish_game():
@@ -118,9 +119,24 @@ class UnoGameSession(BaseMultiplayerGameSession):
             )
         )
         self.timer.start(Uno_Turn_Time, self.on_turn_timeout)
+        self._sync_timer_pause_state()
+
+    def _build_surrender_payload(self, gamer_id: int, reason: str = "surrender") -> dict:
+        if reason == "afk":
+            return {"gamer_id": gamer_id, "reason": "afk"}
+        return {"gamer_id": gamer_id}
+
+    def _on_player_eliminated(self, gamer_id: int, reason: str, state_changed: bool, was_turn: bool):
+        self._first_turn_started = True
+        self._sync_all_private_user_data()
+        if was_turn or state_changed:
+            self.timer.stop(False)
+            self.send_current_turn()
+        else:
+            self._sync_timer_pause_state()
 
     def send_reconnect_data(self, socket_id):
-        if not self.is_game_running:
+        if not self.is_game_running or self.game_controller is None:
             return
         gamer_data = self.find_gamer_from_socket(socket_id)
         gid = (
@@ -231,6 +247,7 @@ class UnoGameSession(BaseMultiplayerGameSession):
 
             await self.send_command(commands.Current_Turn, self._build_turn_payload())
             self.timer.start(Uno_Turn_Time, self.on_turn_timeout)
+            self._sync_timer_pause_state()
 
         elif cmd_id == commands.Draw_Card:
             self._first_turn_started = True
@@ -281,6 +298,7 @@ class UnoGameSession(BaseMultiplayerGameSession):
             if res.get("turn_passed"):
                 await self.send_command(commands.Current_Turn, self._build_turn_payload())
             self.timer.start(Uno_Turn_Time, self.on_turn_timeout)
+            self._sync_timer_pause_state()
 
         elif cmd_id == commands.Pass_Turn:
             self._first_turn_started = True
@@ -308,57 +326,10 @@ class UnoGameSession(BaseMultiplayerGameSession):
             )
             await self.send_command(commands.Current_Turn, self._build_turn_payload())
             self.timer.start(Uno_Turn_Time, self.on_turn_timeout)
+            self._sync_timer_pause_state()
 
     def _eliminate_afk_player(self, cur_turn: int, gamer):
-        self.afk_user_id = gamer.user_id
-        if self.game_score_type != GameScoreTypesEnum.RANK and not str(gamer.user_id).startswith("bot_"):
-            try:
-                from Entities.Database import game_database
-                game_database.users_manager.update_user(gamer.user_id, open_game_id="")
-            except Exception as e:
-                print(f"[UnoGameSession] Error clearing open_game_id on AFK forfeit: {e}")
-
-        self.game_controller._apply_surrender_sync(cur_turn)
-
-        # If all remaining active players are bots (e.g. human AFK vs bots), finish immediately with bots winning
-        remaining_active = getattr(self.game_controller, "active_player_indexes", [])
-        has_remaining_human = False
-        for active_gid in remaining_active:
-            g_obj = self.find_gamer_from_gamer_id(active_gid)
-            if g_obj is not None and not str(g_obj.user_id).startswith("bot_"):
-                has_remaining_human = True
-                break
-        if not has_remaining_human and len(remaining_active) > 0:
-            if self.game_controller.rank1 is None:
-                self.game_controller.rank1 = remaining_active[0]
-            if self.game_controller.rank2 is None and len(remaining_active) > 1:
-                self.game_controller.rank2 = remaining_active[1]
-            self.game_controller.is_game_finished = True
-
-        safe_run_async(
-            self.send_command(
-                commands.Surrender,
-                {"gamer_id": cur_turn, "reason": "afk"},
-            )
-        )
-
-        if self.game_controller.is_game_finished or self.game_controller.check_game_ended():
-            self.game_controller.is_game_finished = True
-            safe_run_async(
-                self.send_command(
-                    commands.Win_Happened,
-                    {
-                        "Winner": self.game_controller.rank1,
-                        "winner_id": self.game_controller.rank1,
-                        "rank1": self.game_controller.rank1,
-                        "rank2": self.game_controller.rank2,
-                    },
-                )
-            )
-            self.check_finish_game()
-            return
-
-        self.send_current_turn()
+        self._eliminate_player_locked(gamer, reason="afk")
 
     def on_turn_timeout(self):
         if self.is_game_finished or self.check_finish_game():

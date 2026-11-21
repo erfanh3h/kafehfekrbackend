@@ -193,9 +193,12 @@ class UnoGameClass(BaseMultiPlayerGameClass):
         return False, 0
 
     def _apply_surrender_sync(self, gamer_id: int) -> bool:
+        if gamer_id not in self.active_player_indexes:
+            return False
         was_turn = (self.current_turn == gamer_id)
         next_turn_candidate = self._next_active_player(gamer_id, steps=1) if was_turn else self.current_turn
         was_finished = super()._apply_surrender_sync(gamer_id)
+        self.uno_called[gamer_id] = False
         if was_finished and self.rank1 is not None and self.rank2 is None:
             self._assign_winner_and_runner_up(self.rank1)
         elif not self.is_game_finished and was_turn and self.active_player_indexes:
@@ -205,7 +208,9 @@ class UnoGameClass(BaseMultiPlayerGameClass):
                 else self.active_player_indexes[0]
             )
             self.has_drawn_this_turn = False
-        return self.is_game_finished
+            self.last_drawn_card = None
+            self.is_current_turn_played = False
+        return bool(self.is_game_finished or was_turn)
 
     def check_authority(self, data: Dict[str, Any], gamer_id: int) -> bool:
         if self.is_game_finished or gamer_id not in self.active_player_indexes:

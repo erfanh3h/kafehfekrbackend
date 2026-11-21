@@ -182,7 +182,7 @@ class CoupGameClass(BaseMultiPlayerGameClass):
 
     def _apply_surrender_sync(self, gamer_id: int) -> bool:
         if gamer_id not in self.active_player_indexes:
-            return self.is_game_finished
+            return False
 
         was_turn = (self.current_turn == gamer_id)
         was_responder = (gamer_id in self.eligible_responders)
@@ -192,31 +192,55 @@ class CoupGameClass(BaseMultiPlayerGameClass):
         was_blocker = (self.pending_blocker == gamer_id)
 
         next_turn_candidate = self.current_turn
-        if was_turn and len(self.active_player_indexes) > 1:
+        if (was_turn or was_actor) and len(self.active_player_indexes) > 1:
+            origin = self.current_turn
             for step in range(1, self.players_count + 1):
-                cand = ((gamer_id - 1 + step) % self.players_count) + 1
+                cand = ((origin - 1 + step) % self.players_count) + 1
                 if cand != gamer_id and cand in self.active_player_indexes:
                     next_turn_candidate = cand
                     break
 
+        # If actor surrenders during exchange, return the extra drawn cards back to court_deck
+        if (was_actor or was_turn) and self.phase == "exchange" and self.exchange_pool:
+            hand_uids = {int(c.get("uid", -1)) for c in self.hands.get(gamer_id, [])}
+            drawn_cards = [dict(c) for c in self.exchange_pool if int(c.get("uid", -1)) not in hand_uids]
+            for c in drawn_cards:
+                c["revealed"] = False
+            if drawn_cards:
+                self.court_deck.extend(drawn_cards)
+                random.shuffle(self.court_deck)
+            self.exchange_pool = []
+            self.exchange_keep_count = 0
+
         self._eliminate_player(gamer_id)
 
         if self.is_game_finished:
+            self._reset_pending_fields()
             self._bump_seq()
             return True
 
         # Clean up any active phase referencing the surrendering player
-        if was_actor or was_blocker:
+        if was_actor:
             # Cancel current pending move and advance from next alive player
             self._reset_pending_fields()
             self.current_turn = next_turn_candidate if next_turn_candidate in self.active_player_indexes else self.active_player_indexes[0]
             self.phase = "action"
+        elif was_blocker and self.phase == "challenge_block":
+            # Blocker surrendered before challenge resolved -> block fails, resolve actor's action if actor is alive
+            self.pending_blocker = 0
+            self.pending_block_role = ""
+            self.eligible_responders = []
+            self.passed_players = []
+            if self.pending_actor in self.active_player_indexes and (
+                self.pending_target == 0 or self.pending_target in self.active_player_indexes
+            ):
+                self._resolve_pending_action()
+            else:
+                self._clear_pending_and_advance_turn()
         elif was_loss_player:
             self._execute_after_loss(self.after_loss_step)
         elif was_target and self.phase in ("challenge_action", "block_action"):
-            self._reset_pending_fields()
-            self.change_turn()
-            self.phase = "action"
+            self._clear_pending_and_advance_turn()
         elif was_responder and self.phase in ("challenge_action", "block_action", "challenge_block"):
             self.eligible_responders = [p for p in self.eligible_responders if p != gamer_id]
             self.passed_players = [p for p in self.passed_players if p != gamer_id]
@@ -226,7 +250,7 @@ class CoupGameClass(BaseMultiPlayerGameClass):
             self.current_turn = next_turn_candidate if next_turn_candidate in self.active_player_indexes else self.active_player_indexes[0]
 
         self._bump_seq()
-        return self.is_game_finished or was_turn or was_actor or was_blocker or was_loss_player or was_target or was_responder
+        return bool(self.is_game_finished or was_turn or was_actor or was_blocker or was_loss_player or was_target or was_responder)
 
     def check_authority(self, data: Dict[str, Any], gamer_id: int) -> bool:
         if self.is_game_finished or gamer_id not in self.active_player_indexes:
@@ -687,6 +711,7 @@ class CoupGameClass(BaseMultiPlayerGameClass):
             self._eliminate_player(gamer_id)
 
         step = self.after_loss_step
+        captured_reason = self.loss_reason
         if not self.is_game_finished:
             self._execute_after_loss(step)
 
@@ -696,7 +721,7 @@ class CoupGameClass(BaseMultiPlayerGameClass):
             "card_index": card_index,
             "lost_role": lost_role,
             "eliminated": eliminated,
-            "reason": self.loss_reason,
+            "reason": captured_reason,
         }
         self._bump_seq()
         self.last_event = ev

@@ -168,6 +168,16 @@ class BaseGamePlayClass:
         while True:
             if self.is_game_terminated:
                 self.is_game_finished = True
+                from Entities.SocketIOManagerClass import send_private_command
+                for gamer in self.gamers:
+                    if gamer.socket_id:
+                        safe_run_async(
+                            send_private_command(
+                                command=make_command_json(id=commands.Game_Finished, data={}),
+                                socket_id=gamer.socket_id,
+                                game_id=self.game_play_id,
+                            )
+                        )
                 from Entities.SocketIOClass.game import delete_game
                 delete_game(self.game_play_id)
                 break
@@ -271,7 +281,28 @@ class BaseGamePlayClass:
             return
         if isinstance(data, dict) and data.get('id') == commands.Surrender:
             if self.game_session is None or getattr(self.game_session, 'is_game_finished', False):
-                # Surrender occurred between games in a series or before game_session initialized
+                if self.is_game_finished or self.is_game_terminated:
+                    return
+                if len(self.gamers) > 2:
+                    if not self.is_game_started or self.game_session is None:
+                        # Surrender before a >2P match has initialized: cancel match cleanly
+                        self.is_game_terminated = True
+                        self.is_game_finished = True
+                        self.timer.stop(False)
+                        from Entities.SocketIOManagerClass import send_private_command
+                        for g in self.gamers:
+                            if g.socket_id:
+                                safe_run_async(
+                                    send_private_command(
+                                        command=make_command_json(id=commands.Game_Finished, data={}),
+                                        socket_id=g.socket_id,
+                                        game_id=self.game_play_id,
+                                    )
+                                )
+                        from Entities.SocketIOClass.game import delete_game
+                        delete_game(self.game_play_id)
+                    return
+                # Surrender occurred between games in a 2-player series or before game_session initialized
                 surrender_user_id = None
                 for gamer in self.gamers:
                     if gamer.socket_id == socket_id:
@@ -349,6 +380,22 @@ class BaseGamePlayClass:
             if str(user_data.user_id) == str(user_id):
                 return True
         return False
+
+    def is_user_active_in_game(self, user_id) -> bool:
+        if self.is_game_finished or self.is_game_terminated:
+            return False
+        if not self.is_user_id_valid(user_id):
+            return False
+        if len(self.gamers) > 2 and self.game_session is not None:
+            gc = getattr(self.game_session, "game_controller", None)
+            active_list = getattr(gc, "active_player_indexes", None) if gc is not None else None
+            if active_list is not None:
+                for sg in getattr(self.game_session, "gamers", []):
+                    if str(sg.user_id) == str(user_id):
+                        if getattr(sg, "gamer_id", 0) > 0 and sg.gamer_id not in active_list:
+                            return False
+                        break
+        return True
 
     def check_is_game_finished(self):
         for index, gamer_score in enumerate(self.gamer_scores):
@@ -428,94 +475,141 @@ class BaseGamePlayClass:
                     self.send_timer_value(gamer.socket_id)
 
     def finish_multiplayer_game(self, rank1_id, rank2_id):
-        self.game_winners = []
-        rank1_index = self.user_id_to_index(rank1_id)
-        if rank1_index != -1:
-            self.gamer_scores[rank1_index] = 2
-            self.game_winners.append(rank1_index + 1)
-        rank2_index = self.user_id_to_index(rank2_id)
-        if rank2_index != -1:
-            self.gamer_scores[rank2_index] = 1
-            self.game_winners.append(rank2_index + 1)
-        from Entities.Database import game_database
-        finished_game_types = [self.game_types[0]]
-        try:
-            self.score_manager.finish_multiplayer_game(rank1_id, rank2_id, finished_game_types)
-        except Exception as e:
-            print(f"[BaseGamePlayClass] Error in score_manager.finish_multiplayer_game: {e}")
-        for gamer in self.gamers:
-            if not str(gamer.user_id).startswith("bot_"):
+        with self._finish_lock:
+            if self.is_game_finished:
+                return
+            self.is_game_finished = True
+            self.timer.stop(False)
+            if self.game_session is not None:
+                self.game_session.is_game_finished = True
                 try:
-                    game_database.users_manager.update_user(gamer.user_id, open_game_id="")
-                except Exception as e:
-                    print(f"[BaseGamePlayClass] Error clearing open_game_id for {gamer.user_id}: {e}")
-        try:
-            game_database.game_play_history_manager.update_game_play_history(
-                self.game_play_id, self.game_winners, self.gamer_scores, winner_id=rank1_id
-            )
-        except Exception as e:
-            print(f"[BaseGamePlayClass] Error updating game_play_history: {e}")
-        self.is_game_finished = True
-        self.game_winner_id = rank1_id
-        rank1_gid = self.game_session.find_gamer_id_from_user_id(rank1_id) if self.game_session is not None else 0
-        rank2_gid = self.game_session.find_gamer_id_from_user_id(rank2_id) if self.game_session is not None else 0
-        from Entities.SocketIOManagerClass import send_private_command
-        last_xp = getattr(self.score_manager, "last_awarded_xp", {})
-        last_score = getattr(self.score_manager, "last_awarded_score", {})
-        last_coin = getattr(self.score_manager, "last_awarded_coin", {})
-        for gamer in self.gamers:
-            self.send_game_play_data(gamer.socket_id)
-            if gamer.socket_id:
-                try:
-                    earned = last_xp.get(gamer.user_id, last_xp.get(str(gamer.user_id), 0))
-                    s_earned = last_score.get(gamer.user_id, last_score.get(str(gamer.user_id), 0))
-                    c_earned = last_coin.get(gamer.user_id, last_coin.get(str(gamer.user_id), 0))
-                    safe_run_async(
-                        send_private_command(
-                            command=make_command_json(
-                                id=commands.Finish_Game,
-                                data={
-                                    "rank1": rank1_gid,
-                                    "rank2": rank2_gid,
-                                    "Winner": rank1_gid,
-                                    "winner": rank1_gid,
-                                    "game_winner_id": rank1_id,
-                                    "series_scores": self.gamer_scores,
-                                    "xp_earned": earned,
-                                    "score_earned": s_earned,
-                                    "coin_earned": c_earned,
-                                }
-                            ),
-                            socket_id=gamer.socket_id,
-                            game_id=self.game_play_id
-                        )
-                    )
-                except Exception as e:
-                    print(f"[BaseGamePlayClass] Error sending multiplayer Finish_Game: {e}")
-        try:
-            from Controllers.Spectator.spectator_session_manager import spectator_session_manager
-            safe_run_async(
-                spectator_session_manager.on_game_ended(
-                    self.game_play_id,
-                    game_play=self,
-                    final_payload={
-                        "rank1": rank1_gid,
-                        "rank2": rank2_gid,
-                        "Winner": rank1_gid,
-                        "winner": rank1_gid,
-                        "game_winner_id": rank1_id,
-                        "series_scores": self.gamer_scores,
-                    },
-                    reason="finished",
+                    self.game_session.timer.stop(False)
+                except Exception:
+                    pass
+                for sg in getattr(self.game_session, "gamers", []):
+                    try:
+                        sg.timer.stop()
+                    except Exception:
+                        pass
+
+            if rank1_id not in (None, 0, "0", "") and rank2_id not in (None, 0, "0", "") and str(rank2_id) == str(rank1_id):
+                rank2_id = None
+
+            self.game_winners = []
+            rank1_index = self.user_id_to_index(rank1_id) if rank1_id not in (None, 0, "0", "") else -1
+            if rank1_index != -1:
+                self.gamer_scores[rank1_index] = 2
+                self.game_winners.append(rank1_index + 1)
+            rank2_index = self.user_id_to_index(rank2_id) if rank2_id not in (None, 0, "0", "") else -1
+            if rank2_index != -1 and rank2_index != rank1_index:
+                self.gamer_scores[rank2_index] = 1
+                self.game_winners.append(rank2_index + 1)
+
+            afk_or_dc_user_ids = set()
+            elimination_order_user_ids = []
+            if self.game_session is not None:
+                for uid in getattr(self.game_session, "dc_timeout_user_ids", set()):
+                    afk_or_dc_user_ids.add(str(uid))
+                for uid in getattr(self.game_session, "afk_user_ids", set()):
+                    afk_or_dc_user_ids.add(str(uid))
+                if getattr(self.game_session, "dc_timeout_user_id", None) is not None:
+                    afk_or_dc_user_ids.add(str(self.game_session.dc_timeout_user_id))
+                if getattr(self.game_session, "afk_user_id", None) is not None:
+                    afk_or_dc_user_ids.add(str(self.game_session.afk_user_id))
+                gc = getattr(self.game_session, "game_controller", None)
+                if gc is not None:
+                    for elim_gid in getattr(gc, "eliminated_order", []):
+                        elim_uid = self.game_session.gamer_id_to_user_id(elim_gid)
+                        if elim_uid is not None and str(elim_uid) not in elimination_order_user_ids:
+                            elimination_order_user_ids.append(str(elim_uid))
+
+            from Entities.Database import game_database
+            finished_game_types = [self.game_types[0]] if self.game_types else []
+            try:
+                self.score_manager.finish_multiplayer_game(
+                    rank1_id,
+                    rank2_id,
+                    finished_game_types,
+                    afk_or_dc_user_ids=afk_or_dc_user_ids,
+                    elimination_order_user_ids=elimination_order_user_ids,
+                    game_id=self.game_play_id,
                 )
-            )
-        except Exception as e:
-            print(f"[BaseGamePlayClass] Error notifying spectators on multiplayer finish: {e}")
-        from Entities.SocketIOClass.game import delete_game
-        try:
-            delete_game(self.game_play_id)
-        except Exception as e:
-            print(f"[BaseGamePlayClass] Error deleting game {self.game_play_id}: {e}")
+            except Exception as e:
+                print(f"[BaseGamePlayClass] Error in score_manager.finish_multiplayer_game: {e}")
+            for gamer in self.gamers:
+                if not str(gamer.user_id).startswith("bot_"):
+                    try:
+                        user_doc = game_database.users_manager.read_user(gamer.user_id)
+                        if user_doc is None or user_doc.get("open_game_id", "") in ("", self.game_play_id):
+                            game_database.users_manager.update_user(gamer.user_id, open_game_id="")
+                    except Exception as e:
+                        print(f"[BaseGamePlayClass] Error clearing open_game_id for {gamer.user_id}: {e}")
+            try:
+                game_database.game_play_history_manager.update_game_play_history(
+                    self.game_play_id, self.game_winners, self.gamer_scores, winner_id=rank1_id
+                )
+            except Exception as e:
+                print(f"[BaseGamePlayClass] Error updating game_play_history: {e}")
+            self.game_winner_id = rank1_id
+            rank1_gid = 0 if rank1_id in (None, 0, "0", "") else (self.game_session.find_gamer_id_from_user_id(rank1_id) if self.game_session is not None else 0)
+            rank2_gid = 0 if rank2_id in (None, 0, "0", "") else (self.game_session.find_gamer_id_from_user_id(rank2_id) if self.game_session is not None else 0)
+            from Entities.SocketIOManagerClass import send_private_command
+            last_xp = getattr(self.score_manager, "last_awarded_xp", {})
+            last_score = getattr(self.score_manager, "last_awarded_score", {})
+            last_coin = getattr(self.score_manager, "last_awarded_coin", {})
+            for gamer in self.gamers:
+                self.send_game_play_data(gamer.socket_id)
+                if gamer.socket_id:
+                    try:
+                        earned = last_xp.get(gamer.user_id, last_xp.get(str(gamer.user_id), 0))
+                        s_earned = last_score.get(gamer.user_id, last_score.get(str(gamer.user_id), 0))
+                        c_earned = last_coin.get(gamer.user_id, last_coin.get(str(gamer.user_id), 0))
+                        safe_run_async(
+                            send_private_command(
+                                command=make_command_json(
+                                    id=commands.Finish_Game,
+                                    data={
+                                        "rank1": rank1_gid,
+                                        "rank2": rank2_gid,
+                                        "Winner": rank1_gid,
+                                        "winner": rank1_gid,
+                                        "game_winner_id": rank1_id,
+                                        "series_scores": self.gamer_scores,
+                                        "xp_earned": earned,
+                                        "score_earned": s_earned,
+                                        "coin_earned": c_earned,
+                                    }
+                                ),
+                                socket_id=gamer.socket_id,
+                                game_id=self.game_play_id
+                            )
+                        )
+                    except Exception as e:
+                        print(f"[BaseGamePlayClass] Error sending multiplayer Finish_Game: {e}")
+            try:
+                from Controllers.Spectator.spectator_session_manager import spectator_session_manager
+                safe_run_async(
+                    spectator_session_manager.on_game_ended(
+                        self.game_play_id,
+                        game_play=self,
+                        final_payload={
+                            "rank1": rank1_gid,
+                            "rank2": rank2_gid,
+                            "Winner": rank1_gid,
+                            "winner": rank1_gid,
+                            "game_winner_id": rank1_id,
+                            "series_scores": self.gamer_scores,
+                        },
+                        reason="finished",
+                    )
+                )
+            except Exception as e:
+                print(f"[BaseGamePlayClass] Error notifying spectators on multiplayer finish: {e}")
+            from Entities.SocketIOClass.game import delete_game
+            try:
+                delete_game(self.game_play_id)
+            except Exception as e:
+                print(f"[BaseGamePlayClass] Error deleting game {self.game_play_id}: {e}")
 
     def change_gamer_socket_id(self, user_id, socket_id):
         for gamer in self.gamers:
@@ -556,7 +650,9 @@ class BaseGamePlayClass:
             for gamer in self.gamers:
                 if not str(gamer.user_id).startswith("bot_"):
                     try:
-                        game_database.users_manager.update_user(gamer.user_id, open_game_id="")
+                        user_doc = game_database.users_manager.read_user(gamer.user_id)
+                        if user_doc is None or user_doc.get("open_game_id", "") in ("", self.game_play_id):
+                            game_database.users_manager.update_user(gamer.user_id, open_game_id="")
                     except Exception as e:
                         print(f"[BaseGamePlayClass] Error clearing open_game_id for {gamer.user_id}: {e}")
             try:

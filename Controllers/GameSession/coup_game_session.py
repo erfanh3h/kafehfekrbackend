@@ -41,6 +41,7 @@ class CoupGameSession(BaseMultiplayerGameSession):
         if self.is_game_finished or self.game_controller.is_game_finished:
             return
         self.timer.start(self._get_phase_time_limit(), self.on_turn_timeout)
+        self._sync_timer_pause_state()
 
     async def send_private_command(self, command_id, command_data, gamer_id: int):
         data = self.find_gamer_from_gamer_id(gamer_id)
@@ -139,8 +140,27 @@ class CoupGameSession(BaseMultiplayerGameSession):
         )
         self._start_phase_timer()
 
+    def _build_surrender_payload(self, gamer_id: int, reason: str = "surrender") -> dict:
+        if reason == "afk":
+            return {"gamer_id": gamer_id, "reason": "afk"}
+        return {"gamer_id": gamer_id}
+
+    def _on_player_eliminated(self, gamer_id: int, reason: str, state_changed: bool, was_turn: bool):
+        self._first_turn_started = True
+        self._sync_all_private_user_data()
+        state_payload = self._build_turn_payload()
+        if state_changed or was_turn:
+            self.timer.stop(False)
+            if self.game_controller.phase == "action":
+                safe_run_async(self.send_command(commands.Current_Turn, state_payload))
+            safe_run_async(self.send_command(commands.Coup_State, state_payload))
+            self._start_phase_timer()
+        else:
+            safe_run_async(self.send_command(commands.Coup_State, state_payload))
+            self._sync_timer_pause_state()
+
     def send_reconnect_data(self, socket_id):
-        if not self.is_game_running:
+        if not self.is_game_running or self.game_controller is None:
             return
         gamer_data = self.find_gamer_from_socket(socket_id)
         gid = (
@@ -251,59 +271,7 @@ class CoupGameSession(BaseMultiplayerGameSession):
         self._start_phase_timer()
 
     def _eliminate_afk_player(self, target_gid: int, gamer):
-        self.afk_user_id = gamer.user_id
-        if self.game_score_type != GameScoreTypesEnum.RANK and not str(gamer.user_id).startswith("bot_"):
-            try:
-                from Entities.Database import game_database
-                game_database.users_manager.update_user(gamer.user_id, open_game_id="")
-            except Exception as e:
-                print(f"[CoupGameSession] Error clearing open_game_id on AFK forfeit: {e}")
-
-        self.game_controller._apply_surrender_sync(target_gid)
-
-        remaining_active = getattr(self.game_controller, "active_player_indexes", [])
-        has_remaining_human = False
-        for active_gid in remaining_active:
-            g_obj = self.find_gamer_from_gamer_id(active_gid)
-            if g_obj is not None and not str(g_obj.user_id).startswith("bot_"):
-                has_remaining_human = True
-                break
-        if not has_remaining_human and len(remaining_active) > 0:
-            if self.game_controller.rank1 is None:
-                self.game_controller.rank1 = remaining_active[0]
-            if self.game_controller.rank2 is None and len(remaining_active) > 1:
-                self.game_controller.rank2 = remaining_active[1]
-            self.game_controller.is_game_finished = True
-            self.game_controller.phase = "finished"
-
-        safe_run_async(
-            self.send_command(
-                commands.Surrender,
-                {"gamer_id": target_gid, "reason": "afk"},
-            )
-        )
-
-        self._sync_all_private_user_data()
-        state_payload = self._build_turn_payload()
-        safe_run_async(self.send_command(commands.Coup_State, state_payload))
-
-        if self.game_controller.is_game_finished or self.game_controller.check_game_ended():
-            self.game_controller.is_game_finished = True
-            safe_run_async(
-                self.send_command(
-                    commands.Win_Happened,
-                    {
-                        "Winner": self.game_controller.rank1,
-                        "winner_id": self.game_controller.rank1,
-                        "rank1": self.game_controller.rank1,
-                        "rank2": self.game_controller.rank2,
-                    },
-                )
-            )
-            self.check_finish_game()
-            return
-
-        self.send_current_turn()
+        self._eliminate_player_locked(gamer, reason="afk")
 
     def on_turn_timeout(self):
         if self.is_game_finished or self.check_finish_game():

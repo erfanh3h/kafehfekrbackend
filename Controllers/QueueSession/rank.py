@@ -69,7 +69,8 @@ class RankQueueSession(BaseQueueSession):
             from Entities.SocketIOClass.game import games
             for g_id, game_play in list(games.items()):
                 if not getattr(game_play, "is_game_finished", False) and not getattr(game_play, "is_game_terminated", False):
-                    if game_play.is_user_id_valid(user_id):
+                    is_active_fn = getattr(game_play, "is_user_active_in_game", game_play.is_user_id_valid)
+                    if is_active_fn(user_id):
                         return True
         except Exception:
             pass

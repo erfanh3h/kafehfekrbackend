@@ -36,6 +36,7 @@ class RiskGameClass(BaseMultiPlayerGameClass):
         self.ignore_adjacency: bool = False
         self.pending_attacker_canon_bonus: int = 0
         self.winner_id: int = 0
+        self.last_surrender_aborted_attack: Optional[dict] = None
 
         self.init_cards()
         self.players_data: list[UserSpotClass] = []
@@ -629,9 +630,12 @@ class RiskGameClass(BaseMultiPlayerGameClass):
         self.game_state = RiskGameState.DRAW
         super().change_turn()
 
-    def _apply_risk_surrender_sync(self, gamer_id: int) -> bool:
+    def _apply_surrender_sync(self, gamer_id: int) -> bool:
         if gamer_id not in self.active_player_indexes:
             return False
+        self.last_surrender_aborted_attack = None
+        was_turn = (self.current_turn == gamer_id)
+
         if 1 <= gamer_id <= len(self.players_data):
             p = self.players_data[gamer_id - 1]
             for t in list(p.tokens):
@@ -647,21 +651,45 @@ class RiskGameClass(BaseMultiPlayerGameClass):
             p.clear()
 
         if self.attack_handler.is_attack_active:
-            if gamer_id in (self.attack_handler.source_id + 1, self.attack_handler.target_id):
+            atk_gid = self.attack_handler.source_id + 1
+            def_gid = self.attack_handler.target_id
+            src_c = self.attack_handler.source_continent.value if self.attack_handler.source_continent else ""
+            tgt_c = self.attack_handler.target_continent.value if self.attack_handler.target_continent else ""
+            if gamer_id in (atk_gid, def_gid):
+                if gamer_id == def_gid:
+                    self.last_surrender_aborted_attack = {
+                        "canceled": True,
+                        "canceled_by": def_gid,
+                        "attacker_id": atk_gid,
+                        "defender_id": def_gid,
+                        "source_continent": src_c,
+                        "target_continent": tgt_c,
+                        "attacker_dice": [],
+                        "defender_dice": [],
+                        "attacker_losses": 0,
+                        "defender_losses": 0,
+                        "conquered": False,
+                        "token_events": [],
+                    }
                 self.attack_handler.reset()
-                if not self.is_game_finished:
+                if gamer_id == def_gid and not self.is_game_finished:
                     self.game_state = RiskGameState.SELECTACTION
 
-        res = self._apply_surrender_sync(gamer_id)
+        res = super()._apply_surrender_sync(gamer_id)
         self.update_domination_tokens()
         self.check_game_ended()
-        return res
+        if self.is_game_finished:
+            self.last_surrender_aborted_attack = None
+        return bool(res or self.is_game_finished or was_turn or self.last_surrender_aborted_attack is not None)
+
+    def _apply_risk_surrender_sync(self, gamer_id: int) -> bool:
+        return self._apply_surrender_sync(gamer_id)
 
     async def surrender(self, gamer_id):
-        return self._apply_risk_surrender_sync(gamer_id)
+        return self._apply_surrender_sync(gamer_id)
 
     def finish_reconnect_time(self, gamer_id):
-        self._apply_risk_surrender_sync(gamer_id)
+        return self._apply_surrender_sync(gamer_id)
 
     def check_authority(self, data, gamer_id: int) -> bool:
         if self.is_game_finished:

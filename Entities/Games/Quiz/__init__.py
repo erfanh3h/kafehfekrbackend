@@ -115,14 +115,16 @@ class QuizGameClass(BaseMultiPlayerGameClass):
             random.shuffle(self.questions)
 
     def setup_players(self, gamers):
-        self.active_player_indexes = [g.gamer_id for g in gamers if getattr(g, "gamer_id", 0) > 0]
-        if not self.active_player_indexes:
-            self.active_player_indexes = list(range(1, max(2, len(gamers)) + 1))
-        self.players_count = len(self.active_player_indexes)
-        self.surrendered_players = []
-        self.scores = {gid: 0 for gid in self.active_player_indexes}
-        self.correct_counts = {gid: 0 for gid in self.active_player_indexes}
-        self.total_answer_time = {gid: 0.0 for gid in self.active_player_indexes}
+        all_ids = [g.gamer_id for g in gamers if getattr(g, "gamer_id", 0) > 0]
+        if not all_ids:
+            all_ids = list(range(1, max(2, len(gamers)) + 1))
+        self.players_count = len(all_ids)
+        surrendered_set = set(self.surrendered_players)
+        self.active_player_indexes = [gid for gid in all_ids if gid not in surrendered_set]
+        for gid in all_ids:
+            self.scores.setdefault(gid, 0)
+            self.correct_counts.setdefault(gid, 0)
+            self.total_answer_time.setdefault(gid, 0.0)
 
     def mark_question_started(self):
         self.question_start_time = time.time()
@@ -226,7 +228,7 @@ class QuizGameClass(BaseMultiPlayerGameClass):
 
         if len(active) == 1:
             self.rank1 = active[0]
-            self.rank2 = self.surrendered_players[-1] if self.surrendered_players else active[0]
+            self.rank2 = self.surrendered_players[-1] if self.surrendered_players else None
             return
 
         # Strict 2-player mode (ClassicRank / 2P Lobby / 2P Rank): equal scores -> Draw (winner = 0)
@@ -265,7 +267,12 @@ class QuizGameClass(BaseMultiPlayerGameClass):
             )
         )
         self.rank1 = sorted_players[0]
-        self.rank2 = sorted_players[1] if len(sorted_players) > 1 else sorted_players[0]
+        if len(sorted_players) > 1:
+            self.rank2 = sorted_players[1]
+        elif self.surrendered_players:
+            self.rank2 = self.surrendered_players[-1]
+        else:
+            self.rank2 = None
 
     def advance_to_next_question(self) -> bool:
         self.current_question_index += 1
@@ -284,17 +291,19 @@ class QuizGameClass(BaseMultiPlayerGameClass):
             return False
         if gamer_id not in self.surrendered_players:
             self.surrendered_players.append(gamer_id)
-        if len(self.active_player_indexes) == 2:
-            if self.rank2 is None:
-                self.rank2 = gamer_id
+        if gamer_id not in self.eliminated_order:
+            self.eliminated_order.append(gamer_id)
         self.active_player_indexes.remove(gamer_id)
+        if len(self.active_player_indexes) == 0:
+            self.is_game_finished = True
+            return True
         if len(self.active_player_indexes) == 1:
             last_survivor = self.active_player_indexes[0]
             if self.rank1 is None:
                 self.rank1 = last_survivor
                 if self.rank2 is None:
                     self.rank2 = gamer_id
-            elif self.rank2 is None:
+            elif self.rank2 is None and self.rank1 != last_survivor:
                 self.rank2 = last_survivor
             self.is_game_finished = True
             return True

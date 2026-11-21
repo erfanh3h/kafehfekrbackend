@@ -55,6 +55,8 @@ class BaseGameSession:
         self.is_game_finished = False
         self.dc_timeout_user_id = None
         self.afk_user_id = None
+        self.dc_timeout_user_ids: set[str] = set()
+        self.afk_user_ids: set[str] = set()
         self.is_first_turn = True
         self._finish_lock = threading.RLock()
 
@@ -263,6 +265,9 @@ class BaseGameSession:
 
     def prepare_gamers(self):
 
+        if self.gamers and all(getattr(g, "gamer_id", 0) > 0 for g in self.gamers):
+            return
+
         random.shuffle(self.gamers)
 
         random.shuffle(self.gamers)
@@ -389,7 +394,8 @@ class BaseGameSession:
 
 
     def disconnect_user(self, socket_id):
-
+        if self.is_game_finished:
+            return
         for gamer_index in range(0, len(self.gamers)):
 
             if self.gamers[gamer_index].socket_id == socket_id:

@@ -92,9 +92,38 @@ class RiskGameSession(BaseMultiplayerGameSession):
             )
         )
         self.timer.start(Risk_Turn_Time, self.on_turn_timeout)
+        self._sync_timer_pause_state()
+
+    def _build_surrender_payload(self, gamer_id: int, reason: str = "surrender") -> dict:
+        payload = {"gamer_id": gamer_id}
+        if reason == "afk":
+            payload["reason"] = "afk"
+        if self.game_controller is not None:
+            payload["players_data"] = [p.to_global_json() for p in self.game_controller.players_data]
+            payload["tokens"] = list(self.game_controller.tokens)
+            payload["continents"] = len(self.game_controller.continents)
+            payload["strategies"] = len(self.game_controller.strategies)
+            payload["active_player_indexes"] = list(self.game_controller.active_player_indexes)
+        return payload
+
+    def _on_player_eliminated(self, gamer_id: int, reason: str, state_changed: bool, was_turn: bool):
+        self._first_turn_started = True
+        self._sync_all_private_user_data()
+        aborted_atk = getattr(self.game_controller, "last_surrender_aborted_attack", None)
+        if self.game_controller is not None:
+            self.game_controller.last_surrender_aborted_attack = None
+        if aborted_atk is not None:
+            self._combat_token += 1
+            safe_run_async(self._broadcast_battle_result(aborted_atk))
+        elif was_turn:
+            self._combat_token += 1
+            self.timer.stop(False)
+            self.send_current_turn()
+        else:
+            self._sync_timer_pause_state()
 
     def send_reconnect_data(self, socket_id):
-        if not self.is_game_running:
+        if not self.is_game_running or self.game_controller is None:
             return
         gamer_data = self.find_gamer_from_socket(socket_id)
         p_idx = (
@@ -148,39 +177,11 @@ class RiskGameSession(BaseMultiplayerGameSession):
             self.timer.start(2, self.check_finish_game)
             return
         self.timer.start(Risk_Turn_Time, self.on_turn_timeout)
+        self._sync_timer_pause_state()
 
     async def command_received(self, data, socket_id):
-        was_attack_active = (
-            hasattr(self, "game_controller")
-            and hasattr(self.game_controller, "attack_handler")
-            and self.game_controller.attack_handler.is_attack_active
-        )
-        prev_def_id = self.game_controller.attack_handler.target_id if was_attack_active else 0
-
         gamer_id = await super().command_received(data, socket_id)
         if gamer_id is None:
-            # Check if a Surrender just aborted an active defense in a 3/4p match that is still continuing
-            if (
-                was_attack_active
-                and not self.is_game_finished
-                and not self.game_controller.is_game_finished
-                and not self.game_controller.attack_handler.is_attack_active
-                and prev_def_id > 0
-            ):
-                await self._broadcast_battle_result({
-                    "canceled": True,
-                    "canceled_by": prev_def_id,
-                    "attacker_id": self.game_controller.current_turn,
-                    "defender_id": prev_def_id,
-                    "source_continent": "",
-                    "target_continent": "",
-                    "attacker_dice": [],
-                    "defender_dice": [],
-                    "attacker_losses": 0,
-                    "defender_losses": 0,
-                    "conquered": False,
-                    "token_events": [],
-                })
             return
 
         is_selection_correct = self.game_controller.check_authority(data, gamer_id)
@@ -230,6 +231,7 @@ class RiskGameSession(BaseMultiplayerGameSession):
                 self.timer.start(2, self.check_finish_game)
                 return
             self.timer.start(Risk_Turn_Time, self.on_turn_timeout)
+            self._sync_timer_pause_state()
 
         elif cmd_id == commands.Pass_Turn:
             draw_result = await self.game_controller.recieve_data(cmd_id, data, gamer_id)
@@ -259,6 +261,7 @@ class RiskGameSession(BaseMultiplayerGameSession):
                 },
             )
             self.timer.start(Risk_Turn_Time, self.on_turn_timeout)
+            self._sync_timer_pause_state()
 
         elif cmd_id == commands.AttackerArmy:
             self.timer.stop(False)
@@ -278,6 +281,7 @@ class RiskGameSession(BaseMultiplayerGameSession):
                 },
             )
             self.timer.start(Risk_Turn_Time, self.on_turn_timeout)
+            self._sync_timer_pause_state()
 
         elif cmd_id in (commands.DefenderArmy, getattr(commands, "Cancel_Attack", "CancelAttack")):
             battle_res = await self.game_controller.recieve_data(cmd_id, data, gamer_id)
@@ -339,23 +343,7 @@ class RiskGameSession(BaseMultiplayerGameSession):
             # Refresh turn timer on active combat tactic plays (e.g., Defender playing Canon/Army during defense)
             self.timer.stop(False)
             self.timer.start(Risk_Turn_Time, self.on_turn_timeout)
-
-    def finish_reconnect_time(self, user_id):
-        if self.is_game_finished:
-            return
-        self.dc_timeout_user_id = user_id
-        safe_run_async(self.send_command(commands.Finish_Reconnect_Time, {"user_id": user_id}))
-        gamer_id = self.find_gamer_id_from_user_id(user_id)
-        was_turn = (self.game_controller.current_turn == gamer_id)
-        self.game_controller.finish_reconnect_time(gamer_id)
-        if self.check_finish_game():
-            self.timer.stop(False)
-            return
-        if was_turn:
-            self.timer.stop(False)
-            self.send_current_turn()
-        else:
-            self.timer.resume()
+            self._sync_timer_pause_state()
 
     def on_turn_timeout(self):
         if self.is_game_finished or self.check_finish_game():
@@ -418,6 +406,7 @@ class RiskGameSession(BaseMultiplayerGameSession):
                 )
             )
             self.timer.start(Risk_Turn_Time, self.on_turn_timeout)
+            self._sync_timer_pause_state()
             return
 
         # 3. If Defender timed out during DEFENDERARMY, auto-resolve first combat round
@@ -460,6 +449,7 @@ class RiskGameSession(BaseMultiplayerGameSession):
             )
         )
         self.timer.start(Risk_Turn_Time, self.on_turn_timeout)
+        self._sync_timer_pause_state()
 
     def send_dice(self):
         from Entities.SocketIOManagerClass import send_command
