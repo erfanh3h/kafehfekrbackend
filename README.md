@@ -15,6 +15,7 @@ The **authoritative realtime game server** for **Cafe Fekr (کافه فکر)**. 
 | **Active Socket Namespaces** | `/game`, `/queue`, `/classic-rank`, `/lobby`, `/social`, `/multi-queue`, `/chat` |
 | **Companion REST Service** | `kafehfekrserver` (Port `5001`) |
 | **Supported Game Engines** | 25 authoritative board game engines |
+| **Multiplayer (>2P) Architecture** | Robust 3–4 player surrender, disconnect, AFK, and podium resolution in `BaseMultiplayerGameSession` |
 | **Live Spectator Subsystem** | `Controllers/Spectator/` (Discovery, sanitization, room streaming) |
 | **Client Applications** | Godot 4.7 (`cafefekr/`), Legacy Flutter (`flutter-code/`) |
 
@@ -49,9 +50,10 @@ The backend operates on an event-driven, authoritative three-layer model with re
          v                          +------------------+                +------------------+
 +------------------+                |   Game Session   |  <-- TimerClass| Spectator Engine |
 | In-Process Bots  |                | (BaseGameSession |  <-- 60s DC    | (Access, Rooms,  |
-| (ClassicRankBot, |                +------------------+      Recovery  |  State Sanitizer)|
-|  25 Game Bots)   |                         |                          +------------------+
-+------------------+                         v                                   |
+| (ClassicRankBot, |                | & BaseMultiplayer|      Recovery  |  State Sanitizer)|
+|  25 Game Bots)   |                +------------------+                +------------------+
++------------------+                         |                                   |
+                                             v                                   |
                                     +------------------+                         |
                                     | Pure Game Rules  |  <-- 25 Authoritative   |
                                     | (Entities/Games) |      Game Engines       |
@@ -66,7 +68,7 @@ The backend operates on an event-driven, authoritative three-layer model with re
                                     +------------------------------------------------------+
 ```
 
-### The Three-Layer Game Engine & Spectator Integration
+### The Three-Layer Game Engine & Multiplayer Resilience
 
 1. **Layer 1: Series Orchestrator (`Controllers/GamePlay/` — `BaseGamePlayClass`)**
    - Manages match series lifecycle:
@@ -79,17 +81,20 @@ The backend operates on an event-driven, authoritative three-layer model with re
 
 2. **Layer 2: Game Session Controller (`Controllers/GameSession/` — `BaseGameSession` & `BaseMultiplayerGameSession`)**
    - Manages player indices (`gamer_id: 1..N`), turn timers (`TimerClass` with thread-safe `_run_id` guards).
-   - **AFK Protection:** 2 missed turns forfeit policy (`check_finish_game_by_not_play_turn()`).
-   - **Disconnection Tolerance:** 60-second recovery timer (`UserDisconnectTimerClass`). Pauses round timers and alerts players and spectators.
+   - **Multiplayer (>2P) Surrender & Disconnect Architecture (`BaseMultiplayerGameSession`):**
+     - When a player surrenders in a 3- or 4-player game (e.g. Risk, Ludo, Monopoly, Uno, Coup, Quiz), they are cleanly eliminated from `active_player_indexes` without ending the match for the remaining players.
+     - The eliminated player's turn timer is immediately stopped, their active turn advances to the next player (`_on_player_eliminated`), and remaining players continue playing.
+     - **Selective Disconnect Pause:** `_sync_timer_pause_state()` only pauses the game timer if an *active* player is disconnected. Disconnections by already-eliminated players never stall the game.
+     - **Automated Human Check:** `_check_and_finish_if_no_humans_left()` detects if all remaining active players are AI bots (i.e. all human players surrendered or left). In that case, the game immediately concludes, awarding podium ranks (`rank1`, `rank2`) to the remaining bots.
+     - **AFK Protection:** 2 consecutive missed turns result in player elimination without penalizing or halting remaining participants.
    - 25 concrete game session controllers (including `monopoly_game_session.py`, `risk_game_session.py`, `chess_game_session.py`, `ludo_game_session.py`).
 
 3. **Layer 3: Pure Authoritative Game Rules (`Entities/Games/<Game>/`)**
    - Pure state machines containing board matrices, move validations, and win/draw determinations.
-   - Methods:
-     - `check_authority(data, gamer_id)`: Validates that the move is permitted for the given gamer.
-     - `recieve_data(command_id, data, gamer_id)`: Executes the game command, modifies state, and broadcasts results via `send_data_function`.
-     - `get_game_data()`: Serializes current board and round state (used for `ReconnectData` and live spectator sync).
-   - Payload versatility: supports nested `data['data']` and top-level identifiers (e.g. Sudoku piece placements).
+   - **Risk Strike Engine Overhaul:** Refined action pacing, defense-phase strategy cards, continent bonus calculations, and enhanced bot threat-evaluation.
+   - **Match Numbers (`MNumbers`) Parity:** Immediate 1st piece reveal and lock state to eliminate rapid double-click race conditions.
+   - **Yatzy Rules Parity:** Enforces strictly 3 re-rolls per turn-round before scoring.
+   - **Sudoku Payload Versatility:** Supports both nested `data['data']` and top-level piece placement identifiers.
 
 ---
 
@@ -105,14 +110,15 @@ kafehfekrbackend/
 │
 ├── Bots/                       # In-process AI bots
 │   ├── bot_controller.py       # Bot runner and event listener
-│   ├── bot_data.py             # Pre-configured bot profile pools (names, avatars)
+│   ├── bot_data.py             # Pre-configured bot profile pools (names, avatars, frames)
 │   ├── behavior/               # Human-like behaviors (delay heuristics, deliberate mistake rate)
 │   │   └── human_behavior.py
 │   └── games/                  # Per-game bot decision engines (25 game AI scripts)
+│       ├── risk.py             # Risk AI (continent priorities, strategy cards, defense play)
 │       ├── monopoly.py         # Monopoly AI (property evaluation, auctions, trades)
-│       ├── risk.py             # Risk AI (territory threat evaluation, attacks)
+│       ├── yatzy.py            # Yatzy AI (3 re-rolls, category scoring heuristics)
 │       ├── chess.py            # Minimax Chess AI
-│       └── ...                 # 22 additional game bot engines
+│       └── ...                 # 21 additional game bot engines
 │
 ├── Commons/                    # Shared protocol definitions & helpers
 │   ├── commands.py             # Master list of ~140 command string constants
@@ -120,7 +126,7 @@ kafehfekrbackend/
 │
 ├── Controllers/                # Match orchestrators and session managers
 │   ├── GamePlay/               # Series-level orchestrator (BaseGamePlayClass)
-│   ├── GameSession/            # 25 game-specific sessions (monopoly, chess, risk, yatzy, etc.)
+│   ├── GameSession/            # 25 game-specific sessions + BaseMultiplayerGameSession
 │   ├── QueueSession/           # Matchmaking queues (rank, lobby, classic_rank, multi_rank)
 │   ├── SocialSession/          # Real-time social coordinator (presence, DMs, clans, invites)
 │   └── Spectator/              # Complete Live Spectator Mode subsystem
@@ -137,7 +143,7 @@ kafehfekrbackend/
 │   │   ├── game_history_collection.py
 │   │   ├── game_play_history_collection.py
 │   │   ├── questions_collection.py         # Trivia question bank
-│   │   ├── users_collection.py             # Profiles, wallets, active match pointers, privacy
+│   │   ├── users_collection.py             # Profiles, wallets, active match pointers, avatar frames
 │   │   ├── user_history_collection.py      # Aggregated performance stats
 │   │   └── social/                         # Social system persistence
 │   │       ├── clans_collection.py         # Clans, memberships, join requests, audit logs
@@ -149,12 +155,12 @@ kafehfekrbackend/
 │   │       ├── presence_collection.py      # Real-time online/in-game presence
 │   │       └── reports_collection.py       # Moderation tickets
 │   ├── Games/                  # Authoritative rules for each of the 25 games
+│   │   ├── Risk/               # Risk Strike territories, strategy cards, defense phase, attack handler
 │   │   ├── Monopoly/           # Monopoly board, deeds, chance/chest cards, trade & auction logic
-│   │   ├── Risk/               # Risk territories, battle dice, card sets, continents
-│   │   ├── Chess/              # Piece movement, check, checkmate, stalemate
-│   │   ├── Sudoku/             # Board verification & dual-player race logic
+│   │   ├── MNumbers/           # Immediate 1st card reveal & lock logic
+│   │   ├── Yatzy/              # 3 re-rolls per round scoring
 │   │   └── ...                 # 21 additional pure game implementations
-│   ├── RewardManagerClass/     # Dynamic Elo rating, XP, and Coin reward algorithms
+│   ├── RewardManagerClass/     # Dynamic Elo rating, multi-rank podium rewards, XP & Coin algorithms
 │   ├── Security/               # JWT token validation & decoding
 │   ├── SocketIOClass/          # Socket.IO Namespace handlers
 │   │   ├── game.py             # /game namespace (live player moves & spectate updates)
@@ -167,8 +173,8 @@ kafehfekrbackend/
 │   ├── SocketIOManagerClass/   # Room-level emission helper utilities
 │   └── TimerClass/             # Robust threading timer with run_id safety guards
 │
-├── Models/                     # Data models (Gamer, Queuer, Lobby, User, ChatUser)
-└── Temp_Games/                 # Reference prototype scripts
+├── Models/                     # Data models (Gamer, Queuer, Lobby, User with profile_frame)
+└── tests/                      # Comprehensive test harnesses (incl. test_multiplayer_surrender_disconnect.py)
 ```
 
 ---
@@ -255,7 +261,7 @@ The backend strictly enforces state sanitization boundaries:
 | `TicTacToe` | تیک تاک تو | 2 | 10s | 5 | Round wins | **Safe** (Full board public) |
 | `RPC` | سنگ کاغذ قیچی | 2 | 7s | 3 | Cumulative | **Sanitized** (Hidden pick until revealed) |
 | `FekrBekr` | فکر بکر | 2 | 60s (Setup 60s) | 12 | Guess count | **Sanitized** (Secret code hidden) |
-| `Yatzy` | یاتزی | 2 | 60s | 12 | Cumulative | **Safe** (Public dice & scores) |
+| `Yatzy` | یاتزی | 2 | 60s | 12 | Cumulative | **Safe** (Public dice & scores; 3 re-rolls) |
 | `FourInRow` | دوز چهارتایی | 2 | 15s | 1 | Single | **Safe** (Full board public) |
 | `Chess` | شطرنج | 2 | 20s | 1 | Single | **Safe** (Full board public) |
 | `Checkers` | چکرز | 2 | 20s | 1 | Single | **Safe** (Full board public) |
@@ -268,11 +274,11 @@ The backend strictly enforces state sanitization boundaries:
 | `BattleShip` | نبرد کشتی | 2 | 12s (Setup 60s) | 1 | Hit points | **Sanitized** (Hidden ships masked) |
 | `Sudoku` | سودوکو | 2 | 1200s | 1 | Race / Accuracy | **Safe** (Public puzzle grid) |
 | `BoxFour` | چهارطرفه | 2 | 12s | 1 | Territory | **Safe** (Full board public) |
-| `MNumbers` | کشف اعداد | 2 | 7s | 1 | Pair points | **Sanitized** (Hidden cards masked) |
+| `MNumbers` | کشف اعداد | 2 | 7s | 1 | Pair points | **Sanitized** (Immediate 1st reveal & lock) |
 | `MSweeper` | مین یاب | 2 | 600s | 1 | Mine points | **Sanitized** (Unrevealed mines masked) |
-| `Ludo` | منچ | 2–4 | 25s | 1 | Podium finish | **Safe** (Full board public) |
-| `Risk` | ریسک استرایک | 2–4 | 30s (Pass 5s) | 1 | Podium finish | **Sanitized** (Player cards masked) |
-| `Monopoly` | مونوپولی | 2–4 | 28s (Resp 14s) | 1 | Wealth / Podium| **Safe** (Board & deeds public) |
+| `Ludo` | منچ | 2–4 | 25s | 1 | Podium finish | **Safe** (Multiplayer surrender-tolerant) |
+| `Risk` | ریسک استرایک | 2–4 | 30s (Pass 5s) | 1 | Podium finish | **Sanitized** (Defense cards, strategy hand) |
+| `Monopoly` | مونوپولی | 2–4 | 28s (Resp 14s) | 1 | Wealth / Podium| **Safe** (Multiplayer surrender-tolerant) |
 | `Uno` | اونو | 2–4 | 20s | 1 | Card points | **Sanitized** (Hand cards masked) |
 | `Coup` | کودتا | 2–4 | 25s (Resp 12s) | 1 | Last standing | **Sanitized** (Influence cards masked) |
 | `Quiz` | کوئیز | 2–4 | 15s (Wait 4s) | 10 | Answer points | **Safe** (Simultaneous trivia) |
@@ -280,17 +286,21 @@ The backend strictly enforces state sanitization boundaries:
 
 ---
 
-## 7. Economy, Rewards & Fair Play (`RewardManagerClass`)
+## 7. Economy, Rewards & Multiplayer Podium Architecture (`RewardManagerClass`)
 
 - **Dynamic Elo Rating (1v1 Ranked):**
   - Base K-factor of 20 with beginner protection (softer K of 12 if score < 300).
   - Clean Sweep bonus (2-0 victory earns +15% Elo boost).
   - Normal surrender treated as standard loss; full disconnect timeout or AFK incurs an increased penalty (minimum -15 score).
-- **Match Rewards:**
-  - Ranked win: +15 coins, dynamic Elo score, series EXP.
-  - Multi-Rank (Ludo/Risk/Monopoly): Podium-based distribution (Rank 1: 25 coins / 12 score / 25 XP; Rank 2: 15 coins / 4 score / 15 XP).
-  - Daily First Win bonus: +15 XP, +15 coins.
-  - Win Streak bonus: +8 XP per consecutive win.
+- **Multiplayer (>2P) Podium Rewards:**
+  - Rank 1: $+12$ rating, $+50$ XP, $+25$ coins.
+  - Rank 2: $+4$ rating, $+30$ XP, $+15$ coins.
+  - Rank 3: $-4$ rating, $+15$ XP, $0$ coins.
+  - Rank 4: $-8$ rating, $+10$ XP, $0$ coins.
+  - Automatic rank deduplication: prevents identical player assignment to multiple podium positions.
+- **Engagement Bonuses:**
+  - Daily First Win bonus: $+15$ XP, $+15$ coins.
+  - Win Streak bonus: $+8$ XP per consecutive win.
   - Clan & Social match play awards Clan XP contributing to clan level progression.
 
 ---
