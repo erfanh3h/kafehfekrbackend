@@ -1,5 +1,6 @@
-from typing import Optional
+import os
 import uuid, datetime
+from typing import Optional
 from fastapi.security import OAuth2PasswordBearer
 from jose import jwt
 from passlib.context import CryptContext
@@ -7,7 +8,7 @@ from pydantic import BaseModel
 
 from Entities.Database import game_database
 
-SECRET_KEY = "09da5e74afaa9ma2565c818195b7b9563b93xc059f6f0f4cab6cf63b88e8d3e7"
+SECRET_KEY = os.getenv("SECRET_KEY", "09da5e74afaa9ma2565c818195b7b9563b93xc059f6f0f4cab6cf63b88e8d3e7")
 ALGORITHM = "HS256"
 
 
