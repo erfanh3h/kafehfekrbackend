@@ -9,6 +9,8 @@ except Exception:
     pass
 
 import logging
+import time
+from datetime import datetime
 
 import socketio
 import uvicorn
@@ -20,12 +22,14 @@ from Entities.Security import SECRET_KEY
 from Entities.SocketIOClass import Socket_Server
 from Entities.Database import game_database
 
+BACKEND_STARTED_AT = time.time()
+
 # Health app for container healthchecks & monitoring
 health_app = FastAPI(docs_url=None, redoc_url=None)
 
 @health_app.get("/health")
 async def health_check():
-    return {"status": "ok", "service": "backend"}
+    return {"status": "ok", "service": "backend", "uptime_seconds": int(time.time() - BACKEND_STARTED_AT)}
 
 @health_app.get("/")
 async def root():
@@ -141,12 +145,15 @@ async def internal_force_logout_user(request: Request, x_internal_secret: str = 
     if not uid:
         return {"ok": False, "kicked": 0}
 
+    reason = str(body.get("reason") or "new_device_login").strip()
+    message = str(body.get("message") or "حساب کاربری شما روی دستگاه دیگری وارد شد.").strip()
+
     from Commons import commands as cmd_const
     logout_cmd = make_command_json(
         id=cmd_const.Logout,
         data={
-            "reason": "new_device_login",
-            "message": "حساب کاربری شما روی دستگاه دیگری وارد شد.",
+            "reason": reason,
+            "message": message,
         },
     )
     kicked = 0
@@ -185,7 +192,6 @@ async def internal_force_logout_user(request: Request, x_internal_secret: str = 
     for ns in ("/lobby", "/queue", "/multi-queue", "/classic-rank", "/chat"):
         try:
             rooms_map = Socket_Server.manager.rooms.get(ns, {})
-            # Check all sids in the namespace if stored in session or room
             for room_key in (uid, f"user_{uid}"):
                 sids_in_room = list((rooms_map.get(room_key) or {}).keys()) if isinstance(rooms_map.get(room_key), dict) else []
                 for sid in sids_in_room:
@@ -198,8 +204,155 @@ async def internal_force_logout_user(request: Request, x_internal_secret: str = 
         except Exception:
             pass
 
-    print(f"[internal_force_logout_user] Forced logout for user {uid}: kicked {kicked} socket(s)")
-    return {"ok": True, "kicked": kicked}
+    print(f"[internal_force_logout_user] Forced logout ({reason}) for user {uid}: kicked {kicked} socket(s)")
+    return {"ok": True, "kicked": kicked, "reason": reason}
+
+
+@health_app.get("/internal/admin/runtime-status")
+async def internal_admin_runtime_status(x_internal_secret: str = Header(default="")):
+    if x_internal_secret != SECRET_KEY:
+        raise HTTPException(status_code=403, detail="Forbidden")
+
+    from Entities.SocketIOClass.game import games, socketid_userid_pairs
+    from Entities.SocketIOClass.queue import rank_queue_session
+    from Entities.SocketIOClass.multi_queue import multi_rank_queue_session
+    from Entities.SocketIOClass.lobby import lobby_session
+    from Controllers.Spectator.spectator_session_manager import spectator_session_manager
+
+    online_social_users = len(getattr(social_session, "user_to_sockets", {}) or {})
+    social_sockets = sum(len(sids) for sids in (getattr(social_session, "user_to_sockets", {}) or {}).values())
+    active_game_sockets = len(socketid_userid_pairs or {})
+
+    ram_games = []
+    for gid, gp in list(games.items()):
+        if gp is None:
+            continue
+        is_done = bool(
+            getattr(gp, "is_game_finished", False)
+            or getattr(gp, "is_finished", False)
+            or getattr(gp, "is_game_terminated", False)
+        )
+        players = []
+        for g in getattr(gp, "gamers", []) or []:
+            players.append({
+                "user_id": str(getattr(g, "user_id", "")),
+                "username": str(getattr(g, "username", "")),
+            })
+        raw_types = getattr(gp, "game_types", []) or []
+        game_types = [str(gt.value if hasattr(gt, "value") else gt) for gt in raw_types]
+        raw_score_type = getattr(gp, "game_score_type", "")
+        score_type = str(raw_score_type.value if hasattr(raw_score_type, "value") else raw_score_type)
+        ram_games.append({
+            "game_id": str(gid),
+            "game_types": game_types,
+            "game_score_type": score_type,
+            "players": players,
+            "spectators": spectator_session_manager.get_spectator_count(str(gid)),
+            "is_finished": is_done,
+        })
+
+    multi_breakdown = {
+        "Ludo": len(getattr(multi_rank_queue_session, "ludo_queuers", []) or []),
+        "Risk": len(getattr(multi_rank_queue_session, "risk_queuers", []) or []),
+        "Uno": len(getattr(multi_rank_queue_session, "uno_queuers", []) or []),
+        "Quiz": len(getattr(multi_rank_queue_session, "quiz_queuers", []) or []),
+        "Coup": len(getattr(multi_rank_queue_session, "coup_queuers", []) or []),
+        "Monopoly": len(getattr(multi_rank_queue_session, "monopoly_queuers", []) or []),
+    }
+
+    spectators_map = getattr(spectator_session_manager, "game_spectators", {}) or {}
+    spectators_total = sum(len(u_map) for u_map in spectators_map.values())
+    spectator_rooms = sum(1 for u_map in spectators_map.values() if len(u_map) > 0)
+
+    return {
+        "ok": True,
+        "service": "backend",
+        "uptime_seconds": int(time.time() - BACKEND_STARTED_AT),
+        "online_social_users": online_social_users,
+        "social_sockets": social_sockets,
+        "active_game_sockets": active_game_sockets,
+        "active_ram_games_count": len([g for g in ram_games if not g["is_finished"]]),
+        "active_ram_games": ram_games[:50],
+        "ranked_queue_count": len(getattr(rank_queue_session, "queuers", []) or []),
+        "active_pre_games_count": len(getattr(rank_queue_session, "active_pre_games", {}) or {}),
+        "multi_queue_count": sum(multi_breakdown.values()),
+        "multi_queue_breakdown": multi_breakdown,
+        "lobbies_count": len(getattr(lobby_session, "lobbies", []) or []),
+        "spectators_count": spectators_total,
+        "spectator_rooms_count": spectator_rooms,
+    }
+
+
+@health_app.post("/internal/admin/games/{game_id}/force-terminate")
+async def internal_admin_force_terminate_game(game_id: str, x_internal_secret: str = Header(default="")):
+    if x_internal_secret != SECRET_KEY:
+        raise HTTPException(status_code=403, detail="Forbidden")
+
+    gid = str(game_id or "").strip()
+    if not gid:
+        raise HTTPException(status_code=400, detail="Invalid game_id")
+
+    from Commons import commands as cmd_const
+    from Entities.SocketIOClass.game import games, delete_game, socketid_gameid_pairs, socketid_userid_pairs
+
+    existed_in_ram = gid in games
+    gp = games.get(gid)
+    if gp is not None:
+        try:
+            setattr(gp, "is_game_terminated", True)
+            setattr(gp, "is_game_finished", True)
+        except Exception:
+            pass
+
+    # Notify connected game room clients that match was terminated by admin
+    try:
+        await Socket_Server.emit(
+            "command",
+            make_command_json(
+                id=cmd_const.Game_Finished,
+                data={
+                    "terminated_by_admin": True,
+                    "reason": "admin_terminated",
+                    "message": "این مسابقه توسط مدیریت متوقف شد.",
+                },
+            ),
+            room=gid,
+            namespace="/game",
+        )
+    except Exception as exc:
+        print(f"[internal_admin_force_terminate_game] Emit error for {gid}: {exc}")
+
+    # Disconnect any sockets still mapped to this game_id
+    disconnected_sockets = 0
+    for sid, mapped_gid in list(socketid_gameid_pairs.items()):
+        if str(mapped_gid) == gid:
+            try:
+                await Socket_Server.disconnect(sid, namespace="/game")
+                disconnected_sockets += 1
+            except Exception:
+                pass
+            socketid_gameid_pairs.pop(sid, None)
+            socketid_userid_pairs.pop(sid, None)
+
+    # Clean RAM timers, spectator rooms, open_game_id, and presence
+    if existed_in_ram:
+        delete_game(gid)
+
+    # Safety sync to MongoDB if still marked unfinished
+    try:
+        game_database.base_db["game_play_history"].update_one(
+            {"_id": gid},
+            {"$set": {"is_finished": True, "finish_date": datetime.now(), "terminated_by_admin": True}},
+        )
+    except Exception:
+        pass
+
+    return {
+        "ok": True,
+        "game_id": gid,
+        "existed_in_ram": existed_in_ram,
+        "disconnected_sockets": disconnected_sockets,
+    }
 
 app = socketio.ASGIApp(Socket_Server, other_asgi_app=health_app)
 # logging.basicConfig(level=logging.DEBUG)
