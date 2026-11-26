@@ -138,13 +138,13 @@ kafehfekrbackend/
 │       └── spectator_state_serializer.py   # State sanitization (strips hidden private data)
 │
 ├── Entities/                   # Core business logic and infrastructure
-│   ├── Database/               # MongoDB collections & queries
+│   ├── Database/               # MongoDB collections, indexes & queries
 │   │   ├── config_collection.py
-│   │   ├── game_history_collection.py
-│   │   ├── game_play_history_collection.py
+│   │   ├── game_history_collection.py      # Round records + ensure_indexes()
+│   │   ├── game_play_history_collection.py # Series records + ensure_indexes()
 │   │   ├── questions_collection.py         # Trivia question bank
 │   │   ├── users_collection.py             # Profiles, wallets, active match pointers, avatar frames
-│   │   ├── user_history_collection.py      # Aggregated performance stats
+│   │   ├── user_history_collection.py      # Aggregated performance stats + ensure_indexes()
 │   │   └── social/                         # Social system persistence
 │   │       ├── clans_collection.py         # Clans, memberships, join requests, audit logs
 │   │       ├── clan_messages_collection.py # Clan chat messages
@@ -153,7 +153,8 @@ kafehfekrbackend/
 │   │       ├── invitations_collection.py   # Match and lobby invitations
 │   │       ├── notifications_collection.py # In-game notification events
 │   │       ├── presence_collection.py      # Real-time online/in-game presence
-│   │       └── reports_collection.py       # Moderation tickets
+│   │       ├── reports_collection.py       # Moderation tickets
+│   │       └── rivals_collection.py        # Head-to-head rivalry stats
 │   ├── Games/                  # Authoritative rules for each of the 25 games
 │   │   ├── Risk/               # Risk Strike territories, strategy cards, defense phase, attack handler
 │   │   ├── Monopoly/           # Monopoly board, deeds, chance/chest cards, trade & auction logic
@@ -163,18 +164,22 @@ kafehfekrbackend/
 │   ├── RewardManagerClass/     # Dynamic Elo rating, multi-rank podium rewards, XP & Coin algorithms
 │   ├── Security/               # JWT token validation & decoding
 │   ├── SocketIOClass/          # Socket.IO Namespace handlers
-│   │   ├── game.py             # /game namespace (live player moves & spectate updates)
+│   │   ├── _auth_guard.py      # Shared auth, ban/auto-unban, maintenance, version & queue gates
+│   │   ├── game.py             # /game namespace (live player moves, O(1) lookups & cleanup)
 │   │   ├── queue.py            # /queue namespace (ranked matchmaking & draft)
 │   │   ├── classic_rank.py     # /classic-rank namespace (instant bot matches)
 │   │   ├── lobby.py            # /lobby namespace (custom rooms)
 │   │   ├── social.py           # /social namespace (presence, DMs, clans, live games, spectate)
-│   │   ├── multi_queue.py      # /multi-queue namespace (legacy 3-player queue)
-│   │   └── chat.py             # /chat namespace (legacy chat)
+│   │   ├── multi_queue.py      # /multi-queue namespace (4-player queue for 6 games)
+│   │   └── chat.py             # /chat namespace (global chat)
 │   ├── SocketIOManagerClass/   # Room-level emission helper utilities
 │   └── TimerClass/             # Robust threading timer with run_id safety guards
 │
 ├── Models/                     # Data models (Gamer, Queuer, Lobby, User with profile_frame)
-└── tests/                      # Comprehensive test harnesses (incl. test_multiplayer_surrender_disconnect.py)
+└── tests/                      # Automated unit tests
+    ├── test_classic_rank_ai_levels.py
+    ├── test_multiplayer_surrender_disconnect.py
+    └── test_backend_optimizations.py
 ```
 
 ---
@@ -188,8 +193,10 @@ kafehfekrbackend/
 | `/classic-rank` | `Entities/SocketIOClass/classic_rank.py` | `ClassicRankSession` | Instant human vs AI bot match generation. Spawns an in-process bot and directs both to `/game`. |
 | `/lobby` | `Entities/SocketIOClass/lobby.py` | `LobbySession` | Custom friendly rooms (2–4 players, password support, kick, ready, start). |
 | `/social` | `Entities/SocketIOClass/social.py` | `SocialSessionManager` & `SpectatorController` | Real-time presence, private DMs, clan chat rooms (`clan_<id>`), invitations, live games discovery (`RequestLiveGames`), and spectator sessions (`RequestSpectate`, `LeaveSpectate`). |
-| `/multi-queue` | `Entities/SocketIOClass/multi_queue.py` | `MultiRankQueueSession`| 3-player Ludo & Risk queue (Legacy Flutter client). |
-| `/chat` | `Entities/SocketIOClass/chat.py` | — | Global community chat (Legacy Flutter client). |
+| `/multi-queue` | `Entities/SocketIOClass/multi_queue.py` | `MultiRankQueueSession`| 4-player matchmaking queue (`Ludo`, `Risk`, `Uno`, `Quiz`, `Coup`, `Monopoly`). |
+| `/chat` | `Entities/SocketIOClass/chat.py` | `ChatSession` | Global community chat (Legacy Flutter client). |
+
+All namespaces enforce shared authentication and gating via `Entities/SocketIOClass/_auth_guard.py` (JWT validation, ban/auto-unban, maintenance mode, minimum client version, and queue-closed checks as configured per namespace). Matchmaking (`RankQueueSession`, `MultiRankQueueSession`) and `LobbySession` include thread-safe queue locking and defensive payload validation, and `RiskGameSession` / `RiskGameClass` enforce attacker-only roll authority and timer recovery on invalid payloads.
 
 ---
 
@@ -312,10 +319,16 @@ The backend strictly enforces state sanitization boundaries:
 | `PORT` | `5000` | Port for the Socket.IO ASGI server |
 | `HOST` | `0.0.0.0` | Host interface binding |
 | `MONGO_URI` | `mongodb://localhost:27017/` | Connection string to MongoDB instance |
+| `SECRET_KEY` | dev fallback key | Shared HS256 JWT secret and `X-Internal-Secret` for `/internal/*` endpoints |
 
 ---
 
-## 9. Development & Deployment
+## 9. Development, Testing & Deployment
+
+### Running Unit Tests
+```bash
+python -m unittest discover -s tests -v
+```
 
 ### Running with Docker Compose (Recommended)
 From the project root:
@@ -330,6 +343,7 @@ pip install -r requirements.txt
 python main.py
 ```
 
-### Health Check & Diagnostics
-- **HTTP Healthcheck:** `GET http://localhost:5000/health` -> `{"status": "ok", "service": "backend"}`
+### Health Check, Internal Control & Diagnostics
+- **HTTP Healthcheck:** `GET http://localhost:5000/health` -> `{"status": "ok", "service": "backend", "uptime_seconds": ...}`
+- **Internal Control API (`X-Internal-Secret`):** `/internal/social/emit`, `/internal/user/in-game/{user_id}`, `/internal/auth/force-logout`, `/internal/admin/runtime-status`, `/internal/admin/games/{game_id}/force-terminate`
 - **Socket.IO Handshake:** `GET http://localhost:5000/socket.io/?EIO=4&transport=polling`
