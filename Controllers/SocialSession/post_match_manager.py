@@ -1,5 +1,6 @@
 import asyncio
 import secrets
+import threading
 import time
 from typing import Callable
 
@@ -18,6 +19,7 @@ class PostMatchManager:
     SESSION_TTL_SEC = 120.0
     REMATCH_TIMEOUT_SEC = 15
     SWITCH_GAME_TIMEOUT_SEC = 20
+    UNCLAIMED_LOBBY_TTL_SEC = 60.0
 
     def __init__(
         self,
@@ -30,6 +32,7 @@ class PostMatchManager:
         self._add_new_game_fn = add_new_game_fn
         self._create_private_lobby_fn = create_private_lobby_fn
         self._valid_game_types_override = valid_game_types
+        self._lock = threading.RLock()
         # game_id -> session dict
         self.sessions: dict[str, dict] = {}
         # user_id -> most recent finished game_id
@@ -49,24 +52,39 @@ class PostMatchManager:
             lookup = {str(g).lower(): str(g) for g in self._valid_game_types_override}
             return lookup.get(raw.lower(), "")
         from Entities.Games.game_types import GameTypesEnum
+        canonical = ""
         for gt in GameTypesEnum:
             if gt.value.lower() == raw.lower():
-                return gt.value
-        return ""
+                canonical = gt.value
+                break
+        if not canonical:
+            return ""
+        try:
+            from Controllers.GamePlay.game_type_class_pairs import game_type_class_pairs
+            if canonical not in game_type_class_pairs:
+                return ""
+        except Exception:
+            pass
+        return canonical
+
+    def _pop_session_locked(self, gid: str) -> dict | None:
+        sess = self.sessions.pop(gid, None)
+        if sess:
+            self._cancel_offer_task(sess)
+            for uid in sess.get("player_ids", []):
+                if self.user_last_session.get(uid) == gid:
+                    self.user_last_session.pop(uid, None)
+        return sess
 
     def _cleanup_expired(self) -> None:
-        now = time.time()
-        expired_ids = [
-            gid for gid, sess in self.sessions.items()
-            if now >= float(sess.get("expires_at", 0.0)) or bool(sess.get("consumed", False))
-        ]
-        for gid in expired_ids:
-            sess = self.sessions.pop(gid, None)
-            if sess:
-                self._cancel_offer_task(sess)
-                for uid in sess.get("player_ids", []):
-                    if self.user_last_session.get(uid) == gid:
-                        self.user_last_session.pop(uid, None)
+        with self._lock:
+            now = time.time()
+            expired_ids = [
+                gid for gid, sess in self.sessions.items()
+                if now >= float(sess.get("expires_at", 0.0)) or bool(sess.get("consumed", False))
+            ]
+            for gid in expired_ids:
+                self._pop_session_locked(gid)
 
     def _cancel_offer_task(self, sess: dict) -> None:
         offer = sess.get("active_offer")
@@ -74,7 +92,15 @@ class PostMatchManager:
             task = offer.get("timeout_task")
             if task is not None and hasattr(task, "cancel"):
                 try:
-                    task.cancel()
+                    task_loop = task.get_loop() if hasattr(task, "get_loop") else None
+                    try:
+                        running_loop = asyncio.get_running_loop()
+                    except RuntimeError:
+                        running_loop = None
+                    if task_loop is not None and task_loop is not running_loop and not task_loop.is_closed():
+                        task_loop.call_soon_threadsafe(task.cancel)
+                    else:
+                        task.cancel()
                 except Exception:
                     pass
             offer["timeout_task"] = None
@@ -86,7 +112,6 @@ class PostMatchManager:
         game_types: list,
         game_score_type,
     ) -> bool:
-        self._cleanup_expired()
         gid = str(game_id or "").strip()
         if not gid or not isinstance(gamers, list) or len(gamers) != 2:
             return False
@@ -118,38 +143,41 @@ class PostMatchManager:
         canonical_gt = self._get_canonical_game_type(last_gt) or last_gt
 
         now = time.time()
-        self.sessions[gid] = {
-            "game_id": gid,
-            "player_ids": player_ids,
-            "players_meta": players_meta,
-            "game_type": canonical_gt,
-            "original_score_type": str(score_type_val),
-            "created_at": now,
-            "expires_at": now + self.SESSION_TTL_SEC,
-            "active_offer": None,
-            "left_users": set(),
-            "consumed": False,
-        }
-        for uid in player_ids:
-            self.user_last_session[uid] = gid
+        with self._lock:
+            self._cleanup_expired()
+            self.sessions[gid] = {
+                "game_id": gid,
+                "player_ids": player_ids,
+                "players_meta": players_meta,
+                "game_type": canonical_gt,
+                "original_score_type": str(score_type_val),
+                "created_at": now,
+                "expires_at": now + self.SESSION_TTL_SEC,
+                "active_offer": None,
+                "left_users": set(),
+                "consumed": False,
+            }
+            for uid in player_ids:
+                self.user_last_session[uid] = gid
         return True
 
     def _get_session_for_user(self, user_id: str, game_id: str) -> tuple[dict | None, str, str]:
-        self._cleanup_expired()
-        uid = str(user_id or "").strip()
-        gid = str(game_id or "").strip()
-        if not gid:
-            gid = self.user_last_session.get(uid, "")
-        sess = self.sessions.get(gid)
-        if not sess or sess.get("consumed"):
-            return None, "", "مهلت درخواست پس از مسابقه به پایان رسیده است."
-        pids = sess.get("player_ids", [])
-        if uid not in pids:
-            return None, "", "شما در این مسابقه حضور نداشتید."
-        opp_id = pids[1] if pids[0] == uid else pids[0]
-        if opp_id in sess.get("left_users", set()):
-            return None, opp_id, "حریف صفحه پایان مسابقه را ترک کرده است."
-        return sess, opp_id, ""
+        with self._lock:
+            self._cleanup_expired()
+            uid = str(user_id or "").strip()
+            gid = str(game_id or "").strip()
+            if not gid:
+                gid = self.user_last_session.get(uid, "")
+            sess = self.sessions.get(gid)
+            if not sess or sess.get("consumed"):
+                return None, "", "مهلت درخواست پس از مسابقه به پایان رسیده است."
+            pids = sess.get("player_ids", [])
+            if uid not in pids:
+                return None, "", "شما در این مسابقه حضور نداشتید."
+            opp_id = pids[1] if pids[0] == uid else pids[0]
+            if opp_id in sess.get("left_users", set()):
+                return None, opp_id, "حریف صفحه پایان مسابقه را ترک کرده است."
+            return sess, opp_id, ""
 
     def _check_pair_can_start_game(self, uid: str, opp_id: str) -> tuple[bool, str]:
         db = self._get_db()
@@ -197,13 +225,38 @@ class PostMatchManager:
             )
             db.users_manager.update_user(pid, open_game_id=new_game_id)
 
-        if self._add_new_game_fn is not None:
-            self._add_new_game_fn(new_game_id, queuers, [target_game_type], GameScoreTypesEnum.LOBBY)
-        else:
-            from Entities.SocketIOClass.game import add_new_game
-            add_new_game(new_game_id, queuers, [target_game_type], GameScoreTypesEnum.LOBBY)
+        try:
+            if self._add_new_game_fn is not None:
+                self._add_new_game_fn(new_game_id, queuers, [target_game_type], GameScoreTypesEnum.LOBBY)
+            else:
+                from Entities.SocketIOClass.game import add_new_game
+                add_new_game(new_game_id, queuers, [target_game_type], GameScoreTypesEnum.LOBBY)
+        except Exception:
+            # Roll back open_game_id so neither player is stuck in a ghost match
+            for pid in swapped_ids:
+                try:
+                    db.users_manager.update_user(pid, open_game_id="")
+                except Exception:
+                    pass
+            raise
 
         return new_game_id
+
+    def _schedule_unclaimed_lobby_cleanup(self, lobby_session, lobby_obj) -> None:
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            return
+
+        async def _cleanup():
+            try:
+                await asyncio.sleep(self.UNCLAIMED_LOBBY_TTL_SEC)
+                if lobby_obj in getattr(lobby_session, "lobbies", []) and len(getattr(lobby_obj, "queuers", [])) == 0:
+                    lobby_session.lobbies.remove(lobby_obj)
+            except Exception:
+                pass
+
+        loop.create_task(_cleanup())
 
     def _create_private_switch_lobby(self, sess: dict, creator_id: str, target_game_type: str) -> dict:
         if self._create_private_lobby_fn is not None:
@@ -225,6 +278,7 @@ class PostMatchManager:
             lobby_password=lobby_password,
         )
         lobby_session.lobbies.append(new_lobby)
+        self._schedule_unclaimed_lobby_cleanup(lobby_session, new_lobby)
         return {
             "lobby_id": lobby_id,
             "lobby_password": lobby_password,
@@ -253,27 +307,31 @@ class PostMatchManager:
                 await asyncio.sleep(timeout_sec)
             except asyncio.CancelledError:
                 return
-            current_offer = sess.get("active_offer")
-            if not isinstance(current_offer, dict) or current_offer.get("offer_id") != offer_id:
-                return
-            if sess.get("consumed"):
-                return
-            offer_kind = current_offer.get("kind", "rematch")
-            sess["active_offer"] = None
+            with self._lock:
+                current_offer = sess.get("active_offer")
+                if not isinstance(current_offer, dict) or current_offer.get("offer_id") != offer_id:
+                    return
+                if sess.get("consumed"):
+                    return
+                offer_kind = current_offer.get("kind", "rematch")
+                sess["active_offer"] = None
+                player_ids = list(sess.get("player_ids", []))
+                gid = sess["game_id"]
             declined_cmd = (
                 commands.Rematch_Declined if offer_kind == "rematch" else commands.Switch_Game_Declined
             )
             payload = {
-                "game_id": sess["game_id"],
+                "game_id": gid,
                 "reason": "timeout",
                 "message": "زمان پاسخ به درخواست به پایان رسید.",
             }
-            for pid in sess["player_ids"]:
+            for pid in player_ids:
                 await self._emit_to_user(namespace_obj, pid, declined_cmd, payload)
 
         task = loop.create_task(_expire())
-        if isinstance(sess.get("active_offer"), dict):
-            sess["active_offer"]["timeout_task"] = task
+        with self._lock:
+            if isinstance(sess.get("active_offer"), dict) and sess["active_offer"].get("offer_id") == offer_id:
+                sess["active_offer"]["timeout_task"] = task
 
     async def handle_rematch_request(self, user_id: str, game_id: str, namespace_obj) -> dict:
         uid = str(user_id or "").strip()
@@ -297,45 +355,62 @@ class PostMatchManager:
             )
             return {"ok": False, "reason": "busy", "message": block_err}
 
-        existing = sess.get("active_offer")
-        # Mutual / simultaneous rematch tap -> accept immediately!
-        if isinstance(existing, dict) and existing.get("kind") == "rematch" and existing.get("from_user_id") == opp_id:
-            return await self.handle_rematch_respond(uid, sess["game_id"], "accept", namespace_obj)
+        with self._lock:
+            existing = sess.get("active_offer")
+            is_live_existing = isinstance(existing, dict) and time.time() <= float(existing.get("expires_at", 0.0))
+            if is_live_existing and existing.get("kind") == "rematch" and existing.get("from_user_id") == opp_id:
+                mutual_gid = sess["game_id"]
+            else:
+                mutual_gid = ""
 
-        # Duplicate tap from same user -> resend remaining waiting state
-        if isinstance(existing, dict) and existing.get("kind") == "rematch" and existing.get("from_user_id") == uid:
-            rem = max(1, int(existing.get("expires_at", time.time()) - time.time()))
+            if not mutual_gid and is_live_existing and existing.get("kind") == "rematch" and existing.get("from_user_id") == uid:
+                rem = max(1, int(existing.get("expires_at", time.time()) - time.time()))
+                dup_gid = sess["game_id"]
+                dup_gt = sess["game_type"]
+            else:
+                rem = 0
+                dup_gid = ""
+                dup_gt = ""
+
+        if mutual_gid:
+            return await self.handle_rematch_respond(uid, mutual_gid, "accept", namespace_obj)
+
+        if dup_gid:
             await self._emit_to_user(
                 namespace_obj,
                 uid,
                 commands.Rematch_State,
-                {"game_id": sess["game_id"], "status": "waiting", "timeout": rem, "game_type": sess["game_type"]},
+                {"game_id": dup_gid, "status": "waiting", "timeout": rem, "game_type": dup_gt},
             )
             return {"ok": True, "status": "waiting", "timeout": rem}
 
-        self._cancel_offer_task(sess)
-        offer_id = secrets.token_hex(6)
-        sess["active_offer"] = {
-            "offer_id": offer_id,
-            "kind": "rematch",
-            "from_user_id": uid,
-            "target_game_type": sess["game_type"],
-            "open_lobby": False,
-            "expires_at": time.time() + self.REMATCH_TIMEOUT_SEC,
-            "timeout_task": None,
-        }
+        with self._lock:
+            self._cancel_offer_task(sess)
+            offer_id = secrets.token_hex(6)
+            sess["active_offer"] = {
+                "offer_id": offer_id,
+                "kind": "rematch",
+                "from_user_id": uid,
+                "target_game_type": sess["game_type"],
+                "open_lobby": False,
+                "expires_at": time.time() + self.REMATCH_TIMEOUT_SEC,
+                "timeout_task": None,
+            }
+            gid = sess["game_id"]
+            gt = sess["game_type"]
+            from_meta = dict(sess["players_meta"].get(uid, {}))
+
         self._schedule_offer_timeout(sess, offer_id, self.REMATCH_TIMEOUT_SEC, namespace_obj)
 
-        from_meta = sess["players_meta"].get(uid, {})
         await self._emit_to_user(
             namespace_obj,
             uid,
             commands.Rematch_State,
             {
-                "game_id": sess["game_id"],
+                "game_id": gid,
                 "status": "waiting",
                 "timeout": self.REMATCH_TIMEOUT_SEC,
-                "game_type": sess["game_type"],
+                "game_type": gt,
             },
         )
         await self._emit_to_user(
@@ -343,10 +418,10 @@ class PostMatchManager:
             opp_id,
             commands.Rematch_Offered,
             {
-                "game_id": sess["game_id"],
+                "game_id": gid,
                 "from_user_id": uid,
                 "from_username": from_meta.get("username", "حریف"),
-                "game_type": sess["game_type"],
+                "game_type": gt,
                 "timeout": self.REMATCH_TIMEOUT_SEC,
             },
         )
@@ -365,27 +440,46 @@ class PostMatchManager:
             )
             return {"ok": False, "reason": "unavailable"}
 
-        offer = sess.get("active_offer")
-        if not isinstance(offer, dict) or offer.get("kind") != "rematch":
+        with self._lock:
+            offer = sess.get("active_offer")
+            is_expired = (
+                not isinstance(offer, dict)
+                or offer.get("kind") != "rematch"
+                or time.time() > float(offer.get("expires_at", 0.0))
+            )
+            if is_expired:
+                if isinstance(offer, dict) and offer.get("kind") == "rematch":
+                    self._cancel_offer_task(sess)
+                    sess["active_offer"] = None
+                gid_exp = sess["game_id"]
+            else:
+                gid_exp = ""
+
+        if gid_exp:
             await self._emit_to_user(
                 namespace_obj,
                 uid,
                 commands.Rematch_Declined,
-                {"game_id": sess["game_id"], "reason": "expired", "message": "درخواست بازی مجدد منقضی شده است."},
+                {"game_id": gid_exp, "reason": "expired", "message": "درخواست بازی مجدد منقضی شده است."},
             )
             return {"ok": False, "reason": "expired"}
 
         if act in ("decline", "cancel"):
-            self._cancel_offer_task(sess)
-            sess["active_offer"] = None
-            reason = "cancelled" if offer.get("from_user_id") == uid else "declined"
+            with self._lock:
+                offer = sess.get("active_offer")
+                from_uid = offer.get("from_user_id") if isinstance(offer, dict) else ""
+                self._cancel_offer_task(sess)
+                sess["active_offer"] = None
+                player_ids = list(sess["player_ids"])
+                gid = sess["game_id"]
+            reason = "cancelled" if from_uid == uid else "declined"
             msg = "درخواست بازی مجدد لغو شد." if reason == "cancelled" else "حریف درخواست بازی مجدد را نپذیرفت."
-            for pid in sess["player_ids"]:
+            for pid in player_ids:
                 await self._emit_to_user(
                     namespace_obj,
                     pid,
                     commands.Rematch_Declined,
-                    {"game_id": sess["game_id"], "reason": reason, "by_user_id": uid, "message": msg},
+                    {"game_id": gid, "reason": reason, "by_user_id": uid, "message": msg},
                 )
             return {"ok": True, "status": reason}
 
@@ -394,35 +488,59 @@ class PostMatchManager:
 
         can_start, block_err = self._check_pair_can_start_game(uid, opp_id)
         if not can_start:
-            self._cancel_offer_task(sess)
-            sess["active_offer"] = None
-            for pid in sess["player_ids"]:
+            with self._lock:
+                self._cancel_offer_task(sess)
+                sess["active_offer"] = None
+                player_ids = list(sess["player_ids"])
+                gid = sess["game_id"]
+            for pid in player_ids:
                 await self._emit_to_user(
                     namespace_obj,
                     pid,
                     commands.Rematch_Declined,
-                    {"game_id": sess["game_id"], "reason": "busy", "message": block_err},
+                    {"game_id": gid, "reason": "busy", "message": block_err},
                 )
             return {"ok": False, "reason": "busy", "message": block_err}
 
-        self._cancel_offer_task(sess)
-        sess["active_offer"] = None
-        sess["consumed"] = True
+        with self._lock:
+            if sess.get("consumed"):
+                return {"ok": False, "reason": "already_consumed"}
+            self._cancel_offer_task(sess)
+            sess["active_offer"] = None
+            sess["consumed"] = True
+            gid = sess["game_id"]
+            gt = sess["game_type"]
+            player_ids = list(sess["player_ids"])
 
-        new_game_id = self._spawn_direct_match(sess, sess["game_type"])
+        try:
+            new_game_id = self._spawn_direct_match(sess, gt)
+        except Exception as e:
+            print(f"[PostMatchManager] Error spawning rematch direct match: {e}")
+            with self._lock:
+                sess["consumed"] = False
+            for pid in player_ids:
+                await self._emit_to_user(
+                    namespace_obj,
+                    pid,
+                    commands.Rematch_Declined,
+                    {"game_id": gid, "reason": "error", "message": "خطا در راه‌اندازی بازی مجدد. لطفاً دوباره تلاش کنید."},
+                )
+            return {"ok": False, "reason": "error"}
+
         accepted_payload = {
-            "old_game_id": sess["game_id"],
+            "old_game_id": gid,
             "new_game_id": new_game_id,
             "game_id": new_game_id,
-            "game_type": sess["game_type"],
+            "game_type": gt,
             "swapped_roles": True,
             "match_mode": "lobby",
         }
-        for pid in sess["player_ids"]:
+        for pid in player_ids:
             await self._emit_to_user(namespace_obj, pid, commands.Rematch_Accepted, accepted_payload)
 
-        self.sessions.pop(sess["game_id"], None)
-        return {"ok": True, "status": "accepted", "new_game_id": new_game_id, "game_type": sess["game_type"]}
+        with self._lock:
+            self._pop_session_locked(gid)
+        return {"ok": True, "status": "accepted", "new_game_id": new_game_id, "game_type": gt}
 
     async def handle_switch_game_request(
         self,
@@ -463,35 +581,68 @@ class PostMatchManager:
             )
             return {"ok": False, "reason": "busy", "message": block_err}
 
-        existing = sess.get("active_offer")
-        if (
-            isinstance(existing, dict)
-            and existing.get("kind") == "switch_game"
-            and existing.get("from_user_id") == opp_id
-            and existing.get("target_game_type") == canonical_gt
-        ):
-            return await self.handle_switch_game_respond(uid, sess["game_id"], "accept", namespace_obj)
+        with self._lock:
+            existing = sess.get("active_offer")
+            is_live_existing = isinstance(existing, dict) and time.time() <= float(existing.get("expires_at", 0.0))
+            mutual_gid = ""
+            dup_gid = ""
+            rem = 0
+            if (
+                is_live_existing
+                and existing.get("kind") == "switch_game"
+                and existing.get("from_user_id") == opp_id
+                and existing.get("target_game_type") == canonical_gt
+            ):
+                mutual_gid = sess["game_id"]
+            elif (
+                is_live_existing
+                and existing.get("kind") == "switch_game"
+                and existing.get("from_user_id") == uid
+                and existing.get("target_game_type") == canonical_gt
+            ):
+                rem = max(1, int(existing.get("expires_at", time.time()) - time.time()))
+                dup_gid = sess["game_id"]
 
-        self._cancel_offer_task(sess)
-        offer_id = secrets.token_hex(6)
-        sess["active_offer"] = {
-            "offer_id": offer_id,
-            "kind": "switch_game",
-            "from_user_id": uid,
-            "target_game_type": canonical_gt,
-            "open_lobby": bool(open_lobby),
-            "expires_at": time.time() + self.SWITCH_GAME_TIMEOUT_SEC,
-            "timeout_task": None,
-        }
+        if mutual_gid:
+            return await self.handle_switch_game_respond(uid, mutual_gid, "accept", namespace_obj)
+
+        if dup_gid:
+            await self._emit_to_user(
+                namespace_obj,
+                uid,
+                commands.Switch_Game_State,
+                {
+                    "game_id": dup_gid,
+                    "status": "waiting",
+                    "target_game_type": canonical_gt,
+                    "timeout": rem,
+                },
+            )
+            return {"ok": True, "status": "waiting", "target_game_type": canonical_gt, "timeout": rem}
+
+        with self._lock:
+            self._cancel_offer_task(sess)
+            offer_id = secrets.token_hex(6)
+            sess["active_offer"] = {
+                "offer_id": offer_id,
+                "kind": "switch_game",
+                "from_user_id": uid,
+                "target_game_type": canonical_gt,
+                "open_lobby": bool(open_lobby),
+                "expires_at": time.time() + self.SWITCH_GAME_TIMEOUT_SEC,
+                "timeout_task": None,
+            }
+            gid = sess["game_id"]
+            from_meta = dict(sess["players_meta"].get(uid, {}))
+
         self._schedule_offer_timeout(sess, offer_id, self.SWITCH_GAME_TIMEOUT_SEC, namespace_obj)
 
-        from_meta = sess["players_meta"].get(uid, {})
         await self._emit_to_user(
             namespace_obj,
             uid,
             commands.Switch_Game_State,
             {
-                "game_id": sess["game_id"],
+                "game_id": gid,
                 "status": "waiting",
                 "target_game_type": canonical_gt,
                 "timeout": self.SWITCH_GAME_TIMEOUT_SEC,
@@ -502,7 +653,7 @@ class PostMatchManager:
             opp_id,
             commands.Switch_Game_Offered,
             {
-                "game_id": sess["game_id"],
+                "game_id": gid,
                 "from_user_id": uid,
                 "from_username": from_meta.get("username", "حریف"),
                 "target_game_type": canonical_gt,
@@ -525,27 +676,46 @@ class PostMatchManager:
             )
             return {"ok": False, "reason": "unavailable"}
 
-        offer = sess.get("active_offer")
-        if not isinstance(offer, dict) or offer.get("kind") != "switch_game":
+        with self._lock:
+            offer = sess.get("active_offer")
+            is_expired = (
+                not isinstance(offer, dict)
+                or offer.get("kind") != "switch_game"
+                or time.time() > float(offer.get("expires_at", 0.0))
+            )
+            if is_expired:
+                if isinstance(offer, dict) and offer.get("kind") == "switch_game":
+                    self._cancel_offer_task(sess)
+                    sess["active_offer"] = None
+                gid_exp = sess["game_id"]
+            else:
+                gid_exp = ""
+
+        if gid_exp:
             await self._emit_to_user(
                 namespace_obj,
                 uid,
                 commands.Switch_Game_Declined,
-                {"game_id": sess["game_id"], "reason": "expired", "message": "پیشنهاد تغییر بازی منقضی شده است."},
+                {"game_id": gid_exp, "reason": "expired", "message": "پیشنهاد تغییر بازی منقضی شده است."},
             )
             return {"ok": False, "reason": "expired"}
 
         if act in ("decline", "cancel"):
-            self._cancel_offer_task(sess)
-            sess["active_offer"] = None
-            reason = "cancelled" if offer.get("from_user_id") == uid else "declined"
+            with self._lock:
+                offer = sess.get("active_offer")
+                from_uid = offer.get("from_user_id") if isinstance(offer, dict) else ""
+                self._cancel_offer_task(sess)
+                sess["active_offer"] = None
+                player_ids = list(sess["player_ids"])
+                gid = sess["game_id"]
+            reason = "cancelled" if from_uid == uid else "declined"
             msg = "پیشنهاد تغییر بازی لغو شد." if reason == "cancelled" else "حریف پیشنهاد تغییر بازی را نپذیرفت."
-            for pid in sess["player_ids"]:
+            for pid in player_ids:
                 await self._emit_to_user(
                     namespace_obj,
                     pid,
                     commands.Switch_Game_Declined,
-                    {"game_id": sess["game_id"], "reason": reason, "by_user_id": uid, "message": msg},
+                    {"game_id": gid, "reason": reason, "by_user_id": uid, "message": msg},
                 )
             return {"ok": True, "status": reason}
 
@@ -554,42 +724,79 @@ class PostMatchManager:
 
         can_start, block_err = self._check_pair_can_start_game(uid, opp_id)
         if not can_start:
-            self._cancel_offer_task(sess)
-            sess["active_offer"] = None
-            for pid in sess["player_ids"]:
+            with self._lock:
+                self._cancel_offer_task(sess)
+                sess["active_offer"] = None
+                player_ids = list(sess["player_ids"])
+                gid = sess["game_id"]
+            for pid in player_ids:
                 await self._emit_to_user(
                     namespace_obj,
                     pid,
                     commands.Switch_Game_Declined,
-                    {"game_id": sess["game_id"], "reason": "busy", "message": block_err},
+                    {"game_id": gid, "reason": "busy", "message": block_err},
                 )
             return {"ok": False, "reason": "busy", "message": block_err}
 
-        target_gt = str(offer.get("target_game_type", sess["game_type"]))
-        use_lobby = bool(offer.get("open_lobby", False))
-        creator_id = str(offer.get("from_user_id", uid))
-        self._cancel_offer_task(sess)
-        sess["active_offer"] = None
-        sess["consumed"] = True
+        with self._lock:
+            if sess.get("consumed"):
+                return {"ok": False, "reason": "already_consumed"}
+            target_gt = str(offer.get("target_game_type", sess["game_type"]))
+            use_lobby = bool(offer.get("open_lobby", False))
+            creator_id = str(offer.get("from_user_id", uid))
+            self._cancel_offer_task(sess)
+            sess["active_offer"] = None
+            sess["consumed"] = True
+            gid = sess["game_id"]
+            player_ids = list(sess["player_ids"])
 
         if use_lobby:
-            lobby_info = self._create_private_switch_lobby(sess, creator_id, target_gt)
+            try:
+                lobby_info = self._create_private_switch_lobby(sess, creator_id, target_gt)
+            except Exception as e:
+                print(f"[PostMatchManager] Error creating private switch lobby: {e}")
+                with self._lock:
+                    sess["consumed"] = False
+                for pid in player_ids:
+                    await self._emit_to_user(
+                        namespace_obj,
+                        pid,
+                        commands.Switch_Game_Declined,
+                        {"game_id": gid, "reason": "error", "message": "خطا در ساخت اتاق خصوصی. لطفاً دوباره تلاش کنید."},
+                    )
+                return {"ok": False, "reason": "error"}
+
             payload = {
-                "old_game_id": sess["game_id"],
+                "old_game_id": gid,
                 "mode": "lobby",
                 "lobby_id": lobby_info["lobby_id"],
                 "lobby_password": lobby_info["lobby_password"],
                 "game_type": target_gt,
                 "creator_id": creator_id,
             }
-            for pid in sess["player_ids"]:
+            for pid in player_ids:
                 await self._emit_to_user(namespace_obj, pid, commands.Switch_Game_Accepted, payload)
-            self.sessions.pop(sess["game_id"], None)
+            with self._lock:
+                self._pop_session_locked(gid)
             return {"ok": True, "status": "accepted", "mode": "lobby", **lobby_info}
 
-        new_game_id = self._spawn_direct_match(sess, target_gt)
+        try:
+            new_game_id = self._spawn_direct_match(sess, target_gt)
+        except Exception as e:
+            print(f"[PostMatchManager] Error spawning switched direct match: {e}")
+            with self._lock:
+                sess["consumed"] = False
+            for pid in player_ids:
+                await self._emit_to_user(
+                    namespace_obj,
+                    pid,
+                    commands.Switch_Game_Declined,
+                    {"game_id": gid, "reason": "error", "message": "خطا در شروع بازی جدید. لطفاً دوباره تلاش کنید."},
+                )
+            return {"ok": False, "reason": "error"}
+
         payload = {
-            "old_game_id": sess["game_id"],
+            "old_game_id": gid,
             "mode": "direct",
             "new_game_id": new_game_id,
             "game_id": new_game_id,
@@ -597,34 +804,50 @@ class PostMatchManager:
             "swapped_roles": True,
             "match_mode": "lobby",
         }
-        for pid in sess["player_ids"]:
+        for pid in player_ids:
             await self._emit_to_user(namespace_obj, pid, commands.Switch_Game_Accepted, payload)
-        self.sessions.pop(sess["game_id"], None)
+        with self._lock:
+            self._pop_session_locked(gid)
         return {"ok": True, "status": "accepted", "mode": "direct", "new_game_id": new_game_id, "game_type": target_gt}
 
     async def handle_post_match_leave(self, user_id: str, game_id: str, namespace_obj) -> None:
         uid = str(user_id or "").strip()
-        gid = str(game_id or "").strip() or self.user_last_session.get(uid, "")
-        sess = self.sessions.get(gid)
-        if not sess or uid not in sess.get("player_ids", []):
-            return
-        sess["left_users"].add(uid)
-        self._cancel_offer_task(sess)
-        sess["active_offer"] = None
-        opp_id = sess["player_ids"][1] if sess["player_ids"][0] == uid else sess["player_ids"][0]
-        if opp_id not in sess["left_users"]:
+        notify_opp = ""
+        resolved_gid = ""
+        with self._lock:
+            gid = str(game_id or "").strip() or self.user_last_session.get(uid, "")
+            sess = self.sessions.get(gid)
+            if not sess or sess.get("consumed") or uid not in sess.get("player_ids", []):
+                return
+            if uid in sess["left_users"]:
+                return
+            sess["left_users"].add(uid)
+            self._cancel_offer_task(sess)
+            sess["active_offer"] = None
+            if self.user_last_session.get(uid) == gid:
+                self.user_last_session.pop(uid, None)
+            opp_id = sess["player_ids"][1] if sess["player_ids"][0] == uid else sess["player_ids"][0]
+            if opp_id not in sess["left_users"]:
+                notify_opp = opp_id
+                resolved_gid = gid
+            else:
+                # Both players have left; remove session cleanly
+                self._pop_session_locked(gid)
+
+        if notify_opp:
             leave_payload = {
-                "game_id": gid,
+                "game_id": resolved_gid,
                 "reason": "opponent_left",
                 "by_user_id": uid,
                 "message": "حریف صفحه پایان مسابقه را ترک کرد.",
             }
-            await self._emit_to_user(namespace_obj, opp_id, commands.Rematch_Declined, leave_payload)
-            await self._emit_to_user(namespace_obj, opp_id, commands.Switch_Game_Declined, leave_payload)
+            await self._emit_to_user(namespace_obj, notify_opp, commands.Rematch_Declined, leave_payload)
+            await self._emit_to_user(namespace_obj, notify_opp, commands.Switch_Game_Declined, leave_payload)
 
     async def handle_user_disconnected(self, user_id: str, namespace_obj) -> None:
         uid = str(user_id or "").strip()
-        gid = self.user_last_session.get(uid, "")
+        with self._lock:
+            gid = self.user_last_session.get(uid, "")
         if gid:
             await self.handle_post_match_leave(uid, gid, namespace_obj)
 

@@ -821,11 +821,21 @@ class SocialSessionManager:
 
         # 10. Post-Match Rematch & Switch Game Together (2-player human matches only)
         if cmd_id == commands.Rematch_Request:
+            gid = str(payload.get("game_id", "")).strip()
             if not self._check_rate(uid, "rematch", max_calls=12, window_sec=60.0):
-                await self._send_error(socket_id, "تعداد درخواست‌های بازی مجدد بیش از حد مجاز است.", namespace_obj)
+                msg = "تعداد درخواست‌های بازی مجدد بیش از حد مجاز است."
+                await self._send_error(socket_id, msg, namespace_obj)
+                await namespace_obj.emit(
+                    "command",
+                    make_command_json(
+                        id=commands.Rematch_Declined,
+                        data={"game_id": gid, "reason": "rate_limited", "message": msg},
+                    ),
+                    to=socket_id,
+                    namespace="/social",
+                )
                 return
             from Controllers.SocialSession.post_match_manager import post_match_manager
-            gid = str(payload.get("game_id", "")).strip()
             await post_match_manager.handle_rematch_request(uid, gid, namespace_obj)
             return
 
@@ -839,11 +849,21 @@ class SocialSessionManager:
             return
 
         if cmd_id == commands.Switch_Game_Request:
+            gid = str(payload.get("game_id", "")).strip()
             if not self._check_rate(uid, "switch_game", max_calls=12, window_sec=60.0):
-                await self._send_error(socket_id, "تعداد درخواست‌های تغییر بازی بیش از حد مجاز است.", namespace_obj)
+                msg = "تعداد درخواست‌های تغییر بازی بیش از حد مجاز است."
+                await self._send_error(socket_id, msg, namespace_obj)
+                await namespace_obj.emit(
+                    "command",
+                    make_command_json(
+                        id=commands.Switch_Game_Declined,
+                        data={"game_id": gid, "reason": "rate_limited", "message": msg},
+                    ),
+                    to=socket_id,
+                    namespace="/social",
+                )
                 return
             from Controllers.SocialSession.post_match_manager import post_match_manager
-            gid = str(payload.get("game_id", "")).strip()
             target_gt = str(payload.get("target_game_type", payload.get("game_type", ""))).strip()
             open_lobby = bool(payload.get("open_lobby", False))
             await post_match_manager.handle_switch_game_request(uid, gid, target_gt, open_lobby, namespace_obj)

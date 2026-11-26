@@ -122,6 +122,23 @@ class BaseGamePlayClass:
             pass
         return False
 
+    def _get_last_played_game_type(self) -> str:
+        if not self.game_types:
+            if self.game_session is not None and getattr(self.game_session, "game_type", ""):
+                return str(self.game_session.game_type)
+            return ""
+        if len(self.game_types) == 1:
+            return str(self.game_types[0])
+        # For multi-game series (e.g. Ranked 2-0 sweep), pick the last game actually played
+        if isinstance(self.game_winners, list) and self.game_winners:
+            for idx in range(min(len(self.game_types), len(self.game_winners)) - 1, -1, -1):
+                if self.game_winners[idx] != -1:
+                    return str(self.game_types[idx])
+        if self.game_session is not None and getattr(self.game_session, "game_type", ""):
+            return str(self.game_session.game_type)
+        idx = max(0, min(self.current_game_index - 1 if self.current_game_index > 0 else 0, len(self.game_types) - 1))
+        return str(self.game_types[idx])
+
     def _build_post_match_payload_for_user(self, viewer_id) -> dict:
         if self._is_bot_match():
             return {"eligible": False, "is_bot_match": True}
@@ -154,7 +171,7 @@ class BaseGamePlayClass:
             h2h = {"my_wins": 0, "opp_wins": 0, "draws": 0, "total_matches": 0, "is_arch_rival": False, "last_game_type": ""}
             friend_status, incoming_req_id = "none", ""
 
-        last_gt = str(self.game_types[-1]) if self.game_types else ""
+        last_gt = self._get_last_played_game_type()
         return {
             "eligible": friend_status != "blocked",
             "is_bot_match": False,
@@ -632,6 +649,32 @@ class BaseGamePlayClass:
             except Exception as e:
                 print(f"[BaseGamePlayClass] Error updating game_play_history: {e}")
             self.game_winner_id = rank1_id
+
+            # Record Head-to-Head Rival stats & register post-match session for 2-player human multiplayer matches (e.g. 2P Ludo/Uno/Risk/Monopoly/Coup/Quiz)
+            if not self._is_bot_match() and len(self.gamers) == 2:
+                last_gt = self._get_last_played_game_type()
+                try:
+                    game_database.rivals_manager.record_match_result(
+                        self.gamers[0].user_id,
+                        self.gamers[1].user_id,
+                        rank1_id,
+                        game_type=last_gt,
+                        game_id=self.game_play_id,
+                        history_col=game_database.game_play_history_manager.collection,
+                    )
+                except Exception as e:
+                    print(f"[BaseGamePlayClass] Error recording multiplayer head-to-head rivalry: {e}")
+                try:
+                    from Controllers.SocialSession.post_match_manager import post_match_manager
+                    post_match_manager.register_finished_match(
+                        self.game_play_id,
+                        self.gamers,
+                        [last_gt] if last_gt else self.game_types,
+                        self.game_score_type,
+                    )
+                except Exception as e:
+                    print(f"[BaseGamePlayClass] Error registering multiplayer post-match session: {e}")
+
             rank1_gid = 0 if rank1_id in (None, 0, "0", "") else (self.game_session.find_gamer_id_from_user_id(rank1_id) if self.game_session is not None else 0)
             rank2_gid = 0 if rank2_id in (None, 0, "0", "") else (self.game_session.find_gamer_id_from_user_id(rank2_id) if self.game_session is not None else 0)
             from Entities.SocketIOManagerClass import send_private_command
@@ -659,6 +702,7 @@ class BaseGamePlayClass:
                                         "xp_earned": earned,
                                         "score_earned": s_earned,
                                         "coin_earned": c_earned,
+                                        "post_match": self._build_post_match_payload_for_user(gamer.user_id),
                                     }
                                 ),
                                 socket_id=gamer.socket_id,
@@ -746,14 +790,15 @@ class BaseGamePlayClass:
 
             # Record Head-to-Head Rival stats and register post-match Rematch/Switch session (strictly human 2P only!)
             if not self._is_bot_match() and len(self.gamers) == 2:
+                last_gt = self._get_last_played_game_type()
                 try:
-                    last_gt = str(self.game_types[-1]) if self.game_types else ""
                     game_database.rivals_manager.record_match_result(
                         self.gamers[0].user_id,
                         self.gamers[1].user_id,
                         winner_id,
                         game_type=last_gt,
                         game_id=self.game_play_id,
+                        history_col=game_database.game_play_history_manager.collection,
                     )
                 except Exception as e:
                     print(f"[BaseGamePlayClass] Error recording head-to-head rivalry: {e}")
@@ -762,7 +807,7 @@ class BaseGamePlayClass:
                     post_match_manager.register_finished_match(
                         self.game_play_id,
                         self.gamers,
-                        self.game_types,
+                        [last_gt] if last_gt else self.game_types,
                         self.game_score_type,
                     )
                 except Exception as e:
