@@ -149,28 +149,63 @@ class ChessGameLogic(BaseGameLogic):
     # ---------------------------------------------------------
 
     def get_legal_moves(self) -> List[Tuple[Tuple[int, int], Tuple[int, int]]]:
-        """Returns all strictly legal moves ((src_r, src_c), (tgt_r, tgt_c))."""
+        """Returns all strictly legal moves ((src_r, src_c), (tgt_r, tgt_c)) for our side."""
         my_id = self.my_player_num if self.my_player_num in (1, 2) else 1
-        pseudo_moves = []
+        return self._get_legal_moves_for(my_id)
 
+    def _get_legal_moves_for(self, player_id: int) -> List[Tuple[Tuple[int, int], Tuple[int, int]]]:
+        """Returns all strictly legal moves ((src_r, src_c), (tgt_r, tgt_c)) for player_id."""
+        pseudo_moves = []
         for r in range(8):
             for c in range(8):
                 spot = self._get_piece(r, c)
-                if spot["gamer_id"] == my_id:
+                if spot["gamer_id"] == player_id:
                     src = (r, c)
-                    tgt_moves = self._get_moves_for_piece(r, c, my_id)
-                    tgt_hits = self._get_hits_for_piece(r, c, my_id)
+                    tgt_moves = self._get_moves_for_piece(r, c, player_id)
+                    tgt_hits = self._get_hits_for_piece(r, c, player_id)
                     for tgt in tgt_moves + tgt_hits:
                         pseudo_moves.append((src, tgt))
 
-        # Filter out moves that leave king in check
         legal = []
         for src, tgt in pseudo_moves:
-            if self._is_king_safe_after_move(src, tgt, my_id):
+            if self._is_king_safe_after_move(src, tgt, player_id):
                 legal.append((src, tgt))
+        return legal
 
-        # Fallback to pseudo-moves if check filter is empty (e.g. checkmate or unusual state)
-        return legal if legal else pseudo_moves
+    def _make_sim_move(self, src: Tuple[int, int], tgt: Tuple[int, int], player_id: int) -> dict:
+        sr, sc = src
+        tr, tc = tgt
+        src_idx = sr * 8 + sc
+        tgt_idx = tr * 8 + tc
+
+        saved = {
+            "src_idx": src_idx,
+            "tgt_idx": tgt_idx,
+            "old_src": dict(self.board[src_idx]),
+            "old_tgt": dict(self.board[tgt_idx]),
+            "king1_pos": self.king1_pos,
+            "king2_pos": self.king2_pos,
+        }
+
+        piece = dict(saved["old_src"])
+        piece["is_first_move"] = False
+        if piece["name"] == "Pawn" and (tr == 0 or tr == 7):
+            piece["name"] = "Queen"
+        if piece["name"] == "King":
+            if player_id == 1:
+                self.king1_pos = (tr, tc)
+            else:
+                self.king2_pos = (tr, tc)
+
+        self.board[tgt_idx] = piece
+        self.board[src_idx] = {"gamer_id": 0, "name": "", "is_first_move": False}
+        return saved
+
+    def _undo_sim_move(self, saved: dict) -> None:
+        self.board[saved["src_idx"]] = saved["old_src"]
+        self.board[saved["tgt_idx"]] = saved["old_tgt"]
+        self.king1_pos = saved["king1_pos"]
+        self.king2_pos = saved["king2_pos"]
 
     def _is_king_safe_after_move(
         self,
@@ -179,37 +214,11 @@ class ChessGameLogic(BaseGameLogic):
         my_id: int,
     ) -> bool:
         """Simulates move on board and checks if king remains safe."""
-        sr, sc = src
-        tr, tc = tgt
-        src_idx = sr * 8 + sc
-        tgt_idx = tr * 8 + tc
-
-        old_src = dict(self.board[src_idx])
-        old_tgt = dict(self.board[tgt_idx])
-        old_king_pos = self.king1_pos if my_id == 1 else self.king2_pos
-
-        # Make move
-        self.board[tgt_idx] = dict(old_src)
-        self.board[src_idx] = {"gamer_id": 0, "name": "", "is_first_move": False}
-        if old_src["name"] == "King":
-            if my_id == 1:
-                self.king1_pos = (tr, tc)
-            else:
-                self.king2_pos = (tr, tc)
-
-        # Check safety
+        saved = self._make_sim_move(src, tgt, my_id)
         king_pos = self.king1_pos if my_id == 1 else self.king2_pos
         opp_id = 2 if my_id == 1 else 1
         is_safe = not self._is_square_attacked(king_pos[0], king_pos[1], by_player=opp_id)
-
-        # Undo move
-        self.board[src_idx] = old_src
-        self.board[tgt_idx] = old_tgt
-        if my_id == 1:
-            self.king1_pos = old_king_pos
-        else:
-            self.king2_pos = old_king_pos
-
+        self._undo_sim_move(saved)
         return is_safe
 
     def _is_square_attacked(self, r: int, c: int, by_player: int) -> bool:
@@ -486,48 +495,79 @@ class ChessGameLogic(BaseGameLogic):
 
         return random.choice(candidates) if candidates else random.choice(legal)
 
+    def _order_moves(
+        self,
+        moves: List[Tuple[Tuple[int, int], Tuple[int, int]]],
+        opp_id: int,
+    ) -> List[Tuple[Tuple[int, int], Tuple[int, int]]]:
+        def _mv_key(m: Tuple[Tuple[int, int], Tuple[int, int]]) -> float:
+            src, tgt = m
+            mover = self._get_piece(src[0], src[1])
+            victim = self._get_piece(tgt[0], tgt[1])
+            sc = CENTER_BONUS.get(tgt, 0) * 0.5
+            if victim["gamer_id"] == opp_id:
+                sc += PIECE_VALUES.get(victim["name"], 0) * 10 - PIECE_VALUES.get(mover["name"], 0)
+            if mover["name"] == "Pawn" and tgt[0] in (0, 7):
+                sc += 800
+            return sc
+        return sorted(moves, key=_mv_key, reverse=True)
+
     def _compute_level_3(
         self, legal: List[Tuple[Tuple[int, int], Tuple[int, int]]]
     ) -> Tuple[Tuple[int, int], Tuple[int, int]]:
         """
         Level 3 - Hard / Master:
-        - Minimax search (depth 2) with alpha-beta pruning.
-        - Evaluates board balance and positional values.
+        - 2-ply Alpha-Beta minimax search (our move -> opponent's strongest legal reply).
+        - Detects checkmate, checks, pawn promotions, hanging pieces, and tactical captures.
         """
         my_id = self.my_player_num if self.my_player_num in (1, 2) else 1
         opp_id = 2 if my_id == 1 else 1
 
+        ordered_moves = self._order_moves(legal, opp_id)
         best_score = -float("inf")
-        best_move = legal[0]
+        best_move = ordered_moves[0]
 
-        for src, tgt in legal:
-            sr, sc = src
-            tr, tc = tgt
-            src_idx = sr * 8 + sc
-            tgt_idx = tr * 8 + tc
+        for src, tgt in ordered_moves:
+            saved = self._make_sim_move(src, tgt, my_id)
 
-            old_src = dict(self.board[src_idx])
-            old_tgt = dict(self.board[tgt_idx])
+            opp_king = self.king2_pos if my_id == 1 else self.king1_pos
+            opp_in_check = self._is_square_attacked(opp_king[0], opp_king[1], by_player=my_id)
+            opp_legal = self._get_legal_moves_for(opp_id)
 
-            # Apply move
-            self.board[tgt_idx] = dict(old_src)
-            self.board[src_idx] = {"gamer_id": 0, "name": "", "is_first_move": False}
+            if not opp_legal:
+                # Checkmate or stalemate
+                score = 50000.0 if opp_in_check else 0.0
+                self._undo_sim_move(saved)
+                if score > best_score:
+                    best_score = score
+                    best_move = (src, tgt)
+                if score >= 50000.0:
+                    return best_move
+                continue
 
-            # Evaluate with 1-ply opponent response
-            score = self._evaluate_board(my_id, opp_id)
+            opp_ordered = self._order_moves(opp_legal, my_id)[:32]
+            worst_reply = float("inf")
+            for o_src, o_tgt in opp_ordered:
+                o_saved = self._make_sim_move(o_src, o_tgt, opp_id)
+                reply_eval = self._evaluate_board(my_id, opp_id)
+                if opp_in_check:
+                    reply_eval += 15.0
+                self._undo_sim_move(o_saved)
+                if reply_eval < worst_reply:
+                    worst_reply = reply_eval
+                # Alpha-beta cutoff: opponent already has a reply worse than our best move
+                if worst_reply <= best_score:
+                    break
 
-            # Revert move
-            self.board[src_idx] = old_src
-            self.board[tgt_idx] = old_tgt
-
-            if score > best_score:
-                best_score = score
+            self._undo_sim_move(saved)
+            if worst_reply > best_score:
+                best_score = worst_reply
                 best_move = (src, tgt)
 
         return best_move
 
     def _evaluate_board(self, my_id: int, opp_id: int) -> float:
-        """Heuristic board evaluation for Level 3."""
+        """Heuristic board evaluation for Level 3 (material + center + pawn advancement + hanging/check)."""
         score = 0.0
         for r in range(8):
             for c in range(8):
@@ -535,6 +575,9 @@ class ChessGameLogic(BaseGameLogic):
                 if p["gamer_id"] == 0:
                     continue
                 val = PIECE_VALUES.get(p["name"], 0) + CENTER_BONUS.get((r, c), 0)
+                if p["name"] == "Pawn":
+                    adv = r if p["gamer_id"] == 1 else (7 - r)
+                    val += adv * 8
                 if p["gamer_id"] == my_id:
                     score += val
                 else:

@@ -5,6 +5,7 @@ Socket.IO Namespace for Classic Rank Matchmaking (/classic-rank).
 import socketio
 from Commons import commands
 from Controllers.QueueSession.classic_rank import ClassicRankSession
+from Entities.RewardManagerClass.reward_data import normalize_ai_level
 from Entities.Security import check_is_token_valid
 from Models.Queuer import QueuerModel
 
@@ -24,6 +25,7 @@ class ClassicRankSocketNameSpace(socketio.AsyncNamespace):
                 return
             user_id = token_data["id"]
             game_type = auth.get("game_type", "TicTacToe")
+            ai_level = normalize_ai_level(auth.get("ai_level", auth.get("difficulty_level", auth.get("level", 2))))
         except Exception as e:
             print(f"[ClassicRankSocket] Auth error: {e}")
             await self.disconnect(socket_id, namespace="/classic-rank")
@@ -103,7 +105,7 @@ class ClassicRankSocketNameSpace(socketio.AsyncNamespace):
             is_rdy=True,
             profile_frame=profile_frame,
         )
-        await classic_rank_session.start_classic_rank_match(queuer_data, game_type, socket_id)
+        await classic_rank_session.start_classic_rank_match(queuer_data, game_type, socket_id, ai_level=ai_level)
 
     async def on_disconnect(self, socket_id):
         pass

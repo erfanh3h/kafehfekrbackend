@@ -133,9 +133,10 @@ class SudokuGameLogic(BaseGameLogic):
 
     def compute_next_move(self) -> Optional[Tuple[int, int]]:
         """
-        Computes the bot next move.
-        CRITICAL: Per instructions, bot level MUST NOT be able to solve Sudoku.
-        It makes casual, locally plausible placements without global constraint search.
+        Computes the bot next move without full backtracking/solving:
+        - Level 1: Casual random locally-valid placement with occasional human slip (~18%).
+        - Level 2: Strictly locally-valid placement, mildly favors constrained cells.
+        - Level 3: Strictly locally-valid placement, prioritizes local naked singles / tightest cells.
         """
         candidates = self.get_legal_moves()
         if not candidates:
@@ -156,9 +157,25 @@ class SudokuGameLogic(BaseGameLogic):
                 cells_map[idx] = []
             cells_map[idx].append(num)
 
-        chosen_idx = random.choice(list(cells_map.keys()))
-        possible_nums = cells_map[chosen_idx]
-        chosen_num = random.choice(possible_nums)
+        if self.level <= 1:
+            chosen_idx = random.choice(list(cells_map.keys()))
+            possible_nums = cells_map[chosen_idx]
+            if random.random() < 0.18 and len(possible_nums) < 9:
+                wrong_pool = [n for n in range(1, 10) if n not in possible_nums]
+                chosen_num = random.choice(wrong_pool)
+            else:
+                chosen_num = random.choice(possible_nums)
+        elif self.level == 2:
+            ranked_cells = sorted(cells_map.keys(), key=lambda idx: len(cells_map[idx]))
+            top_pool = ranked_cells[: min(5, len(ranked_cells))]
+            chosen_idx = random.choice(top_pool)
+            chosen_num = random.choice(cells_map[chosen_idx])
+        else:
+            ranked_cells = sorted(cells_map.keys(), key=lambda idx: len(cells_map[idx]))
+            min_len = len(cells_map[ranked_cells[0]])
+            tightest = [idx for idx in ranked_cells if len(cells_map[idx]) == min_len]
+            chosen_idx = random.choice(tightest[: min(2, len(tightest))])
+            chosen_num = random.choice(cells_map[chosen_idx])
 
         self.board_values[chosen_idx] = chosen_num
         return (chosen_idx, chosen_num)

@@ -328,14 +328,29 @@ class MonopolyGameLogic(BaseGameLogic):
         if self.phase == "roll":
             if me.get("in_jail"):
                 unowned = self._unowned_purchasable_count()
-                if int(me.get("jail_cards", 0)) > 0 and (unowned >= 4 or self.level >= 2):
+                if self.level >= 3:
+                    # Level 3 stays in jail late-game when board is owned, exits early when properties are unowned
+                    if unowned >= 3 and int(me.get("jail_cards", 0)) > 0:
+                        return {"cmd": "MonopolyAction", "action": "use_jail_card"}
+                    if unowned >= 4 and my_cash >= 160:
+                        return {"cmd": "MonopolyAction", "action": "pay_bail"}
+                    if unowned <= 1:
+                        return {"cmd": "MonopolyAction", "action": "roll_jail"}
+                if int(me.get("jail_cards", 0)) > 0 and (unowned >= 4 or self.level == 2):
                     return {"cmd": "MonopolyAction", "action": "use_jail_card"}
-                if my_cash >= 220 and unowned >= 5:
+                bail_cash = 260 if self.level == 1 else 220
+                bail_unowned = 6 if self.level == 1 else 5
+                if my_cash >= bail_cash and unowned >= bail_unowned:
                     return {"cmd": "MonopolyAction", "action": "pay_bail"}
                 return {"cmd": "MonopolyAction", "action": "roll_jail"}
-            if self.buildable_tiles and my_cash >= 260 and self.level >= 2:
-                best_tid = max(self.buildable_tiles, key=lambda t: BOARD_META[t]["price"])
-                if my_cash - BOARD_META[best_tid]["house_cost"] >= 120:
+            min_build_cash = 220 if self.level >= 3 else 260
+            build_reserve = 80 if self.level >= 3 else 120
+            if self.buildable_tiles and my_cash >= min_build_cash and self.level >= 2:
+                best_tid = max(
+                    self.buildable_tiles,
+                    key=lambda t: (BOARD_META[t]["price"] - BOARD_META[t]["house_cost"] * 0.4) if self.level >= 3 else BOARD_META[t]["price"],
+                )
+                if my_cash - BOARD_META[best_tid]["house_cost"] >= build_reserve:
                     return {"cmd": "MonopolyAction", "action": "build_house", "tile_id": best_tid}
             return {"cmd": "MonopolyRoll"}
 
@@ -346,7 +361,12 @@ class MonopolyGameLogic(BaseGameLogic):
                 if my_cash >= price:
                     completes = self._would_complete_group(my_id, tid)
                     blocks = self._opponent_needs_tile(tid)
-                    reserve = 0 if (completes or blocks or self.level == 1) else 50
+                    if self.level >= 3:
+                        reserve = 0 if (completes or blocks) else 65
+                    elif self.level == 2:
+                        reserve = 0 if (completes or blocks) else 50
+                    else:
+                        reserve = 0
                     if my_cash - price >= reserve:
                         return {"cmd": "MonopolyAction", "action": "buy_property"}
             return {"cmd": "MonopolyAction", "action": "decline_buy"}
@@ -360,9 +380,14 @@ class MonopolyGameLogic(BaseGameLogic):
                 return {"cmd": "MonopolyAuction", "decision": "pass", "amount": 0}
             completes = self._would_complete_group(my_id, tid)
             blocks = self._opponent_needs_tile(tid)
-            mult = 1.25 if completes else (1.08 if blocks else (0.78 if self.level == 1 else 0.95))
+            if self.level >= 3:
+                mult = 1.40 if completes else (1.22 if blocks else 1.02)
+            elif self.level == 2:
+                mult = 1.25 if completes else (1.08 if blocks else 0.95)
+            else:
+                mult = 1.15 if completes else (1.00 if blocks else 0.78)
             max_willing = int(base_price * mult)
-            cash_limit = my_cash if completes else max(0, my_cash - 40)
+            cash_limit = my_cash if completes else max(0, my_cash - (25 if self.level >= 3 else 40))
             if min_next <= min(max_willing, cash_limit):
                 return {"cmd": "MonopolyAuction", "decision": "bid", "amount": min_next}
             return {"cmd": "MonopolyAuction", "decision": "pass", "amount": 0}
@@ -386,30 +411,41 @@ class MonopolyGameLogic(BaseGameLogic):
             o_tiles = [int(t) for t in (tr.get("offer_tiles") or [])]
             r_tiles = [int(t) for t in (tr.get("request_tiles") or [])]
             gain = o_cash
+            my_completes = False
             for tid in o_tiles:
                 gain += int(BOARD_META[tid]["price"])
                 if self._would_complete_group(my_id, tid):
-                    gain += 180
+                    gain += 220 if self.level >= 3 else 180
+                    my_completes = True
             loss = r_cash
+            opp_completes = False
             for tid in r_tiles:
                 loss += int(BOARD_META[tid]["price"])
                 if self._opponent_needs_tile(tid):
-                    loss += 180
-            if gain >= loss - (60 if self.level == 1 else 0):
+                    loss += 220 if self.level >= 3 else 180
+                    opp_completes = True
+            if self.level >= 3 and opp_completes and not my_completes:
+                return {"cmd": "MonopolyTrade", "action": "reject"}
+            margin = 40 if self.level >= 3 else (0 if self.level == 2 else -60)
+            if gain >= loss + margin:
                 return {"cmd": "MonopolyTrade", "action": "accept"}
             return {"cmd": "MonopolyTrade", "action": "reject"}
 
         if self.phase == "manage":
             if self.buildable_tiles:
-                best_tid = max(self.buildable_tiles, key=lambda t: BOARD_META[t]["price"])
+                best_tid = max(
+                    self.buildable_tiles,
+                    key=lambda t: (BOARD_META[t]["price"] - BOARD_META[t]["house_cost"] * 0.4) if self.level >= 3 else BOARD_META[t]["price"],
+                )
                 cost = int(BOARD_META[best_tid]["house_cost"])
-                reserve = 100 if self.level >= 2 else 150
+                reserve = 75 if self.level >= 3 else (100 if self.level == 2 else 150)
                 if my_cash - cost >= reserve:
                     return {"cmd": "MonopolyAction", "action": "build_house", "tile_id": best_tid}
             if self.unmortgageable_tiles:
                 tid = min(self.unmortgageable_tiles, key=lambda t: BOARD_META[t]["price"])
                 cost = int(round((BOARD_META[tid]["price"] // 2) * 1.1))
-                if my_cash - cost >= 180:
+                unmort_reserve = 130 if self.level >= 3 else 180
+                if my_cash - cost >= unmort_reserve:
                     return {"cmd": "MonopolyAction", "action": "unmortgage", "tile_id": tid}
             return {"cmd": "MonopolyAction", "action": "end_turn"}
 

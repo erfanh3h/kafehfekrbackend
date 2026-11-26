@@ -40,6 +40,82 @@ DAILY_FIRST_WIN_XP = 15
 DAILY_FIRST_WIN_COIN = 15
 WIN_STREAK_XP_BONUS = 8
 
+# Classic Rank AI Opponent Levels & Reward Scaling
+CLASSIC_RANK_DEFAULT_AI_LEVEL = 2
+CLASSIC_RANK_AI_LEVELS = (1, 2, 3)
+
+CLASSIC_RANK_REWARDS_TABLE = {
+    1: {  # Easy AI (آسان)
+        GameDifficultyEnum.Easy.value: {"win_xp": 6, "draw_xp": 3, "lose_xp": 1, "win_coin": 2, "draw_coin": 0, "lose_coin": 0},
+        GameDifficultyEnum.Normal.value: {"win_xp": 9, "draw_xp": 4, "lose_xp": 2, "win_coin": 2, "draw_coin": 1, "lose_coin": 0},
+        GameDifficultyEnum.Hard.value: {"win_xp": 12, "draw_xp": 6, "lose_xp": 2, "win_coin": 3, "draw_coin": 1, "lose_coin": 0},
+    },
+    2: {  # Medium AI (متوسط - Default)
+        GameDifficultyEnum.Easy.value: {"win_xp": 10, "draw_xp": 5, "lose_xp": 2, "win_coin": 4, "draw_coin": 1, "lose_coin": 0},
+        GameDifficultyEnum.Normal.value: {"win_xp": 15, "draw_xp": 7, "lose_xp": 3, "win_coin": 5, "draw_coin": 2, "lose_coin": 0},
+        GameDifficultyEnum.Hard.value: {"win_xp": 22, "draw_xp": 11, "lose_xp": 5, "win_coin": 6, "draw_coin": 2, "lose_coin": 0},
+    },
+    3: {  # Hard AI (سخت)
+        GameDifficultyEnum.Easy.value: {"win_xp": 16, "draw_xp": 8, "lose_xp": 4, "win_coin": 7, "draw_coin": 3, "lose_coin": 0},
+        GameDifficultyEnum.Normal.value: {"win_xp": 24, "draw_xp": 12, "lose_xp": 5, "win_coin": 9, "draw_coin": 4, "lose_coin": 0},
+        GameDifficultyEnum.Hard.value: {"win_xp": 35, "draw_xp": 17, "lose_xp": 8, "win_coin": 12, "draw_coin": 5, "lose_coin": 0},
+    },
+}
+
+
+def normalize_ai_level(level) -> int:
+    """Normalizes AI opponent difficulty level to 1 (Easy), 2 (Medium, default), or 3 (Hard)."""
+    if isinstance(level, bool):
+        return CLASSIC_RANK_DEFAULT_AI_LEVEL
+    if isinstance(level, (int, float)):
+        lvl_int = int(level)
+        return lvl_int if lvl_int in CLASSIC_RANK_AI_LEVELS else CLASSIC_RANK_DEFAULT_AI_LEVEL
+    if isinstance(level, str):
+        s = level.strip().lower()
+        if s in ("1", "easy", "beginner", "lvl1", "level1"):
+            return 1
+        if s in ("2", "medium", "normal", "intermediate", "lvl2", "level2"):
+            return 2
+        if s in ("3", "hard", "master", "expert", "lvl3", "level3"):
+            return 3
+        try:
+            lvl_int = int(s)
+            return lvl_int if lvl_int in CLASSIC_RANK_AI_LEVELS else CLASSIC_RANK_DEFAULT_AI_LEVEL
+        except ValueError:
+            return CLASSIC_RANK_DEFAULT_AI_LEVEL
+    return CLASSIC_RANK_DEFAULT_AI_LEVEL
+
+
+def get_classic_rank_reward_profile(game_type: str, ai_level=CLASSIC_RANK_DEFAULT_AI_LEVEL) -> dict:
+    """Returns win/draw/lose XP and coin rewards for a Classic Rank match."""
+    lvl = normalize_ai_level(ai_level)
+    diff = gametype_to_difficulty(game_type)
+    diff_key = diff.value if hasattr(diff, "value") else str(diff)
+    level_table = CLASSIC_RANK_REWARDS_TABLE.get(lvl, CLASSIC_RANK_REWARDS_TABLE[CLASSIC_RANK_DEFAULT_AI_LEVEL])
+    return dict(level_table.get(diff_key, level_table[GameDifficultyEnum.Normal.value]))
+
+
+def calculate_classic_rank_rewards(
+    game_type: str,
+    ai_level=CLASSIC_RANK_DEFAULT_AI_LEVEL,
+    outcome: str = "win",
+    is_afk_or_dc: bool = False,
+) -> tuple[int, int]:
+    """
+    Computes (xp, coin) rewards for Classic Rank based on AI opponent level and game difficulty.
+    outcome: 'win' | 'draw' | 'lose'
+    AFK or disconnect timeout always receives (0, 0).
+    """
+    if is_afk_or_dc:
+        return 0, 0
+    profile = get_classic_rank_reward_profile(game_type, ai_level=ai_level)
+    out = str(outcome or "lose").strip().lower()
+    if out == "win":
+        return int(profile["win_xp"]), int(profile["win_coin"])
+    if out == "draw":
+        return int(profile["draw_xp"]), int(profile["draw_coin"])
+    return int(profile["lose_xp"]), int(profile["lose_coin"])
+
 
 def calculate_elo_change(
     score_a: int,

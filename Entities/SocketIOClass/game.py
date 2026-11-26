@@ -27,8 +27,8 @@ def start_new_test_game():
     add_new_game(game_id, queuers, final_game_types, GameScoreTypesEnum.LOBBY)
 
 
-def add_new_game(game_id, queuers, game_types, game_score_type):
-    game_play = BaseGamePlayClass(game_id, queuers, game_types, game_score_type)
+def add_new_game(game_id, queuers, game_types, game_score_type, ai_level=None):
+    game_play = BaseGamePlayClass(game_id, queuers, game_types, game_score_type, ai_level=ai_level)
     game_play.start_game_timer()
     games[game_id] = game_play
     game_idies.append(game_id)

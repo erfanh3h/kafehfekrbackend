@@ -57,7 +57,7 @@ class ClassicRankBot:
         self.bot_name = bot_name
         self.bot_avatar = bot_avatar
         self.token = token
-        self.level = level
+        self.level = int(level) if level in (1, 2, 3) else 2
         if not server_url:
             port = os.getenv("PORT", "5000")
             server_url = f"http://127.0.0.1:{port}"
@@ -356,7 +356,12 @@ class ClassicRankBot:
 
     async def _take_quiz_turn(self):
         try:
-            delay = round(random.uniform(2.5, 6.8), 2)
+            if self.level == 1:
+                delay = round(random.uniform(3.5, 7.2), 2)
+            elif self.level == 3:
+                delay = round(random.uniform(1.8, 5.0), 2)
+            else:
+                delay = round(random.uniform(2.5, 6.5), 2)
             await asyncio.sleep(delay)
             if not self.is_active or not self.sio or not self.sio.connected:
                 return
@@ -372,7 +377,7 @@ class ClassicRankBot:
             return
 
     async def _take_turn(self, is_continuation: bool = False):
-        """Simulates human thinking time (Level 2) and plays move."""
+        """Simulates human thinking time calibrated to bot level and plays move."""
         if not self.sio or not self.sio.connected:
             return
 
@@ -418,14 +423,19 @@ class ClassicRankBot:
         await self.emit("user_command", payload)
 
     async def _simultaneous_play_loop(self):
-        """Loop for simultaneous games like Sudoku."""
+        """Loop for simultaneous games like Sudoku and MSweeper."""
         await asyncio.sleep(random.uniform(3.0, 5.0))
         while self.is_active and self.sio and self.sio.connected:
             legal_moves = self.game_logic.get_legal_moves()
             if not legal_moves:
                 break
             await self._take_turn()
-            await asyncio.sleep(random.uniform(5.0, 8.5))
+            if self.level == 1:
+                await asyncio.sleep(random.uniform(6.0, 9.5))
+            elif self.level == 3:
+                await asyncio.sleep(random.uniform(3.6, 6.0))
+            else:
+                await asyncio.sleep(random.uniform(4.8, 7.8))
 
     async def disconnect(self):
         """Cleanly disconnects socket client and cancels pending tasks."""

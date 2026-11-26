@@ -8,12 +8,13 @@ from Commons.static_functions import make_command_json, safe_run_async
 from Controllers.GamePlay.game_type_class_pairs import game_type_class_pairs
 from Entities.Games.wait_times import Join_Game_Limit_Time, Start_Game_Time, Game_Play_Round_Time
 from Entities.RewardManagerClass import RewardManagerClass, GameScoreTypesEnum
+from Entities.RewardManagerClass.reward_data import normalize_ai_level
 from Entities.TimerClass import TimerClass
 from Models.Gamer import GamerModel
 
 
 class BaseGamePlayClass:
-    def __init__(self, game_play_id, gamers, game_types, game_score_type):
+    def __init__(self, game_play_id, gamers, game_types, game_score_type, ai_level=None):
         self.timer = TimerClass()
         self._finish_lock = threading.RLock()
         self.game_play_id = game_play_id
@@ -26,6 +27,7 @@ class BaseGamePlayClass:
         self.disconnected_user_ids: set[str] = set()
         self.game_types = game_types
         self.game_score_type = game_score_type
+        self.ai_level = normalize_ai_level(ai_level) if game_score_type == GameScoreTypesEnum.CLASSIC_RANK else None
         self.game_session = None
         self.gamer_scores = [0 for g in gamers]
         # self.gamer1_score = 0
@@ -40,7 +42,7 @@ class BaseGamePlayClass:
         self.active_game_id = ""
         self.game_winner_id = None
         self.afk_or_dc_penalty_user_id = None
-        self.score_manager = RewardManagerClass(game_score_type)
+        self.score_manager = RewardManagerClass(game_score_type, ai_level=self.ai_level if self.ai_level is not None else 2)
 
     def select_random_games(self):
         if self.game_score_type == GameScoreTypesEnum.RANK:
@@ -75,7 +77,7 @@ class BaseGamePlayClass:
             })
         score_val = self.game_score_type.value if hasattr(self.game_score_type, "value") else str(self.game_score_type)
         game_database.game_play_history_manager.create_game_play_history(
-            self.game_play_id, user_idis, self.game_types, score_val, users_info=users_info
+            self.game_play_id, user_idis, self.game_types, score_val, users_info=users_info, ai_level=self.ai_level
         )
         for user_id in user_idis:
             if not str(user_id).startswith("bot_"):
@@ -209,6 +211,8 @@ class BaseGamePlayClass:
                      'xp_awarded': getattr(self.score_manager, 'last_awarded_xp', {}),
                      'score_awarded': getattr(self.score_manager, 'last_awarded_score', {}),
                      'coin_awarded': getattr(self.score_manager, 'last_awarded_coin', {})}
+        if self.ai_level is not None:
+            game_data['ai_level'] = self.ai_level
         session_gamer_map = {}
         if self.game_session is not None:
             for sg in getattr(self.game_session, 'gamers', []):
@@ -688,22 +692,25 @@ class BaseGamePlayClass:
                         earned = last_xp.get(gamer.user_id, last_xp.get(str(gamer.user_id), 0))
                         s_earned = last_score.get(gamer.user_id, last_score.get(str(gamer.user_id), 0))
                         c_earned = last_coin.get(gamer.user_id, last_coin.get(str(gamer.user_id), 0))
+                        finish_data = {
+                            "rank1": rank1_gid,
+                            "rank2": rank2_gid,
+                            "Winner": rank1_gid,
+                            "winner": rank1_gid,
+                            "game_winner_id": rank1_id,
+                            "series_scores": self.gamer_scores,
+                            "xp_earned": earned,
+                            "score_earned": s_earned,
+                            "coin_earned": c_earned,
+                            "post_match": self._build_post_match_payload_for_user(gamer.user_id),
+                        }
+                        if self.ai_level is not None:
+                            finish_data["ai_level"] = self.ai_level
                         safe_run_async(
                             send_private_command(
                                 command=make_command_json(
                                     id=commands.Finish_Game,
-                                    data={
-                                        "rank1": rank1_gid,
-                                        "rank2": rank2_gid,
-                                        "Winner": rank1_gid,
-                                        "winner": rank1_gid,
-                                        "game_winner_id": rank1_id,
-                                        "series_scores": self.gamer_scores,
-                                        "xp_earned": earned,
-                                        "score_earned": s_earned,
-                                        "coin_earned": c_earned,
-                                        "post_match": self._build_post_match_payload_for_user(gamer.user_id),
-                                    }
+                                    data=finish_data
                                 ),
                                 socket_id=gamer.socket_id,
                                 game_id=self.game_play_id
@@ -848,6 +855,8 @@ class BaseGamePlayClass:
                         "coin_earned": c_earned,
                         "post_match": self._build_post_match_payload_for_user(gamer.user_id),
                     }
+                    if self.ai_level is not None:
+                        finish_payload["ai_level"] = self.ai_level
                     if rank1_val is not None:
                         finish_payload["rank1"] = rank1_val
                     if rank2_val is not None:

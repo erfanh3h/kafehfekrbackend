@@ -29,7 +29,7 @@ MALE_BOT_AVATARS = [0, 1, 3, 4, 6, 8, 9, 12, 14, 16, 18, 20, 22, 24, 25, 26]
 FEMALE_BOT_AVATARS = [2, 5, 7, 10, 11, 13, 15, 17, 19, 21, 23]
 
 
-def get_random_bot_profile(exclude_avatar: Optional[int] = None):
+def get_random_bot_profile(exclude_avatar: Optional[int] = None, level: int = 2):
     # 50% chance male or female
     is_male = random.random() < 0.5
 
@@ -41,7 +41,12 @@ def get_random_bot_profile(exclude_avatar: Optional[int] = None):
         candidates = [a for a in FEMALE_BOT_AVATARS if a != exclude_avatar] or FEMALE_BOT_AVATARS
 
     avatar = random.choice(candidates)
-    score = random.randint(350, 1450)
+    if level == 1:
+        score = random.randint(250, 620)
+    elif level == 3:
+        score = random.randint(1150, 1700)
+    else:
+        score = random.randint(650, 1150)
     return {
         "name": name,
         "avatar": avatar,

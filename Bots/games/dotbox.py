@@ -264,17 +264,27 @@ class DotBoxGameLogic(BaseGameLogic):
         score = 0.0
         if boxes_completed > 0:
             score += boxes_completed * 210.0
-            # If completing this box also creates a 3rd wall in the adjacent box,
-            # that's actually GREAT for us because we get a bonus turn and will capture that box next!
             if third_walls_created > 0:
                 score += 65.0
+            if self.level >= 3:
+                # Level 3 evaluates follow-up bonus-turn chain boxes unlocked on sim_lines
+                follow_up = self._estimate_opponent_chain_capture(sim_lines)
+                score += follow_up * 28.0
         else:
             if third_walls_created == 0:
                 # Safe move! Prefer edges touching boxes with fewer walls (0->1 better than 1->2)
                 score += 30.0 - (second_walls_created * 6.0)
+                if self.level >= 3:
+                    # Level 3 values safe-move parity & avoiding leaving zero safe moves unnecessarily
+                    rem_safe = self._count_safe_lines(sim_lines)
+                    if rem_safe % 2 == 0:
+                        score += 8.0
             else:
                 # Sacrifice move: gives opponent at least one 3-walled box
-                if self.level >= 2:
+                if self.level >= 3:
+                    chain_gifted = self._estimate_opponent_chain_capture(sim_lines)
+                    score -= 95.0 + (chain_gifted * 48.0)
+                elif self.level == 2:
                     chain_gifted = self._estimate_opponent_chain_capture(sim_lines)
                     score -= 90.0 + (chain_gifted * 38.0)
                 else:
@@ -286,9 +296,20 @@ class DotBoxGameLogic(BaseGameLogic):
         elif self.level == 2:
             score += random.uniform(-3.5, 3.5)
         else:
-            score += random.uniform(-0.4, 0.4)
+            score += random.uniform(-0.2, 0.2)
 
         return score
+
+    @classmethod
+    def _count_safe_lines(cls, sim_lines: List[int]) -> int:
+        safe_cnt = 0
+        for l_idx, val in enumerate(sim_lines):
+            if val != 0:
+                continue
+            adj = LINE_TO_BOXES.get(l_idx, [])
+            if all(sum(1 for n in BOXES_NEIGHBORS[b] if sim_lines[n] != 0) < 2 for b in adj):
+                safe_cnt += 1
+        return safe_cnt
 
     @classmethod
     def _estimate_opponent_chain_capture(cls, sim_lines: List[int]) -> int:

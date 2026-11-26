@@ -437,6 +437,16 @@ class YinshGameLogic(BaseGameLogic):
         score += (my_flips - opp_flips) * 8.5
         if target_id in CENTER_SPOTS:
             score += 4.0
+
+        if self.level >= 3:
+            # Level 3 penalizes leaving opponent with a 4-in-a-row threat and values center-ring control
+            if opp_max == 4 and my_max < 5:
+                score -= 90.0
+            if my_max == 4:
+                score += 65.0
+            if source_id in CENTER_SPOTS and target_id not in CENTER_SPOTS:
+                score -= 6.0
+
         return score
 
     def is_critical_turn(self) -> bool:
@@ -469,9 +479,13 @@ class YinshGameLogic(BaseGameLogic):
             if self.level == 1:
                 pool = center_legal if (center_legal and random.random() < 0.65) else legal
                 return ("SubmitRing", random.choice(pool))
-            else:
+            elif self.level == 2:
                 pool = center_legal if center_legal else legal
                 return ("SubmitRing", random.choice(pool))
+            else:
+                pool = center_legal if center_legal else legal
+                best_spot = max(pool, key=lambda pid: len(self.neighbors[pid]))
+                return ("SubmitRing", best_spot)
 
         # Phase 2A: Select one of our rings (and plan its destination)
         if self.last_selected_piece_id == -1:

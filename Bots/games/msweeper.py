@@ -160,12 +160,43 @@ class MSweeperGameLogic(BaseGameLogic):
     def is_critical_turn(self) -> bool:
         return False
 
+    def _get_neighbors(self, index: int) -> List[int]:
+        r, c = self.get_row_col(index)
+        out: List[int] = []
+        for dr in (-1, 0, 1):
+            for dc in (-1, 0, 1):
+                if dr == 0 and dc == 0:
+                    continue
+                nr, nc = r + dr, c + dc
+                if 0 <= nr < GRID_SIZE and 0 <= nc < GRID_SIZE:
+                    out.append(self.get_index(nr, nc))
+        return out
+
+    def _find_local_clue_moves(self) -> Tuple[List[int], List[int]]:
+        """Finds purely local single-cell safe probes and obvious mines from revealed numbers."""
+        safe_probes: List[int] = []
+        obvious_mines: List[int] = []
+        for idx in range(TOTAL_CELLS):
+            val = self.values[idx]
+            if val is None or self.flagged[idx]:
+                continue
+            neighbors = self._get_neighbors(idx)
+            flagged_n = [n for n in neighbors if self.flagged[n]]
+            unknown_n = [n for n in neighbors if not self.selected[n]]
+            if not unknown_n:
+                continue
+            if len(flagged_n) >= val:
+                safe_probes.extend(unknown_n)
+            elif len(flagged_n) + len(unknown_n) == val:
+                obvious_mines.extend(unknown_n)
+        return list(dict.fromkeys(safe_probes)), list(dict.fromkeys(obvious_mines))
+
     def compute_next_move(self) -> Optional[Tuple[str, int]]:
         """
-        Computes the bot's next move.
-        CRITICAL: Per instructions, at the current level this bot MUST NOT be able to solve Minesweeper!
-        It plays blindly/casually without constraint solving, mixing random reveals ("SelectPeace")
-        and blind flag guesses ("SelectMine").
+        Computes the bot's next move without global CSP/backtracking solving:
+        - Level 1: Blind casual mix (60% reveal / 40% flag guess).
+        - Level 2: Uses local 1-cell clues ~55% of the time; otherwise probes mostly safe guesses.
+        - Level 3: Always applies local 1-cell safe/mine clues first; prefers safer reveals when guessing.
         """
         if self.is_hit_mine:
             return None
@@ -179,16 +210,29 @@ class MSweeperGameLogic(BaseGameLogic):
         if not can_reveal and not can_flag:
             return None
 
-        # Choose randomly between revealing a spot (SelectPeace) and guessing a mine flag (SelectMine)
-        if can_reveal and can_flag:
-            # 60% chance to dig/reveal (which can also step on a mine), 40% chance to guess a flag
-            action = "SelectPeace" if random.random() < 0.60 else "SelectMine"
-        elif can_reveal:
-            action = "SelectPeace"
-        else:
-            action = "SelectMine"
+        action = ""
+        target_idx = -1
 
-        target_idx = random.choice(unselected)
+        if self.level >= 2:
+            safe_probes, obvious_mines = self._find_local_clue_moves()
+            clue_prob = 0.55 if self.level == 2 else 1.0
+            if can_reveal and safe_probes and random.random() < clue_prob:
+                action = "SelectPeace"
+                target_idx = random.choice(safe_probes)
+            elif can_flag and obvious_mines and random.random() < clue_prob:
+                action = "SelectMine"
+                target_idx = random.choice(obvious_mines)
+
+        if target_idx == -1:
+            if can_reveal and can_flag:
+                reveal_prob = 0.60 if self.level <= 1 else (0.78 if self.level == 2 else 0.88)
+                action = "SelectPeace" if random.random() < reveal_prob else "SelectMine"
+            elif can_reveal:
+                action = "SelectPeace"
+            else:
+                action = "SelectMine"
+            target_idx = random.choice(unselected)
+
         self.selected[target_idx] = True
 
         if action == "SelectMine":

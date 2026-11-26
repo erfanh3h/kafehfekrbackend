@@ -12,6 +12,7 @@ from typing import Dict, Optional
 from Commons import commands, static_functions
 from Commons.static_functions import make_command_json
 from Entities.RewardManagerClass import GameScoreTypesEnum
+from Entities.RewardManagerClass.reward_data import CLASSIC_RANK_DEFAULT_AI_LEVEL, normalize_ai_level
 from Entities.Security import create_access_token
 from Models.Queuer import QueuerModel
 from Bots import get_random_bot_profile, ClassicRankBot
@@ -22,10 +23,18 @@ class ClassicRankSession:
         self.game_score_type = GameScoreTypesEnum.CLASSIC_RANK
         self.active_bots: Dict[str, ClassicRankBot] = {}
 
-    async def start_classic_rank_match(self, human_queuer: QueuerModel, game_type: str, socket_id: str):
-        """Creates a Classic Rank match for a human player vs an intelligent bot."""
-        # Generate random Persian bot profile
-        bot_prof = get_random_bot_profile(exclude_avatar=human_queuer.user_image)
+    async def start_classic_rank_match(
+        self,
+        human_queuer: QueuerModel,
+        game_type: str,
+        socket_id: str,
+        ai_level: int = CLASSIC_RANK_DEFAULT_AI_LEVEL,
+    ):
+        """Creates a Classic Rank match for a human player vs an intelligent bot at the chosen AI level (1..3)."""
+        resolved_level = normalize_ai_level(ai_level)
+
+        # Generate random Persian bot profile calibrated to AI level
+        bot_prof = get_random_bot_profile(exclude_avatar=human_queuer.user_image, level=resolved_level)
         bot_name = bot_prof["name"]
         bot_avatar = bot_prof["avatar"]
         bot_score = bot_prof["score"]
@@ -59,9 +68,9 @@ class ClassicRankSession:
 
         # Register game on /game namespace
         from Entities.SocketIOClass.game import add_new_game
-        add_new_game(game_id, queuers, final_game_types, self.game_score_type)
+        add_new_game(game_id, queuers, final_game_types, self.game_score_type, ai_level=resolved_level)
 
-        # Instantiate bot with default level = 2
+        # Instantiate bot with selected AI level (1=Easy, 2=Medium, 3=Hard)
         def on_bot_game_finished(winner):
             if game_id in self.active_bots:
                 del self.active_bots[game_id]
@@ -73,7 +82,7 @@ class ClassicRankSession:
             bot_name=bot_name,
             bot_avatar=bot_avatar,
             token=bot_token,
-            level=2,  # Default level must always be 2
+            level=resolved_level,
             on_finished_callback=on_bot_game_finished,
         )
         self.active_bots[game_id] = bot
@@ -82,7 +91,7 @@ class ClassicRankSession:
         asyncio.create_task(bot.start())
 
         # Notify human client that the match is ready (after namespace Connect ACK is flushed)
-        game_data = {"game_id": game_id, "game_type": game_type}
+        game_data = {"game_id": game_id, "game_type": game_type, "ai_level": resolved_level}
         from Entities.SocketIOClass import Socket_Server
 
         async def _delayed_start_emit():
@@ -95,4 +104,4 @@ class ClassicRankSession:
             )
 
         asyncio.create_task(_delayed_start_emit())
-        print(f"[ClassicRankSession] Match started: {game_id} | Game: {game_type} | Human: {human_queuer.username} vs Bot: {bot_name} (Lvl 2)")
+        print(f"[ClassicRankSession] Match started: {game_id} | Game: {game_type} | Human: {human_queuer.username} vs Bot: {bot_name} (Lvl {resolved_level})")

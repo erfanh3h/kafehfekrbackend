@@ -10,19 +10,24 @@ from Entities.RewardManagerClass.reward_data import (
     multi_rank_rank1_score, multi_rank_rank2_score, multi_rank_rank3_score, multi_rank_rankn_score,
     multi_rank_rank1_xp, multi_rank_rank2_xp, multi_rank_rank3_xp, multi_rank_rankn_xp,
     calculate_elo_change, calculate_rank_series_xp, calculate_social_xp,
+    calculate_classic_rank_rewards, normalize_ai_level, CLASSIC_RANK_DEFAULT_AI_LEVEL,
     DAILY_FIRST_WIN_XP, DAILY_FIRST_WIN_COIN, WIN_STREAK_XP_BONUS
 )
 
 
 class RewardManagerClass:
-    def __init__(self, game_score_type):
+    def __init__(self, game_score_type, ai_level=CLASSIC_RANK_DEFAULT_AI_LEVEL):
         self.players_idis = []
         self.game_score_type = game_score_type
+        self.ai_level = normalize_ai_level(ai_level) if game_score_type == GameScoreTypesEnum.CLASSIC_RANK else None
         self.game_types = []
         self.game_winners = []
         self.last_awarded_xp = {}
         self.last_awarded_score = {}
         self.last_awarded_coin = {}
+
+    def set_ai_level(self, ai_level):
+        self.ai_level = normalize_ai_level(ai_level)
 
     def set_user_data(self, idis):
         self.players_idis = idis
@@ -163,27 +168,19 @@ class RewardManagerClass:
 
         elif self.game_score_type == GameScoreTypesEnum.CLASSIC_RANK:
             g_type = game_types[0] if game_types else ""
-            diff = gametype_to_difficulty(g_type)
-            if diff == GameDifficultyEnum.Easy:
-                win_xp, draw_xp, lose_xp = 8, 4, 2
-            elif diff == GameDifficultyEnum.Normal:
-                win_xp, draw_xp, lose_xp = 14, 7, 3
-            else:
-                win_xp, draw_xp, lose_xp = 20, 10, 5
-
+            lvl = normalize_ai_level(self.ai_level)
             for idx in range(num_players):
                 uid = self.players_idis[idx]
                 gamer_num = idx + 1
                 is_penalty = (penalty_uid is not None and str(uid) == str(penalty_uid))
-                if is_penalty:
-                    p_xp = 0
-                elif winner_gamer_id == 0:
-                    p_xp = draw_xp
+                if winner_gamer_id == 0:
+                    outcome = "draw"
                 elif winner_gamer_id == gamer_num:
-                    p_xp = win_xp
+                    outcome = "win"
                 else:
-                    p_xp = lose_xp
-                rewards_map[str(uid)] = (p_xp, 0, 0, None, None)
+                    outcome = "lose"
+                p_xp, p_coin = calculate_classic_rank_rewards(g_type, ai_level=lvl, outcome=outcome, is_afk_or_dc=is_penalty)
+                rewards_map[str(uid)] = (p_xp, 0, p_coin, None, None)
 
         else:
             # LOBBY and NORMAL: Social progression EXP only, STRICTLY 0 Coins and 0 Score
@@ -412,25 +409,15 @@ class RewardManagerClass:
 
             elif self.game_score_type == GameScoreTypesEnum.CLASSIC_RANK:
                 g_type = game_types[0] if game_types else ""
-                diff = gametype_to_difficulty(g_type)
-                if diff == GameDifficultyEnum.Easy:
-                    r1_xp, r2_xp, rn_xp, draw_xp = 15, 8, 4, 6
-                elif diff == GameDifficultyEnum.Normal:
-                    r1_xp, r2_xp, rn_xp, draw_xp = 25, 14, 7, 10
-                else:
-                    r1_xp, r2_xp, rn_xp, draw_xp = 40, 20, 10, 15
-
-                d_score, d_coin = 0, 0
-                if is_penalty:
-                    d_xp = 0
-                elif is_total_draw:
-                    d_xp = draw_xp
+                lvl = normalize_ai_level(self.ai_level)
+                if is_total_draw:
+                    outcome = "draw"
                 elif is_r1:
-                    d_xp = r1_xp
-                elif is_r2:
-                    d_xp = r2_xp
+                    outcome = "win"
                 else:
-                    d_xp = rn_xp
+                    outcome = "lose"
+                d_score = 0
+                d_xp, d_coin = calculate_classic_rank_rewards(g_type, ai_level=lvl, outcome=outcome, is_afk_or_dc=is_penalty)
 
             else:
                 # LOBBY / NORMAL Multiplayer: Social EXP only, STRICTLY 0 Coins and 0 Score
@@ -524,6 +511,7 @@ class RewardManagerClass:
         g_types = game_types or self.game_types
         g_type = g_types[0] if g_types else ""
         gt_lower = str(g_type).lower()
+        lvl = normalize_ai_level(self.ai_level)
 
         total_players = min(4, len(self.players_idis))
         for idx in range(total_players):
@@ -535,14 +523,17 @@ class RewardManagerClass:
             is_win = (winner_gamer_id == gamer_num) or (winner_gamer_id is not None and str(winner_gamer_id) == str(uid))
             if winner_gamer_id == 0:
                 h["draw_classic_rank"] = 1
+                h[f"draw_classic_rank_lvl{lvl}"] = 1
                 if gt_lower:
                     h[f"{gt_lower}_draw"] = 1
             elif is_win:
                 h["win_classic_rank"] = 1
+                h[f"win_classic_rank_lvl{lvl}"] = 1
                 if gt_lower:
                     h[f"{gt_lower}_win"] = 1
             else:
                 h["lose_classic_rank"] = 1
+                h[f"lose_classic_rank_lvl{lvl}"] = 1
                 if gt_lower:
                     h[f"{gt_lower}_lose"] = 1
             histories[idx] = h
