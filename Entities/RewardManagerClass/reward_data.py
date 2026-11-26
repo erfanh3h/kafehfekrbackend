@@ -117,6 +117,46 @@ def calculate_classic_rank_rewards(
     return int(profile["lose_xp"]), int(profile["lose_coin"])
 
 
+# Classic Rank Anti-Farming / Early Surrender Guard
+CLASSIC_RANK_MIN_ELAPSED_SEC_WITH_MOVES = 45.0
+CLASSIC_RANK_MIN_ACTIONS_FOR_TIME = 3
+CLASSIC_RANK_MIN_ELAPSED_SEC_DEEP_PLAY = 90.0
+CLASSIC_RANK_MIN_ROUNDS_FOR_SURRENDER = 3
+CLASSIC_RANK_MIN_ACTIONS_FAST_GAME = 6
+CLASSIC_RANK_MIN_ELAPSED_SEC_FLOOR = 25.0
+
+
+def is_classic_rank_surrender_reward_eligible(
+    elapsed_seconds: float,
+    player_actions: int = 0,
+    rounds_played: int = 1,
+) -> bool:
+    """
+    Returns True when a surrendering player in Classic Rank engaged genuinely enough
+    to receive defeat rewards, blocking quick-quit / early-turn XP & coin farming.
+
+    Eligible when at least 1 real gameplay action was taken AND any of:
+    - Elapsed >= 90s (long match / deep thinking), OR
+    - Elapsed >= 45s AND player_actions >= 3, OR
+    - Elapsed >= 25s AND (rounds_played >= 3 OR player_actions >= 6).
+    """
+    elapsed = max(0.0, float(elapsed_seconds or 0.0))
+    actions = max(0, int(player_actions or 0))
+    rounds = max(1, int(rounds_played or 1))
+
+    if actions <= 0:
+        return False
+    if elapsed >= CLASSIC_RANK_MIN_ELAPSED_SEC_DEEP_PLAY:
+        return True
+    if elapsed >= CLASSIC_RANK_MIN_ELAPSED_SEC_WITH_MOVES and actions >= CLASSIC_RANK_MIN_ACTIONS_FOR_TIME:
+        return True
+    if elapsed >= CLASSIC_RANK_MIN_ELAPSED_SEC_FLOOR and (
+        rounds >= CLASSIC_RANK_MIN_ROUNDS_FOR_SURRENDER or actions >= CLASSIC_RANK_MIN_ACTIONS_FAST_GAME
+    ):
+        return True
+    return False
+
+
 def calculate_elo_change(
     score_a: int,
     score_b: int,

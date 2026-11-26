@@ -57,8 +57,29 @@ class BaseGameSession:
         self.afk_user_id = None
         self.dc_timeout_user_ids: set[str] = set()
         self.afk_user_ids: set[str] = set()
+        self.surrender_user_ids: set[str] = set()
+        self.player_actions_count: dict[str, int] = {}
+        self.started_monotonic: float = 0.0
         self.is_first_turn = True
         self._finish_lock = threading.RLock()
+
+    def get_elapsed_seconds(self) -> float:
+        if self.started_monotonic <= 0.0:
+            return 0.0
+        return max(0.0, time.monotonic() - self.started_monotonic)
+
+    def get_rounds_played(self) -> int:
+        gc = getattr(self, "game_controller", None)
+        if gc is None:
+            return 1
+        for attr in ("current_round", "current_turn_round", "round_number"):
+            val = getattr(gc, attr, None)
+            if isinstance(val, (int, float)) and val >= 1:
+                return int(val)
+        gh = getattr(gc, "guess_history", None)
+        if isinstance(gh, list) and gh:
+            return len(gh)
+        return 1
 
 
 
@@ -119,6 +140,8 @@ class BaseGameSession:
                 time.sleep(0.8)
 
                 self.is_game_running = True
+                if self.started_monotonic <= 0.0:
+                    self.started_monotonic = time.monotonic()
 
                 self.prepare_gamers()
 
@@ -326,19 +349,25 @@ class BaseGameSession:
             return None
 
         cur_turn = getattr(self.game_controller, "current_turn", 0) if hasattr(self, "game_controller") else 0
-        if cmd_id not in (commands.Surrender, commands.Exit_Game) and cur_turn in (0, gamer_data.gamer_id):
-            if hasattr(gamer_data, "reset_not_played_turns"):
-                gamer_data.reset_not_played_turns()
-            if hasattr(self, "game_controller") and hasattr(self.game_controller, "is_current_turn_played"):
-                self.game_controller.is_current_turn_played = True
+        if cmd_id not in (commands.Surrender, commands.Exit_Game):
+            uid_key = str(gamer_data.user_id)
+            self.player_actions_count[uid_key] = self.player_actions_count.get(uid_key, 0) + 1
+            if cur_turn in (0, gamer_data.gamer_id):
+                if hasattr(gamer_data, "reset_not_played_turns"):
+                    gamer_data.reset_not_played_turns()
+                if hasattr(self, "game_controller") and hasattr(self.game_controller, "is_current_turn_played"):
+                    self.game_controller.is_current_turn_played = True
 
         if any(g.gamer_id == 0 for g in self.gamers):
             self.prepare_gamers()
         self.is_game_running = True
+        if self.started_monotonic <= 0.0:
+            self.started_monotonic = time.monotonic()
 
         gamer_id = gamer_data.gamer_id
 
         if cmd_id == commands.Surrender:
+            self.surrender_user_ids.add(str(gamer_data.user_id))
             from Entities.RewardManagerClass import GameScoreTypesEnum
             from Entities.Database import game_database
             if self.game_score_type != GameScoreTypesEnum.RANK and not str(gamer_data.user_id).startswith("bot_"):

@@ -289,6 +289,76 @@ class TestClassicRankAILevels(unittest.TestCase):
         ymv = y.compute_next_move()
         self.assertEqual(ymv[0], "SubmitRing")
 
+    def test_early_surrender_anti_farming_blocks_quick_quits_but_allows_genuine_surrenders(self):
+        from Entities.RewardManagerClass.reward_data import is_classic_rank_surrender_reward_eligible
+
+        # Blocked cases (anti-farming)
+        self.assertFalse(is_classic_rank_surrender_reward_eligible(elapsed_seconds=3.0, player_actions=0, rounds_played=1))
+        self.assertFalse(is_classic_rank_surrender_reward_eligible(elapsed_seconds=15.0, player_actions=2, rounds_played=1))
+        self.assertFalse(is_classic_rank_surrender_reward_eligible(elapsed_seconds=12.0, player_actions=6, rounds_played=2))
+        self.assertFalse(is_classic_rank_surrender_reward_eligible(elapsed_seconds=120.0, player_actions=0, rounds_played=1))
+
+        # Eligible cases (genuine play then surrender)
+        self.assertTrue(is_classic_rank_surrender_reward_eligible(elapsed_seconds=45.0, player_actions=3, rounds_played=1))
+        self.assertTrue(is_classic_rank_surrender_reward_eligible(elapsed_seconds=95.0, player_actions=1, rounds_played=1))
+        self.assertTrue(is_classic_rank_surrender_reward_eligible(elapsed_seconds=26.0, player_actions=2, rounds_played=3))
+        self.assertTrue(is_classic_rank_surrender_reward_eligible(elapsed_seconds=28.0, player_actions=6, rounds_played=1))
+
+        users_col = _FakeCollection([
+            {"_id": "u_human", "username": "Ali", "score": 500, "xp": 100, "coin": 50},
+        ])
+        history_col = _FakeCollection()
+        fake_users_mgr = MagicMock()
+        fake_users_mgr.read_user.side_effect = lambda uid: users_col.find_one({"_id": uid})
+        fake_users_mgr.update_user.side_effect = lambda uid, **kw: users_col.find_one_and_update({"_id": uid}, {"$set": kw})
+        fake_hist_mgr = UserHistoryCollectionManager(history_col)
+        fake_db = types.SimpleNamespace(users_manager=fake_users_mgr, user_history_manager=fake_hist_mgr)
+
+        with patch.dict("sys.modules", {"Entities.Database": types.SimpleNamespace(game_database=fake_db)}):
+            # 1. Early surrender after 8s and 1 move -> 0 XP, 0 Coin, flagged
+            rm = RewardManagerClass(GameScoreTypesEnum.CLASSIC_RANK, ai_level=3)
+            rm.set_user_data(["u_human", "bot_1"])
+            rm.finish_game(
+                2, ["Chess"], [2],
+                surrender_user_ids={"u_human"},
+                player_actions_count={"u_human": 1},
+                elapsed_seconds=8.0,
+                rounds_played=1,
+            )
+            self.assertEqual(rm.last_awarded_xp["u_human"], 0)
+            self.assertEqual(rm.last_awarded_coin["u_human"], 0)
+            self.assertIn("u_human", rm.early_surrender_blocked_uids)
+
+            # 2. Genuine surrender after 50s and 4 moves -> gets normal Level 3 lose reward
+            rm2 = RewardManagerClass(GameScoreTypesEnum.CLASSIC_RANK, ai_level=3)
+            rm2.set_user_data(["u_human", "bot_1"])
+            rm2.finish_game(
+                2, ["Chess"], [2],
+                surrender_user_ids={"u_human"},
+                player_actions_count={"u_human": 4},
+                elapsed_seconds=50.0,
+                rounds_played=1,
+            )
+            exp_xp, exp_coin = calculate_classic_rank_rewards("Chess", ai_level=3, outcome="lose")
+            self.assertEqual(rm2.last_awarded_xp["u_human"], exp_xp)
+            self.assertEqual(rm2.last_awarded_coin["u_human"], exp_coin)
+            self.assertNotIn("u_human", rm2.early_surrender_blocked_uids)
+
+            # 3. Multiplayer Classic Rank early surrender -> 0 XP, 0 Coin, flagged
+            rm3 = RewardManagerClass(GameScoreTypesEnum.CLASSIC_RANK, ai_level=3)
+            rm3.set_user_data(["u_human", "bot_ludo"])
+            rm3.finish_multiplayer_game(
+                "bot_ludo", "u_human", ["Ludo"],
+                game_id="g_ludo_early",
+                surrender_user_ids={"u_human"},
+                player_actions_count={"u_human": 1},
+                elapsed_seconds=6.0,
+                rounds_played=1,
+            )
+            self.assertEqual(rm3.last_awarded_xp["u_human"], 0)
+            self.assertEqual(rm3.last_awarded_coin["u_human"], 0)
+            self.assertIn("u_human", rm3.early_surrender_blocked_uids)
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

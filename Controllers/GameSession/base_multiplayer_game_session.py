@@ -119,6 +119,8 @@ class BaseMultiplayerGameSession(BaseGameSession):
             elif reason == "afk":
                 self.afk_user_id = gamer_data.user_id
                 self.afk_user_ids.add(str(gamer_data.user_id))
+            elif reason == "surrender":
+                self.surrender_user_ids.add(str(gamer_data.user_id))
 
             self._clear_user_open_game_id(gamer_data.user_id)
 
@@ -189,12 +191,16 @@ class BaseMultiplayerGameSession(BaseGameSession):
             self.prepare_gamers()
         if not self.is_game_running and cmd_id == commands.Surrender:
             self.is_game_running = True
+        if self.started_monotonic <= 0.0:
+            import time as _time
+            self.started_monotonic = _time.monotonic()
 
         gamer_id = gamer_data.gamer_id
         if gamer_id is None or gamer_id == 0:
             return None
 
         if cmd_id == commands.Surrender:
+            self.surrender_user_ids.add(str(gamer_data.user_id))
             self._eliminate_player_locked(gamer_data, reason="surrender")
             return None
 
@@ -206,6 +212,8 @@ class BaseMultiplayerGameSession(BaseGameSession):
         if not self._is_player_active(gamer_id):
             return None
 
+        uid_key = str(gamer_data.user_id)
+        self.player_actions_count[uid_key] = self.player_actions_count.get(uid_key, 0) + 1
         return gamer_id
 
     def finish_reconnect_time(self, user_id):

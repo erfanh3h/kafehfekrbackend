@@ -42,6 +42,8 @@ class BaseGamePlayClass:
         self.active_game_id = ""
         self.game_winner_id = None
         self.afk_or_dc_penalty_user_id = None
+        self.started_monotonic: float = 0.0
+        self.pre_surrender_user_ids: set[str] = set()
         self.score_manager = RewardManagerClass(game_score_type, ai_level=self.ai_level if self.ai_level is not None else 2)
 
     def select_random_games(self):
@@ -228,6 +230,10 @@ class BaseGamePlayClass:
                 g_json['team_id'] = session_gamer_map[str(gamer.user_id)]
             game_data['gamers'].append(g_json)
         if recipient_uid:
+            blocked_uids = getattr(self.score_manager, 'early_surrender_blocked_uids', set())
+            if recipient_uid in blocked_uids:
+                game_data['early_surrender_no_reward'] = True
+                game_data['reward_blocked_reason'] = 'early_surrender'
             pm = self._build_post_match_payload_for_user(recipient_uid)
             game_data['rivalry'] = pm
             if self.is_game_finished:
@@ -286,6 +292,8 @@ class BaseGamePlayClass:
             if self.check_all_players_joined():
                 time.sleep(0.3)
                 self.is_game_started = True
+                if self.started_monotonic <= 0.0:
+                    self.started_monotonic = time.monotonic()
                 self.timer.stop(False)
                 self.select_random_games()
                 self.prepare_database()
@@ -418,6 +426,7 @@ class BaseGamePlayClass:
                         winner_user_id = gamer.user_id
                         break
                 # Surrender is a normal loss - NO AFK/DC penalty!
+                self.pre_surrender_user_ids.add(str(surrender_user_id))
                 self.timer.stop(False)
                 self.finish_game_play(winner_user_id)
                 return
@@ -576,6 +585,29 @@ class BaseGamePlayClass:
                 for gamer in self.gamers:
                     self.send_timer_value(gamer.socket_id)
 
+    def _collect_engagement_metrics(self) -> dict:
+        surr_uids = set(self.pre_surrender_user_ids)
+        actions_map: dict[str, int] = {}
+        elapsed_sec = 0.0
+        rounds_played = 1
+        if self.game_session is not None:
+            for u in getattr(self.game_session, "surrender_user_ids", set()):
+                surr_uids.add(str(u))
+            for k, v in getattr(self.game_session, "player_actions_count", {}).items():
+                actions_map[str(k)] = int(v or 0)
+            if hasattr(self.game_session, "get_elapsed_seconds"):
+                elapsed_sec = float(self.game_session.get_elapsed_seconds() or 0.0)
+            if hasattr(self.game_session, "get_rounds_played"):
+                rounds_played = int(self.game_session.get_rounds_played() or 1)
+        if elapsed_sec <= 0.0 and self.started_monotonic > 0.0:
+            elapsed_sec = max(0.0, time.monotonic() - self.started_monotonic)
+        return {
+            "surrender_user_ids": surr_uids,
+            "player_actions_count": actions_map,
+            "elapsed_seconds": elapsed_sec,
+            "rounds_played": rounds_played,
+        }
+
     def finish_multiplayer_game(self, rank1_id, rank2_id):
         with self._finish_lock:
             if self.is_game_finished:
@@ -627,6 +659,7 @@ class BaseGamePlayClass:
 
             from Entities.Database import game_database
             finished_game_types = [self.game_types[0]] if self.game_types else []
+            metrics = self._collect_engagement_metrics()
             try:
                 self.score_manager.finish_multiplayer_game(
                     rank1_id,
@@ -635,6 +668,10 @@ class BaseGamePlayClass:
                     afk_or_dc_user_ids=afk_or_dc_user_ids,
                     elimination_order_user_ids=elimination_order_user_ids,
                     game_id=self.game_play_id,
+                    surrender_user_ids=metrics["surrender_user_ids"],
+                    player_actions_count=metrics["player_actions_count"],
+                    elapsed_seconds=metrics["elapsed_seconds"],
+                    rounds_played=metrics["rounds_played"],
                 )
             except Exception as e:
                 print(f"[BaseGamePlayClass] Error in score_manager.finish_multiplayer_game: {e}")
@@ -706,6 +743,10 @@ class BaseGamePlayClass:
                         }
                         if self.ai_level is not None:
                             finish_data["ai_level"] = self.ai_level
+                        blocked_uids = getattr(self.score_manager, "early_surrender_blocked_uids", set())
+                        if str(gamer.user_id) in blocked_uids:
+                            finish_data["early_surrender_no_reward"] = True
+                            finish_data["reward_blocked_reason"] = "early_surrender"
                         safe_run_async(
                             send_private_command(
                                 command=make_command_json(
@@ -769,13 +810,18 @@ class BaseGamePlayClass:
             w_idx_lookup = self.user_id_to_index(winner_id) if (winner_id != 0 and winner_id is not None) else -1
             winner_idx = (w_idx_lookup + 1) if w_idx_lookup != -1 else 0
             penalty_user = afk_or_dc_user_id or self.afk_or_dc_penalty_user_id
+            metrics = self._collect_engagement_metrics()
             try:
                 self.score_manager.finish_game(
                     winner_idx,
                     finished_game_types,
                     finished_game_winners,
                     gamer_scores=self.gamer_scores,
-                    afk_or_dc_user_id=penalty_user
+                    afk_or_dc_user_id=penalty_user,
+                    surrender_user_ids=metrics["surrender_user_ids"],
+                    player_actions_count=metrics["player_actions_count"],
+                    elapsed_seconds=metrics["elapsed_seconds"],
+                    rounds_played=metrics["rounds_played"],
                 )
             except Exception as e:
                 print(f"[BaseGamePlayClass] Error in score_manager.finish_game: {e}")
@@ -857,6 +903,10 @@ class BaseGamePlayClass:
                     }
                     if self.ai_level is not None:
                         finish_payload["ai_level"] = self.ai_level
+                    blocked_uids = getattr(self.score_manager, "early_surrender_blocked_uids", set())
+                    if str(gamer.user_id) in blocked_uids:
+                        finish_payload["early_surrender_no_reward"] = True
+                        finish_payload["reward_blocked_reason"] = "early_surrender"
                     if rank1_val is not None:
                         finish_payload["rank1"] = rank1_val
                     if rank2_val is not None:

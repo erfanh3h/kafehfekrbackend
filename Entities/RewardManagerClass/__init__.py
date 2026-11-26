@@ -11,6 +11,7 @@ from Entities.RewardManagerClass.reward_data import (
     multi_rank_rank1_xp, multi_rank_rank2_xp, multi_rank_rank3_xp, multi_rank_rankn_xp,
     calculate_elo_change, calculate_rank_series_xp, calculate_social_xp,
     calculate_classic_rank_rewards, normalize_ai_level, CLASSIC_RANK_DEFAULT_AI_LEVEL,
+    is_classic_rank_surrender_reward_eligible,
     DAILY_FIRST_WIN_XP, DAILY_FIRST_WIN_COIN, WIN_STREAK_XP_BONUS
 )
 
@@ -25,14 +26,50 @@ class RewardManagerClass:
         self.last_awarded_xp = {}
         self.last_awarded_score = {}
         self.last_awarded_coin = {}
+        self.early_surrender_blocked_uids: set[str] = set()
 
     def set_ai_level(self, ai_level):
         self.ai_level = normalize_ai_level(ai_level)
 
+    def _compute_classic_rank_for_player(
+        self,
+        uid,
+        game_type: str,
+        outcome: str,
+        is_penalty: bool,
+        surrender_uid_set: set[str],
+        actions_map: dict,
+        elapsed_seconds: float,
+        rounds_played: int,
+    ) -> tuple[int, int]:
+        lvl = normalize_ai_level(self.ai_level)
+        uid_str = str(uid)
+        if not is_penalty and outcome != "win" and uid_str in surrender_uid_set:
+            if not is_classic_rank_surrender_reward_eligible(
+                elapsed_seconds=elapsed_seconds,
+                player_actions=actions_map.get(uid_str, 0),
+                rounds_played=rounds_played,
+            ):
+                self.early_surrender_blocked_uids.add(uid_str)
+                return 0, 0
+        return calculate_classic_rank_rewards(game_type, ai_level=lvl, outcome=outcome, is_afk_or_dc=is_penalty)
+
     def set_user_data(self, idis):
         self.players_idis = idis
 
-    def finish_game(self, winner_gamer_id, game_types, game_winners, gamer_scores=None, afk_or_dc_user_id=None, leaver_user_id=None):
+    def finish_game(
+        self,
+        winner_gamer_id,
+        game_types,
+        game_winners,
+        gamer_scores=None,
+        afk_or_dc_user_id=None,
+        leaver_user_id=None,
+        surrender_user_ids=None,
+        player_actions_count=None,
+        elapsed_seconds=0.0,
+        rounds_played=1,
+    ):
         # -1 indicates game was terminated before start (e.g. user never joined)
         if winner_gamer_id == -1:
             return
@@ -50,6 +87,7 @@ class RewardManagerClass:
         self.last_awarded_xp = {}
         self.last_awarded_score = {}
         self.last_awarded_coin = {}
+        self.early_surrender_blocked_uids = set()
 
         from Entities.Database import game_database
 
@@ -168,7 +206,8 @@ class RewardManagerClass:
 
         elif self.game_score_type == GameScoreTypesEnum.CLASSIC_RANK:
             g_type = game_types[0] if game_types else ""
-            lvl = normalize_ai_level(self.ai_level)
+            surr_set = {str(u) for u in (surrender_user_ids or []) if u not in (None, "", 0, "0")}
+            act_map = {str(k): int(v or 0) for k, v in (player_actions_count or {}).items()}
             for idx in range(num_players):
                 uid = self.players_idis[idx]
                 gamer_num = idx + 1
@@ -179,7 +218,16 @@ class RewardManagerClass:
                     outcome = "win"
                 else:
                     outcome = "lose"
-                p_xp, p_coin = calculate_classic_rank_rewards(g_type, ai_level=lvl, outcome=outcome, is_afk_or_dc=is_penalty)
+                p_xp, p_coin = self._compute_classic_rank_for_player(
+                    uid=uid,
+                    game_type=g_type,
+                    outcome=outcome,
+                    is_penalty=is_penalty,
+                    surrender_uid_set=surr_set,
+                    actions_map=act_map,
+                    elapsed_seconds=float(elapsed_seconds or 0.0),
+                    rounds_played=int(rounds_played or 1),
+                )
                 rewards_map[str(uid)] = (p_xp, 0, p_coin, None, None)
 
         else:
@@ -270,11 +318,18 @@ class RewardManagerClass:
         afk_or_dc_user_ids=None,
         elimination_order_user_ids=None,
         game_id=None,
+        surrender_user_ids=None,
+        player_actions_count=None,
+        elapsed_seconds=0.0,
+        rounds_played=1,
     ):
         self.game_types = game_types
         self.last_awarded_xp = {}
         self.last_awarded_score = {}
         self.last_awarded_coin = {}
+        self.early_surrender_blocked_uids = set()
+        surr_uid_set = {str(u) for u in (surrender_user_ids or []) if u not in (None, "", 0, "0")}
+        actions_map = {str(k): int(v or 0) for k, v in (player_actions_count or {}).items()}
 
         from Entities.Database import game_database
 
@@ -409,7 +464,6 @@ class RewardManagerClass:
 
             elif self.game_score_type == GameScoreTypesEnum.CLASSIC_RANK:
                 g_type = game_types[0] if game_types else ""
-                lvl = normalize_ai_level(self.ai_level)
                 if is_total_draw:
                     outcome = "draw"
                 elif is_r1:
@@ -417,7 +471,16 @@ class RewardManagerClass:
                 else:
                     outcome = "lose"
                 d_score = 0
-                d_xp, d_coin = calculate_classic_rank_rewards(g_type, ai_level=lvl, outcome=outcome, is_afk_or_dc=is_penalty)
+                d_xp, d_coin = self._compute_classic_rank_for_player(
+                    uid=uid,
+                    game_type=g_type,
+                    outcome=outcome,
+                    is_penalty=is_penalty,
+                    surrender_uid_set=surr_uid_set,
+                    actions_map=actions_map,
+                    elapsed_seconds=float(elapsed_seconds or 0.0),
+                    rounds_played=int(rounds_played or 1),
+                )
 
             else:
                 # LOBBY / NORMAL Multiplayer: Social EXP only, STRICTLY 0 Coins and 0 Score
