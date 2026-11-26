@@ -315,7 +315,7 @@ class BaseGameSession:
 
         data = self.find_gamer_from_gamer_id(gamer_id)
 
-        if data is not None:
+        if data is not None and data.socket_id:
 
             socket_id = data.socket_id
 

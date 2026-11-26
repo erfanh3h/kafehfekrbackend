@@ -134,6 +134,15 @@ class RiskAttackHandler:
             "battle_started": self.battle_started,
         }
 
+    @staticmethod
+    def _parse_nonneg_int(val) -> int:
+        if isinstance(val, bool):
+            return 0
+        try:
+            return max(0, int(val or 0))
+        except (TypeError, ValueError):
+            return 0
+
     def add_attacker_army(self, count: int, gamer_id: int = None, commit: bool = True) -> int:
         # Rule: After attack starts (or once attacker has finalized commitment), players can NO LONGER add new army cards!
         if not self.is_attack_active or self.battle_started or self.attacker_committed:
@@ -142,7 +151,7 @@ class RiskAttackHandler:
         if p_idx != self.source_id or not (0 <= p_idx < len(self.game.players_data)):
             return 0
         player = self.game.players_data[p_idx]
-        req = max(0, int(count or 0))
+        req = self._parse_nonneg_int(count)
         avail = player.count_strategy(RiskStrategyModel.ARMY)
         actual = min(req, avail)
         for _ in range(actual):
@@ -161,7 +170,7 @@ class RiskAttackHandler:
         if p_idx != (self.target_id - 1) or not (0 <= p_idx < len(self.game.players_data)):
             return 0
         player = self.game.players_data[p_idx]
-        req = max(0, int(count or 0))
+        req = self._parse_nonneg_int(count)
         avail = player.count_strategy(RiskStrategyModel.ARMY)
         actual = min(req, avail)
         for _ in range(actual):

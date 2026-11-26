@@ -821,6 +821,7 @@ class RiskGameClass(BaseMultiPlayerGameClass):
             return (
                 self.attack_handler.is_attack_active
                 and self.attack_handler.battle_started
+                and gamer_id == (self.attack_handler.source_id + 1)
                 and self.game_state == RiskGameState.ATTACK
             )
 

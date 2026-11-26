@@ -8,22 +8,51 @@ def make_command_json(id, data=None):
     return {'id': id, 'data': data}
 
 
+def _normalize_game_key(game_type) -> str:
+    val = game_type.value if hasattr(game_type, "value") else str(game_type)
+    return val.lower().replace("_", "").replace("-", "")
+
+
+_EASY_GAME_VALUES = frozenset(
+    _normalize_game_key(gt)
+    for gt in (
+        GameTypesEnum.TIC_TAC_TOE,
+        GameTypesEnum.RPC,
+        GameTypesEnum.DOTBOX,
+        GameTypesEnum.LUDO,
+        GameTypesEnum.MNUMBERS,
+        GameTypesEnum.UNO,
+    )
+)
+
+_HARD_GAME_VALUES = frozenset(
+    _normalize_game_key(gt)
+    for gt in (
+        GameTypesEnum.CHESS,
+        GameTypesEnum.CHECKERS,
+        GameTypesEnum.OTHELLO,
+        GameTypesEnum.BACKGAMMON,
+        GameTypesEnum.YINSH,
+        GameTypesEnum.MILL,
+        GameTypesEnum.RISK,
+        GameTypesEnum.QUORIDOR,
+    )
+)
+
+
 def create_random_name() -> str:
     char_set = string.ascii_uppercase + string.digits
-    random_name = ''.join(random.sample(char_set * 6, 6))
-    return random_name
+    return ''.join(random.choices(char_set, k=6))
 
 
 def create_random_game_id(length=7) -> str:
     char_set = string.ascii_uppercase + string.ascii_lowercase + string.digits
-    result = ''.join(random.sample(char_set * 6, length))
-    return result
+    return ''.join(random.choices(char_set, k=length))
 
 
 def create_random_user_id() -> str:
     char_set = string.ascii_uppercase + string.ascii_lowercase + string.digits
-    result = ''.join(random.sample(char_set * 6, 6))
-    return result
+    return ''.join(random.choices(char_set, k=6))
 
 
 async def get_current_user(token: str):
@@ -44,19 +73,11 @@ async def get_current_user(token: str):
 
 
 def gametype_to_difficulty(game_type):
-    val = game_type.value if hasattr(game_type, "value") else str(game_type)
-    val_norm = val.lower().replace("_", "").replace("-", "")
-
-    easy_types = (GameTypesEnum.TIC_TAC_TOE, GameTypesEnum.RPC, GameTypesEnum.DOTBOX, GameTypesEnum.LUDO, GameTypesEnum.MNUMBERS, GameTypesEnum.UNO)
-    for gt in easy_types:
-        if val_norm == gt.value.lower().replace("_", "").replace("-", ""):
-            return GameDifficultyEnum.Easy
-
-    hard_types = (GameTypesEnum.CHESS, GameTypesEnum.CHECKERS, GameTypesEnum.OTHELLO, GameTypesEnum.BACKGAMMON, GameTypesEnum.YINSH, GameTypesEnum.MILL, GameTypesEnum.RISK, GameTypesEnum.QUORIDOR)
-    for gt in hard_types:
-        if val_norm == gt.value.lower().replace("_", "").replace("-", ""):
-            return GameDifficultyEnum.Hard
-
+    val_norm = _normalize_game_key(game_type)
+    if val_norm in _EASY_GAME_VALUES:
+        return GameDifficultyEnum.Easy
+    if val_norm in _HARD_GAME_VALUES:
+        return GameDifficultyEnum.Hard
     return GameDifficultyEnum.Normal
 
 
@@ -194,5 +215,7 @@ def safe_run_async(coro):
         if main_loop is not None and main_loop.is_running():
             return asyncio.run_coroutine_threadsafe(coro, main_loop)
         loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        return loop.run_until_complete(coro)
+        try:
+            return loop.run_until_complete(coro)
+        finally:
+            loop.close()

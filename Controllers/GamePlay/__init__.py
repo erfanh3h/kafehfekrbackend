@@ -196,7 +196,9 @@ class BaseGamePlayClass:
             "can_add_friend": friend_status in ("none", "incoming_pending"),
         }
 
-    def send_game_play_data(self, socket_id):
+    def send_game_play_data(self, socket_id, post_match_cache: dict | None = None):
+        if not socket_id:
+            return
         is_between = (self.game_session is None or self.game_session.is_game_finished) and not self.is_game_finished
         spec_cnt = 0
         try:
@@ -222,7 +224,7 @@ class BaseGamePlayClass:
                     session_gamer_map[str(sg.user_id)] = sg.gamer_id
         recipient_uid = ""
         for gamer in self.gamers:
-            if socket_id and gamer.socket_id == socket_id:
+            if gamer.socket_id == socket_id:
                 recipient_uid = str(gamer.user_id)
             g_json = gamer.to_json()
             if str(gamer.user_id) in session_gamer_map:
@@ -234,7 +236,12 @@ class BaseGamePlayClass:
             if recipient_uid in blocked_uids:
                 game_data['early_surrender_no_reward'] = True
                 game_data['reward_blocked_reason'] = 'early_surrender'
-            pm = self._build_post_match_payload_for_user(recipient_uid)
+            if post_match_cache is not None and recipient_uid in post_match_cache:
+                pm = post_match_cache[recipient_uid]
+            else:
+                pm = self._build_post_match_payload_for_user(recipient_uid)
+                if post_match_cache is not None:
+                    post_match_cache[recipient_uid] = pm
             game_data['rivalry'] = pm
             if self.is_game_finished:
                 game_data['post_match'] = pm
@@ -244,6 +251,8 @@ class BaseGamePlayClass:
                                  game_id=self.game_play_id, socket_id=socket_id))
 
     def navigate_to_game(self, socket_id, is_reconnect=False):
+        if not socket_id:
+            return
         game_data = {'current_game_index': self.current_game_index, 'games': self.game_types, 'is_reconnect': is_reconnect}
         from Entities.SocketIOManagerClass import send_private_command
         safe_run_async(
@@ -251,6 +260,8 @@ class BaseGamePlayClass:
                                  game_id=self.game_play_id, socket_id=socket_id))
 
     def send_timer_value(self, socket_id):
+        if not socket_id:
+            return
         max_t = self.timer.max_time if self.timer.max_time > 0 else Game_Play_Round_Time
         rem_t = max(1, max_t - self.timer.counter)
         data = {'time': rem_t, 'max_time': max_t}
@@ -608,6 +619,23 @@ class BaseGamePlayClass:
             "rounds_played": rounds_played,
         }
 
+    def _clear_gamers_open_game_id(self, game_database) -> None:
+        for gamer in self.gamers:
+            if str(gamer.user_id).startswith("bot_"):
+                continue
+            try:
+                user_doc = game_database.users_manager.read_user(gamer.user_id)
+                if user_doc is None or user_doc.get("open_game_id", "") in ("", self.game_play_id):
+                    game_database.users_manager.update_user(gamer.user_id, open_game_id="")
+            except Exception as e:
+                print(f"[BaseGamePlayClass] Error clearing open_game_id for {gamer.user_id}: {e}")
+
+    def _get_post_match_cached(self, user_id, post_match_cache: dict) -> dict:
+        uid_str = str(user_id)
+        if uid_str not in post_match_cache:
+            post_match_cache[uid_str] = self._build_post_match_payload_for_user(uid_str)
+        return post_match_cache[uid_str]
+
     def finish_multiplayer_game(self, rank1_id, rank2_id):
         with self._finish_lock:
             if self.is_game_finished:
@@ -675,14 +703,7 @@ class BaseGamePlayClass:
                 )
             except Exception as e:
                 print(f"[BaseGamePlayClass] Error in score_manager.finish_multiplayer_game: {e}")
-            for gamer in self.gamers:
-                if not str(gamer.user_id).startswith("bot_"):
-                    try:
-                        user_doc = game_database.users_manager.read_user(gamer.user_id)
-                        if user_doc is None or user_doc.get("open_game_id", "") in ("", self.game_play_id):
-                            game_database.users_manager.update_user(gamer.user_id, open_game_id="")
-                    except Exception as e:
-                        print(f"[BaseGamePlayClass] Error clearing open_game_id for {gamer.user_id}: {e}")
+            self._clear_gamers_open_game_id(game_database)
             try:
                 game_database.game_play_history_manager.update_game_play_history(
                     self.game_play_id, self.game_winners, self.gamer_scores, winner_id=rank1_id
@@ -722,8 +743,9 @@ class BaseGamePlayClass:
             last_xp = getattr(self.score_manager, "last_awarded_xp", {})
             last_score = getattr(self.score_manager, "last_awarded_score", {})
             last_coin = getattr(self.score_manager, "last_awarded_coin", {})
+            post_match_cache: dict[str, dict] = {}
             for gamer in self.gamers:
-                self.send_game_play_data(gamer.socket_id)
+                self.send_game_play_data(gamer.socket_id, post_match_cache=post_match_cache)
                 if gamer.socket_id:
                     try:
                         earned = last_xp.get(gamer.user_id, last_xp.get(str(gamer.user_id), 0))
@@ -739,7 +761,7 @@ class BaseGamePlayClass:
                             "xp_earned": earned,
                             "score_earned": s_earned,
                             "coin_earned": c_earned,
-                            "post_match": self._build_post_match_payload_for_user(gamer.user_id),
+                            "post_match": self._get_post_match_cached(gamer.user_id, post_match_cache),
                         }
                         if self.ai_level is not None:
                             finish_data["ai_level"] = self.ai_level
@@ -825,14 +847,7 @@ class BaseGamePlayClass:
                 )
             except Exception as e:
                 print(f"[BaseGamePlayClass] Error in score_manager.finish_game: {e}")
-            for gamer in self.gamers:
-                if not str(gamer.user_id).startswith("bot_"):
-                    try:
-                        user_doc = game_database.users_manager.read_user(gamer.user_id)
-                        if user_doc is None or user_doc.get("open_game_id", "") in ("", self.game_play_id):
-                            game_database.users_manager.update_user(gamer.user_id, open_game_id="")
-                    except Exception as e:
-                        print(f"[BaseGamePlayClass] Error clearing open_game_id for {gamer.user_id}: {e}")
+            self._clear_gamers_open_game_id(game_database)
             try:
                 game_database.game_play_history_manager.update_game_play_history(
                     self.game_play_id, self.game_winners, self.gamer_scores, winner_id=winner_id
@@ -883,8 +898,9 @@ class BaseGamePlayClass:
                 rank1_val = getattr(self.game_session.game_controller, "rank1", None)
                 rank2_val = getattr(self.game_session.game_controller, "rank2", None)
 
+            post_match_cache: dict[str, dict] = {}
             for gamer in self.gamers:
-                self.send_game_play_data(gamer.socket_id)
+                self.send_game_play_data(gamer.socket_id, post_match_cache=post_match_cache)
                 if not gamer.socket_id:
                     continue
                 try:
@@ -899,7 +915,7 @@ class BaseGamePlayClass:
                         "xp_earned": earned,
                         "score_earned": s_earned,
                         "coin_earned": c_earned,
-                        "post_match": self._build_post_match_payload_for_user(gamer.user_id),
+                        "post_match": self._get_post_match_cached(gamer.user_id, post_match_cache),
                     }
                     if self.ai_level is not None:
                         finish_payload["ai_level"] = self.ai_level

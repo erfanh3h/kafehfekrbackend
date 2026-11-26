@@ -1,30 +1,23 @@
 import socketio
-from Commons import commands
-from Commons.static_functions import check_ban_and_auto_unban
 from Controllers.SocialSession import social_session
-from Entities.Database import game_database
-from Entities.Security import check_is_token_valid
+from Entities.SocketIOClass._auth_guard import authenticate_namespace_user
 
 
 class SocialSocketNameSpace(socketio.AsyncNamespace):
     """Socket.IO /social namespace for presence, DMs, clan chat, notifications, and invitations."""
 
     async def on_connect(self, socket_id, environ, auth):
-        token_data = await check_is_token_valid(auth)
-        if not token_data:
-            await self.emit("command", {"id": commands.Logout}, to=socket_id, namespace="/social")
-            await self.disconnect(socket_id, namespace="/social")
+        auth_res = await authenticate_namespace_user(
+            self,
+            socket_id,
+            auth,
+            "/social",
+            require_dict_auth=False,
+            disconnect_bot=True,
+        )
+        if auth_res is None:
             return
-        user_id = str(token_data["id"])
-        is_bot = bool(token_data.get('is_bot')) or str(user_id).startswith("bot_")
-        if is_bot:
-            await self.disconnect(socket_id, namespace="/social")
-            return
-        user_data = game_database.users_manager.read_user(user_id)
-        if not user_data or check_ban_and_auto_unban(user_data, game_database.users_manager):
-            await self.emit("command", {"id": commands.Logout, "data": {"reason": "banned", "message": "حساب کاربری شما توسط مدیریت مسدود شده است."}}, to=socket_id, namespace="/social")
-            await self.disconnect(socket_id, namespace="/social")
-            return
+        _token_data, user_data, _is_bot = auth_res
         await social_session.connect_user(socket_id, user_data, self)
 
     async def on_disconnect(self, socket_id):

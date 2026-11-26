@@ -10,7 +10,7 @@ Manages the full lifecycle of spectator sessions across all active matches:
 """
 
 import time
-from datetime import datetime
+from datetime import datetime, timezone
 from Commons import commands
 from Commons.static_functions import make_command_json
 from Controllers.Spectator.spectator_room_manager import SpectatorRoomManager
@@ -201,7 +201,7 @@ class SpectatorSessionManager:
                             "visibility": visibility,
                             "spectator_count": count,
                             "is_running": bool(is_running and not is_fin),
-                            "updated_at": datetime.utcnow(),
+                            "updated_at": datetime.now(timezone.utc).replace(tzinfo=None),
                         }
                     },
                 )
@@ -217,7 +217,7 @@ class SpectatorSessionManager:
                     {
                         "$set": {
                             "spectator_count": int(max(0, count)),
-                            "updated_at": datetime.utcnow(),
+                            "updated_at": datetime.now(timezone.utc).replace(tzinfo=None),
                         }
                     },
                 )
@@ -266,7 +266,7 @@ class SpectatorSessionManager:
                 "game_data": board_state,
                 "timer_data": timer_data,
                 "spectator_count": self.get_spectator_count(gid),
-                "server_time": datetime.utcnow().isoformat(),
+                "server_time": datetime.now(timezone.utc).replace(tzinfo=None).isoformat(),
             },
         )
         await SpectatorRoomManager.broadcast_to_spectators(gid, state_cmd)
@@ -288,7 +288,7 @@ class SpectatorSessionManager:
                     "reactionId": reaction_id,
                 },
                 "spectator_count": self.get_spectator_count(gid),
-                "server_time": datetime.utcnow().isoformat(),
+                "server_time": datetime.now(timezone.utc).replace(tzinfo=None).isoformat(),
             },
         )
         await SpectatorRoomManager.broadcast_to_spectators(gid, state_cmd)
@@ -372,7 +372,7 @@ class SpectatorSessionManager:
                 "winners": winner_ids,
                 "game_winner_id": winner_user_id,
                 "final_data": SpectatorStateSerializer.strip_private_fields(final_payload or {}),
-                "server_time": datetime.utcnow().isoformat(),
+                "server_time": datetime.now(timezone.utc).replace(tzinfo=None).isoformat(),
             },
         )
         if users_map:
@@ -405,7 +405,7 @@ class SpectatorSessionManager:
                         "$set": {
                             "spectator_count": 0,
                             "is_running": False,
-                            "updated_at": datetime.utcnow(),
+                            "updated_at": datetime.now(timezone.utc).replace(tzinfo=None),
                         }
                     },
                 )

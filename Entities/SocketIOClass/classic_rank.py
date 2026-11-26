@@ -3,10 +3,9 @@ Socket.IO Namespace for Classic Rank Matchmaking (/classic-rank).
 """
 
 import socketio
-from Commons import commands
 from Controllers.QueueSession.classic_rank import ClassicRankSession
 from Entities.RewardManagerClass.reward_data import normalize_ai_level
-from Entities.Security import check_is_token_valid
+from Entities.SocketIOClass._auth_guard import authenticate_namespace_user
 from Models.Queuer import QueuerModel
 
 classic_rank_session = ClassicRankSession()
@@ -14,22 +13,22 @@ classic_rank_session = ClassicRankSession()
 
 class ClassicRankSocketNameSpace(socketio.AsyncNamespace):
     async def on_connect(self, socket_id, environ, auth):
-        if not isinstance(auth, dict):
-            await self.disconnect(socket_id, namespace="/classic-rank")
+        auth_res = await authenticate_namespace_user(
+            self,
+            socket_id,
+            auth,
+            "/classic-rank",
+            require_dict_auth=True,
+            check_maintenance=True,
+            check_version=True,
+            check_queue=True,
+        )
+        if auth_res is None:
             return
-        try:
-            token_data = await check_is_token_valid(auth)
-            if token_data is None:
-                await self.emit("command", {"id": commands.Logout}, to=socket_id, namespace="/classic-rank")
-                await self.disconnect(socket_id, namespace="/classic-rank")
-                return
-            user_id = token_data["id"]
-            game_type = auth.get("game_type", "TicTacToe")
-            ai_level = normalize_ai_level(auth.get("ai_level", auth.get("difficulty_level", auth.get("level", 2))))
-        except Exception as e:
-            print(f"[ClassicRankSocket] Auth error: {e}")
-            await self.disconnect(socket_id, namespace="/classic-rank")
-            return
+        token_data, user_data, _is_bot = auth_res
+        user_id = token_data["id"]
+        game_type = auth.get("game_type", "TicTacToe")
+        ai_level = normalize_ai_level(auth.get("ai_level", auth.get("difficulty_level", auth.get("level", 2))))
 
         # Reject if user already has a live active ongoing game in memory
         from Entities.SocketIOClass.game import games
@@ -45,42 +44,6 @@ class ClassicRankSocketNameSpace(socketio.AsyncNamespace):
                         return
 
         await self.enter_room(socket_id, socket_id, namespace="/classic-rank")
-
-        from Entities.Database import game_database
-        from Commons.static_functions import (
-            check_ban_and_auto_unban,
-            get_maintenance_block,
-            is_queue_closed,
-            is_version_allowed,
-        )
-        is_bot = bool(token_data.get('is_bot')) or str(user_id).startswith("bot_")
-        user_data = None
-        if not is_bot:
-            user_data = game_database.users_manager.read_user(user_id)
-            if user_data is None or check_ban_and_auto_unban(user_data, game_database.users_manager):
-                await self.emit("command", {"id": commands.Logout, "data": {"reason": "banned", "message": "حساب کاربری شما توسط مدیریت مسدود شده است."}}, to=socket_id, namespace="/classic-rank")
-                await self.disconnect(socket_id, namespace="/classic-rank")
-                return
-
-            config_data = game_database.config_manager.read_config() or {}
-            maint_msg = get_maintenance_block(config_data)
-            if maint_msg:
-                await self.emit("command", {"id": commands.Logout, "data": {"reason": "maintenance", "message": maint_msg}}, to=socket_id, namespace="/classic-rank")
-                await self.disconnect(socket_id, namespace="/classic-rank")
-                return
-
-            client_ver = str(auth.get("version", "")).strip() if isinstance(auth, dict) else ""
-            if client_ver:
-                allowed_ver = str(config_data.get("allowed_version", "")).strip()
-                if allowed_ver and not is_version_allowed(client_ver, allowed_ver):
-                    await self.emit("command", {"id": commands.Logout, "data": {"reason": "force_update", "message": f"نسخه بازی شما ({client_ver}) قدیمی است. حداقل نسخه مجاز {allowed_ver} می‌باشد."}}, to=socket_id, namespace="/classic-rank")
-                    await self.disconnect(socket_id, namespace="/classic-rank")
-                    return
-
-            if is_queue_closed(config_data):
-                await self.emit("command", {"id": getattr(commands, "Queue_Closed", "QueueClosed"), "data": {"message": "صف مسابقات در حال حاضر توسط مدیریت بسته شده است."}}, to=socket_id, namespace="/classic-rank")
-                await self.disconnect(socket_id, namespace="/classic-rank")
-                return
 
         if user_data is not None:
             username = user_data["username"]

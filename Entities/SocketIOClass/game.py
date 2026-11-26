@@ -103,14 +103,14 @@ def delete_game(game_id):
         from Commons.static_functions import safe_run_async
         from Controllers.Spectator.spectator_session_manager import spectator_session_manager
         if spectator_session_manager.get_spectator_count(str(game_id)) > 0:
-            safe_run_async(spectator_session_manager.on_game_ended(str(game_id), game_play=games.get(game_id), reason="ended"))
+            safe_run_async(spectator_session_manager.on_game_ended(str(game_id), game_play=game_obj, reason="ended"))
     except Exception:
         pass
-    try:
-        if game_id in games:
-            del games[game_id]
-    except Exception:
-        pass
+    for stale_sid, mapped_gid in list(socketid_gameid_pairs.items()):
+        if mapped_gid == game_id:
+            socketid_gameid_pairs.pop(stale_sid, None)
+            socketid_userid_pairs.pop(stale_sid, None)
+    games.pop(game_id, None)
     try:
         while game_id in game_idies:
             game_idies.remove(game_id)
@@ -227,17 +227,11 @@ class GameSocketNameSpace(socketio.AsyncNamespace):
 
 
 def is_game_id_valid(recived_game_id):
-    for game_id in game_idies:
-        if game_id == recived_game_id:
-            return True
-    return False
+    return recived_game_id in games
 
 
 def return_gameid_from_socketid(socket_id):
-    for raw_socket_id in socketid_gameid_pairs.keys():
-        if raw_socket_id == socket_id:
-            return socketid_gameid_pairs[raw_socket_id]
-    return None
+    return socketid_gameid_pairs.get(socket_id)
 
 
 def return_random_idies():

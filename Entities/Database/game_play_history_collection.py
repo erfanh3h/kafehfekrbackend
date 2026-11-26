@@ -1,4 +1,9 @@
-from datetime import datetime
+from datetime import datetime, timezone
+import pymongo
+
+
+def _utc_now_naive() -> datetime:
+    return datetime.now(timezone.utc).replace(tzinfo=None)
 
 
 def create_game_play_history_json(game_play_id, user_idis, game_types, game_score_type, users_info=None, ai_level=None) -> dict:
@@ -18,7 +23,7 @@ def create_game_play_history_json(game_play_id, user_idis, game_types, game_scor
         'visibility': 'everyone',
         'spectator_count': 0,
         'start_date': datetime.now(),
-        'updated_at': datetime.utcnow(),
+        'updated_at': _utc_now_naive(),
         'users_info': users_info or [],
         'winner_id': "",
         'winner_list': [],
@@ -34,6 +39,14 @@ def create_game_play_history_json(game_play_id, user_idis, game_types, game_scor
 class GamePlayHistoryCollectionManager:
     def __init__(self, collection):
         self.collection = collection
+        self.ensure_indexes()
+
+    def ensure_indexes(self):
+        try:
+            self.collection.create_index([("user_ids", pymongo.ASCENDING), ("start_date", pymongo.DESCENDING)])
+            self.collection.create_index([("is_finished", pymongo.ASCENDING), ("is_running", pymongo.ASCENDING)])
+        except Exception:
+            pass
 
     def create_game_play_history(self, game_play_id, user_idis, game_types, game_score_type, users_info=None, ai_level=None):
         game_data = create_game_play_history_json(game_play_id, user_idis, game_types, game_score_type, users_info=users_info, ai_level=ai_level)
@@ -76,7 +89,7 @@ class GamePlayHistoryCollectionManager:
                 "is_finished": True,
                 "is_running": False,
                 "spectator_count": 0,
-                "updated_at": datetime.utcnow(),
+                "updated_at": _utc_now_naive(),
                 "winner_list": list(winner_list) if isinstance(winner_list, (list, tuple)) else [],
                 "user_scores": scores,
             }

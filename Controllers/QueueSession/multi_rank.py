@@ -1,5 +1,4 @@
 from Commons.static_functions import safe_run_async
-import asyncio
 import threading
 import time
 
@@ -12,6 +11,18 @@ from Models.Queuer import QueuerModel
 
 MULTI_RANK_REQUIRED_PLAYERS = 4
 
+_MULTI_RANK_ALIASES = {
+    "ludo": GameTypesEnum.LUDO.value,
+    "risk": GameTypesEnum.RISK.value,
+    "uno": GameTypesEnum.UNO.value,
+    "quiz": GameTypesEnum.QUIZ.value,
+    "coup": GameTypesEnum.COUP.value,
+    "کودتا": GameTypesEnum.COUP.value,
+    "monopoly": GameTypesEnum.MONOPOLY.value,
+    "مونوپولی": GameTypesEnum.MONOPOLY.value,
+    "منوپولی": GameTypesEnum.MONOPOLY.value,
+}
+
 
 class MultiRankQueueSession(BaseQueueSession):
     def __init__(self):
@@ -22,40 +33,25 @@ class MultiRankQueueSession(BaseQueueSession):
         self.quiz_queuers: list[QueuerModel] = []
         self.coup_queuers: list[QueuerModel] = []
         self.monopoly_queuers: list[QueuerModel] = []
+        # Shared mapping referencing the same list objects for uniform queue operations
+        self._queues_by_type: dict[str, list[QueuerModel]] = {
+            GameTypesEnum.LUDO.value: self.ludo_queuers,
+            GameTypesEnum.RISK.value: self.risk_queuers,
+            GameTypesEnum.UNO.value: self.uno_queuers,
+            GameTypesEnum.QUIZ.value: self.quiz_queuers,
+            GameTypesEnum.COUP.value: self.coup_queuers,
+            GameTypesEnum.MONOPOLY.value: self.monopoly_queuers,
+        }
         self._lock = threading.Lock()
 
     @staticmethod
     def normalize_game_type(game_type) -> str:
         raw = str(game_type.value if hasattr(game_type, "value") else game_type).strip().lower()
-        if raw == "ludo":
-            return GameTypesEnum.LUDO.value
-        if raw == "risk":
-            return GameTypesEnum.RISK.value
-        if raw == "uno":
-            return GameTypesEnum.UNO.value
-        if raw == "quiz":
-            return GameTypesEnum.QUIZ.value
-        if raw in ("coup", "کودتا"):
-            return GameTypesEnum.COUP.value
-        if raw in ("monopoly", "مونوپولی", "منوپولی"):
-            return GameTypesEnum.MONOPOLY.value
-        return str(game_type)
+        return _MULTI_RANK_ALIASES.get(raw, str(game_type))
 
     def _get_queue_list(self, game_type):
         norm = self.normalize_game_type(game_type)
-        if norm == GameTypesEnum.LUDO.value:
-            return self.ludo_queuers, GameTypesEnum.LUDO.value
-        if norm == GameTypesEnum.RISK.value:
-            return self.risk_queuers, GameTypesEnum.RISK.value
-        if norm == GameTypesEnum.UNO.value:
-            return self.uno_queuers, GameTypesEnum.UNO.value
-        if norm == GameTypesEnum.QUIZ.value:
-            return self.quiz_queuers, GameTypesEnum.QUIZ.value
-        if norm == GameTypesEnum.COUP.value:
-            return self.coup_queuers, GameTypesEnum.COUP.value
-        if norm == GameTypesEnum.MONOPOLY.value:
-            return self.monopoly_queuers, GameTypesEnum.MONOPOLY.value
-        return None, norm
+        return self._queues_by_type.get(norm), norm
 
     @staticmethod
     def _distinct_queuers(queuer_list: list[QueuerModel]) -> list[QueuerModel]:
@@ -68,16 +64,28 @@ class MultiRankQueueSession(BaseQueueSession):
                 distinct.append(q)
         return distinct
 
+    def _remove_queuer_from_all_locked(self, queuer: QueuerModel) -> None:
+        for q_list in self._queues_by_type.values():
+            if queuer in q_list:
+                q_list.remove(queuer)
+
     def find_gamer_from_user_id(self, user_id):
-        for queuer in list(self.ludo_queuers) + list(self.risk_queuers) + list(self.uno_queuers) + list(self.quiz_queuers) + list(self.coup_queuers) + list(self.monopoly_queuers):
-            if str(queuer.user_id) == str(user_id):
-                return queuer
+        uid_str = str(user_id)
+        with self._lock:
+            for q_list in self._queues_by_type.values():
+                for queuer in q_list:
+                    if str(queuer.user_id) == uid_str:
+                        return queuer
         return None
 
     def find_gamer_from_socket_id(self, socket_id):
-        for queuer in list(self.ludo_queuers) + list(self.risk_queuers) + list(self.uno_queuers) + list(self.quiz_queuers) + list(self.coup_queuers) + list(self.monopoly_queuers):
-            if queuer.socket_id == socket_id:
-                return queuer
+        if not socket_id:
+            return None
+        with self._lock:
+            for q_list in self._queues_by_type.values():
+                for queuer in q_list:
+                    if queuer.socket_id == socket_id:
+                        return queuer
         return None
 
     def can_user_join_queue(self, user_id, socket_id=None) -> bool:
@@ -85,35 +93,13 @@ class MultiRankQueueSession(BaseQueueSession):
         if existing_q is not None:
             if socket_id and existing_q.socket_id == socket_id:
                 with self._lock:
-                    if existing_q in self.ludo_queuers:
-                        self.ludo_queuers.remove(existing_q)
-                    if existing_q in self.risk_queuers:
-                        self.risk_queuers.remove(existing_q)
-                    if existing_q in self.uno_queuers:
-                        self.uno_queuers.remove(existing_q)
-                    if existing_q in self.quiz_queuers:
-                        self.quiz_queuers.remove(existing_q)
-                    if existing_q in self.coup_queuers:
-                        self.coup_queuers.remove(existing_q)
-                    if existing_q in self.monopoly_queuers:
-                        self.monopoly_queuers.remove(existing_q)
+                    self._remove_queuer_from_all_locked(existing_q)
             else:
                 try:
                     from Entities.SocketIOClass import Socket_Server
                     if not Socket_Server.manager.is_connected(existing_q.socket_id, "/multi-queue"):
                         with self._lock:
-                            if existing_q in self.ludo_queuers:
-                                self.ludo_queuers.remove(existing_q)
-                            if existing_q in self.risk_queuers:
-                                self.risk_queuers.remove(existing_q)
-                            if existing_q in self.uno_queuers:
-                                self.uno_queuers.remove(existing_q)
-                            if existing_q in self.quiz_queuers:
-                                self.quiz_queuers.remove(existing_q)
-                            if existing_q in self.coup_queuers:
-                                self.coup_queuers.remove(existing_q)
-                            if existing_q in self.monopoly_queuers:
-                                self.monopoly_queuers.remove(existing_q)
+                            self._remove_queuer_from_all_locked(existing_q)
                     else:
                         return False
                 except Exception:
@@ -121,7 +107,7 @@ class MultiRankQueueSession(BaseQueueSession):
 
         try:
             from Entities.SocketIOClass.game import games
-            for g_id, game_play in list(games.items()):
+            for _g_id, game_play in list(games.items()):
                 if not getattr(game_play, "is_game_finished", False) and not getattr(game_play, "is_game_terminated", False):
                     is_active_fn = getattr(game_play, "is_user_active_in_game", game_play.is_user_id_valid)
                     if is_active_fn(user_id):
@@ -188,18 +174,7 @@ class MultiRankQueueSession(BaseQueueSession):
 
         with self._lock:
             for queuer_data in queuers:
-                if queuer_data in self.ludo_queuers:
-                    self.ludo_queuers.remove(queuer_data)
-                if queuer_data in self.risk_queuers:
-                    self.risk_queuers.remove(queuer_data)
-                if queuer_data in self.uno_queuers:
-                    self.uno_queuers.remove(queuer_data)
-                if queuer_data in self.quiz_queuers:
-                    self.quiz_queuers.remove(queuer_data)
-                if queuer_data in self.coup_queuers:
-                    self.coup_queuers.remove(queuer_data)
-                if queuer_data in self.monopoly_queuers:
-                    self.monopoly_queuers.remove(queuer_data)
+                self._remove_queuer_from_all_locked(queuer_data)
 
         for queuer_data in queuers:
             safe_run_async(
@@ -211,103 +186,26 @@ class MultiRankQueueSession(BaseQueueSession):
             )
 
     def _try_matchmake_once(self) -> bool:
-        ludo_match = None
-        risk_match = None
-        uno_match = None
-        quiz_match = None
-        coup_match = None
-        monopoly_match = None
+        matches: list[tuple[str, list[QueuerModel]]] = []
         with self._lock:
-            distinct_ludo = self._distinct_queuers(self.ludo_queuers)
-            if len(distinct_ludo) >= MULTI_RANK_REQUIRED_PLAYERS:
-                ludo_match = distinct_ludo[:MULTI_RANK_REQUIRED_PLAYERS]
-                matched_uids = {str(q.user_id) for q in ludo_match}
-                self.ludo_queuers = [q for q in self.ludo_queuers if str(q.user_id) not in matched_uids]
+            for game_type_val, q_list in self._queues_by_type.items():
+                distinct = self._distinct_queuers(q_list)
+                if len(distinct) >= MULTI_RANK_REQUIRED_PLAYERS:
+                    matched = distinct[:MULTI_RANK_REQUIRED_PLAYERS]
+                    matched_uids = {str(q.user_id) for q in matched}
+                    # Mutate in-place so attribute aliases (e.g. self.ludo_queuers) stay synchronized
+                    q_list[:] = [q for q in q_list if str(q.user_id) not in matched_uids]
+                    matches.append((game_type_val, matched))
 
-            distinct_risk = self._distinct_queuers(self.risk_queuers)
-            if len(distinct_risk) >= MULTI_RANK_REQUIRED_PLAYERS:
-                risk_match = distinct_risk[:MULTI_RANK_REQUIRED_PLAYERS]
-                matched_uids = {str(q.user_id) for q in risk_match}
-                self.risk_queuers = [q for q in self.risk_queuers if str(q.user_id) not in matched_uids]
-
-            distinct_uno = self._distinct_queuers(self.uno_queuers)
-            if len(distinct_uno) >= MULTI_RANK_REQUIRED_PLAYERS:
-                uno_match = distinct_uno[:MULTI_RANK_REQUIRED_PLAYERS]
-                matched_uids = {str(q.user_id) for q in uno_match}
-                self.uno_queuers = [q for q in self.uno_queuers if str(q.user_id) not in matched_uids]
-
-            distinct_quiz = self._distinct_queuers(self.quiz_queuers)
-            if len(distinct_quiz) >= MULTI_RANK_REQUIRED_PLAYERS:
-                quiz_match = distinct_quiz[:MULTI_RANK_REQUIRED_PLAYERS]
-                matched_uids = {str(q.user_id) for q in quiz_match}
-                self.quiz_queuers = [q for q in self.quiz_queuers if str(q.user_id) not in matched_uids]
-
-            distinct_coup = self._distinct_queuers(self.coup_queuers)
-            if len(distinct_coup) >= MULTI_RANK_REQUIRED_PLAYERS:
-                coup_match = distinct_coup[:MULTI_RANK_REQUIRED_PLAYERS]
-                matched_uids = {str(q.user_id) for q in coup_match}
-                self.coup_queuers = [q for q in self.coup_queuers if str(q.user_id) not in matched_uids]
-            distinct_monopoly = self._distinct_queuers(self.monopoly_queuers)
-            if len(distinct_monopoly) >= MULTI_RANK_REQUIRED_PLAYERS:
-                monopoly_match = distinct_monopoly[:MULTI_RANK_REQUIRED_PLAYERS]
-                matched_uids = {str(q.user_id) for q in monopoly_match}
-                self.monopoly_queuers = [q for q in self.monopoly_queuers if str(q.user_id) not in matched_uids]
-
-        started_any = False
-        if ludo_match is not None:
-            started_any = True
+        for game_type_val, matched in matches:
             threading.Thread(
                 target=self.start_new_game,
-                args=(ludo_match, GameTypesEnum.LUDO.value),
+                args=(matched, game_type_val),
                 daemon=True,
             ).start()
-            self.broadcast_queue_status(GameTypesEnum.LUDO.value)
+            self.broadcast_queue_status(game_type_val)
 
-        if risk_match is not None:
-            started_any = True
-            threading.Thread(
-                target=self.start_new_game,
-                args=(risk_match, GameTypesEnum.RISK.value),
-                daemon=True,
-            ).start()
-            self.broadcast_queue_status(GameTypesEnum.RISK.value)
-
-        if uno_match is not None:
-            started_any = True
-            threading.Thread(
-                target=self.start_new_game,
-                args=(uno_match, GameTypesEnum.UNO.value),
-                daemon=True,
-            ).start()
-            self.broadcast_queue_status(GameTypesEnum.UNO.value)
-
-        if quiz_match is not None:
-            started_any = True
-            threading.Thread(
-                target=self.start_new_game,
-                args=(quiz_match, GameTypesEnum.QUIZ.value),
-                daemon=True,
-            ).start()
-            self.broadcast_queue_status(GameTypesEnum.QUIZ.value)
-
-        if coup_match is not None:
-            started_any = True
-            threading.Thread(
-                target=self.start_new_game,
-                args=(coup_match, GameTypesEnum.COUP.value),
-                daemon=True,
-            ).start()
-            self.broadcast_queue_status(GameTypesEnum.COUP.value)
-        if monopoly_match is not None:
-            started_any = True
-            threading.Thread(
-                target=self.start_new_game,
-                args=(monopoly_match, GameTypesEnum.MONOPOLY.value),
-                daemon=True,
-            ).start()
-            self.broadcast_queue_status(GameTypesEnum.MONOPOLY.value)
-
-        return started_any
+        return bool(matches)
 
     def check_start_new_game(self):
         while True:
@@ -316,38 +214,18 @@ class MultiRankQueueSession(BaseQueueSession):
 
     def join_user(self, user_data: QueuerModel, game_type) -> bool:
         norm_type = self.normalize_game_type(game_type)
-        if norm_type not in (
-            GameTypesEnum.LUDO.value,
-            GameTypesEnum.RISK.value,
-            GameTypesEnum.UNO.value,
-            GameTypesEnum.QUIZ.value,
-            GameTypesEnum.COUP.value,
-            GameTypesEnum.MONOPOLY.value,
-        ):
+        target_list = self._queues_by_type.get(norm_type)
+        if target_list is None:
             return False
         if not self.can_user_join_queue(user_data.user_id, user_data.socket_id):
             return False
 
         user_data.selected_game = norm_type
+        uid_str = str(user_data.user_id)
         with self._lock:
-            self.ludo_queuers = [q for q in self.ludo_queuers if str(q.user_id) != str(user_data.user_id)]
-            self.risk_queuers = [q for q in self.risk_queuers if str(q.user_id) != str(user_data.user_id)]
-            self.uno_queuers = [q for q in self.uno_queuers if str(q.user_id) != str(user_data.user_id)]
-            self.quiz_queuers = [q for q in self.quiz_queuers if str(q.user_id) != str(user_data.user_id)]
-            self.coup_queuers = [q for q in self.coup_queuers if str(q.user_id) != str(user_data.user_id)]
-            self.monopoly_queuers = [q for q in self.monopoly_queuers if str(q.user_id) != str(user_data.user_id)]
-            if norm_type == GameTypesEnum.LUDO.value:
-                self.ludo_queuers.append(user_data)
-            elif norm_type == GameTypesEnum.RISK.value:
-                self.risk_queuers.append(user_data)
-            elif norm_type == GameTypesEnum.UNO.value:
-                self.uno_queuers.append(user_data)
-            elif norm_type == GameTypesEnum.QUIZ.value:
-                self.quiz_queuers.append(user_data)
-            elif norm_type == GameTypesEnum.COUP.value:
-                self.coup_queuers.append(user_data)
-            elif norm_type == GameTypesEnum.MONOPOLY.value:
-                self.monopoly_queuers.append(user_data)
+            for q_list in self._queues_by_type.values():
+                q_list[:] = [q for q in q_list if str(q.user_id) != uid_str]
+            target_list.append(user_data)
 
         self.broadcast_queue_status(norm_type)
         self._try_matchmake_once()
@@ -356,35 +234,11 @@ class MultiRankQueueSession(BaseQueueSession):
     async def disconnect_user(self, socket_id):
         affected_types = []
         with self._lock:
-            for user_data in list(self.ludo_queuers):
-                if socket_id == user_data.socket_id:
-                    self.ludo_queuers.remove(user_data)
-                    affected_types.append(GameTypesEnum.LUDO.value)
-                    break
-            for user_data in list(self.risk_queuers):
-                if socket_id == user_data.socket_id:
-                    self.risk_queuers.remove(user_data)
-                    affected_types.append(GameTypesEnum.RISK.value)
-                    break
-            for user_data in list(self.uno_queuers):
-                if socket_id == user_data.socket_id:
-                    self.uno_queuers.remove(user_data)
-                    affected_types.append(GameTypesEnum.UNO.value)
-                    break
-            for user_data in list(self.quiz_queuers):
-                if socket_id == user_data.socket_id:
-                    self.quiz_queuers.remove(user_data)
-                    affected_types.append(GameTypesEnum.QUIZ.value)
-                    break
-            for user_data in list(self.coup_queuers):
-                if socket_id == user_data.socket_id:
-                    self.coup_queuers.remove(user_data)
-                    affected_types.append(GameTypesEnum.COUP.value)
-                    break
-            for user_data in list(self.monopoly_queuers):
-                if socket_id == user_data.socket_id:
-                    self.monopoly_queuers.remove(user_data)
-                    affected_types.append(GameTypesEnum.MONOPOLY.value)
-                    break
+            for game_type_val, q_list in self._queues_by_type.items():
+                for user_data in list(q_list):
+                    if socket_id == user_data.socket_id:
+                        q_list.remove(user_data)
+                        affected_types.append(game_type_val)
+                        break
         for gt in affected_types:
             self.broadcast_queue_status(gt)

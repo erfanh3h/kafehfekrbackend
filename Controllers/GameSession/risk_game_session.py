@@ -194,9 +194,9 @@ class RiskGameSession(BaseMultiplayerGameSession):
 
         if cmd_id == commands.Draw_Card:
             self._first_turn_started = True
-            self.timer.stop(False)
             draw_type = payload.get('draw_type', data.get('draw_type', 3))
             draw_result = await self.game_controller.recieve_data(cmd_id, data, gamer_id)
+            self.timer.stop(False)
             token_events = list(getattr(self.game_controller, 'last_token_events', []))
             self.game_controller.last_token_events = []
             is_ended, winner_id = self.game_controller.check_end_game()
@@ -264,8 +264,8 @@ class RiskGameSession(BaseMultiplayerGameSession):
             self._sync_timer_pause_state()
 
         elif cmd_id == commands.AttackerArmy:
-            self.timer.stop(False)
             total_committed = await self.game_controller.recieve_data(cmd_id, data, gamer_id)
+            self.timer.stop(False)
             await self._sync_all_private_user_data_async()
             await self.send_command(
                 commands.AttackerArmy,

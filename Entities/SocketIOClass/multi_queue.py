@@ -1,9 +1,8 @@
 import socketio
-from Commons import static_functions
+from Commons import static_functions, commands
 from Controllers.QueueSession.multi_rank import MultiRankQueueSession
-from Entities.Security import check_is_token_valid
+from Entities.SocketIOClass._auth_guard import authenticate_namespace_user
 from Models.Queuer import QueuerModel
-from Commons import commands
 
 multi_rank_queue_session = MultiRankQueueSession()
 multi_rank_queue_session.init_session()
@@ -11,14 +10,19 @@ multi_rank_queue_session.init_session()
 
 class MultiQueueSocketNameSpace(socketio.AsyncNamespace):
     async def on_connect(self, socket_id, environ, auth):
-        if not isinstance(auth, dict):
-            await self.disconnect(socket_id, namespace="/multi-queue")
+        auth_res = await authenticate_namespace_user(
+            self,
+            socket_id,
+            auth,
+            "/multi-queue",
+            require_dict_auth=True,
+            check_maintenance=True,
+            check_version=True,
+            check_queue=True,
+        )
+        if auth_res is None:
             return
-        token_data = await check_is_token_valid(auth)
-        if not token_data:
-            await self.emit('command', {'id': commands.Logout}, to=socket_id, namespace="/multi-queue")
-            await self.disconnect(socket_id, namespace="/multi-queue")
-            return
+        token_data, user_data, _is_bot = auth_res
         user_id = token_data['id']
         raw_game_type = auth.get('game_type')
         if raw_game_type is None:
@@ -29,41 +33,6 @@ class MultiQueueSocketNameSpace(socketio.AsyncNamespace):
             print(f"[MultiQueue] Duplicate queue join rejected for user {user_id} (socket {socket_id})")
             await self.disconnect(socket_id, namespace="/multi-queue")
             return
-        from Entities.Database import game_database
-        from Commons.static_functions import (
-            check_ban_and_auto_unban,
-            get_maintenance_block,
-            is_queue_closed,
-            is_version_allowed,
-        )
-        is_bot = bool(token_data.get('is_bot')) or str(user_id).startswith("bot_")
-        user_data = None
-        if not is_bot:
-            user_data = game_database.users_manager.read_user(user_id)
-            if not user_data or check_ban_and_auto_unban(user_data, game_database.users_manager):
-                await self.emit('command', {'id': commands.Logout, 'data': {'reason': 'banned', 'message': 'حساب کاربری شما توسط مدیریت مسدود شده است.'}}, to=socket_id, namespace="/multi-queue")
-                await self.disconnect(socket_id, namespace="/multi-queue")
-                return
-
-            config_data = game_database.config_manager.read_config() or {}
-            maint_msg = get_maintenance_block(config_data)
-            if maint_msg:
-                await self.emit('command', {'id': commands.Logout, 'data': {'reason': 'maintenance', 'message': maint_msg}}, to=socket_id, namespace="/multi-queue")
-                await self.disconnect(socket_id, namespace="/multi-queue")
-                return
-
-            client_ver = str(auth.get("version", "")).strip() if isinstance(auth, dict) else ""
-            if client_ver:
-                allowed_ver = str(config_data.get("allowed_version", "")).strip()
-                if allowed_ver and not is_version_allowed(client_ver, allowed_ver):
-                    await self.emit('command', {'id': commands.Logout, 'data': {'reason': 'force_update', 'message': f'نسخه بازی شما ({client_ver}) قدیمی است. حداقل نسخه مجاز {allowed_ver} می‌باشد.'}}, to=socket_id, namespace="/multi-queue")
-                    await self.disconnect(socket_id, namespace="/multi-queue")
-                    return
-
-            if is_queue_closed(config_data):
-                await self.emit('command', {'id': getattr(commands, "Queue_Closed", "QueueClosed"), 'data': {'message': 'صف مسابقات در حال حاضر توسط مدیریت بسته شده است.'}}, to=socket_id, namespace="/multi-queue")
-                await self.disconnect(socket_id, namespace="/multi-queue")
-                return
         if not user_data:
             user_data = {"username": "Gamer", "image": 1, "coin": 1000, "score": 1000, "profile_frame": 1}
         await self.enter_room(socket_id, socket_id, namespace="/multi-queue")

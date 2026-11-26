@@ -1,4 +1,5 @@
 from datetime import datetime
+import pymongo
 
 
 def create_game_history_json(game_id, game_play_id, user_idis, game_type, game_score_type, winner_id, users_info=None) -> dict:
@@ -32,6 +33,14 @@ def create_game_history_json(game_id, game_play_id, user_idis, game_type, game_s
 class GameHistoryCollectionManager:
     def __init__(self, collection):
         self.collection = collection
+        self.ensure_indexes()
+
+    def ensure_indexes(self):
+        try:
+            self.collection.create_index([("game_play_id", pymongo.ASCENDING), ("date", pymongo.ASCENDING)])
+            self.collection.create_index([("user_ids", pymongo.ASCENDING), ("date", pymongo.DESCENDING)])
+        except Exception:
+            pass
 
     def create_game_history(self, game_id, game_play_id, user_idis, game_type, game_score_type, winner_id, users_info=None):
         game_data = create_game_history_json(game_id, game_play_id, user_idis, game_type, game_score_type, winner_id, users_info=users_info)

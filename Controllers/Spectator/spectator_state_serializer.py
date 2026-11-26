@@ -7,7 +7,7 @@ Responsible for:
 """
 
 import copy
-from datetime import datetime
+from datetime import datetime, timezone
 from Commons import commands
 
 
@@ -514,7 +514,7 @@ class SpectatorStateSerializer:
             "timer_data": timer_data,
             "disconnected_player": disconnected_player,
             "reconnect_data": reconnect_payload,
-            "server_time": datetime.utcnow().isoformat(),
+            "server_time": datetime.now(timezone.utc).replace(tzinfo=None).isoformat(),
         }
 
     @classmethod
