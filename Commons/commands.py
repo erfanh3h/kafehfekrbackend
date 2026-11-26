@@ -147,6 +147,24 @@ SpectatorGameEnded = "SpectatorGameEnded"
 SpectatorCountUpdated = "SpectatorCountUpdated"
 LiveGamesList = "LiveGamesList"
 
+# Post-Match Rematch & Switch Game Together Commands (Client -> Server)
+Rematch_Request = "RematchRequest"
+Rematch_Respond = "RematchRespond"
+Switch_Game_Request = "SwitchGameRequest"
+Switch_Game_Respond = "SwitchGameRespond"
+PostMatch_Leave = "PostMatchLeave"
+
+# Post-Match Rematch & Switch Game Together Commands (Server -> Client)
+Rematch_Offered = "RematchOffered"
+Rematch_State = "RematchState"
+Rematch_Accepted = "RematchAccepted"
+Rematch_Declined = "RematchDeclined"
+Switch_Game_Offered = "SwitchGameOffered"
+Switch_Game_State = "SwitchGameState"
+Switch_Game_Accepted = "SwitchGameAccepted"
+Switch_Game_Declined = "SwitchGameDeclined"
+
 Social_Error = "SocialError"
 Social_Ack = "SocialAck"
+
 

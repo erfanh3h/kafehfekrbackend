@@ -167,6 +167,11 @@ class SocialSessionManager:
                 clear_sockets=True,
             )
             await self.broadcast_presence_to_peers(uid, pres, namespace_obj, force=True)
+            try:
+                from Controllers.SocialSession.post_match_manager import post_match_manager
+                await post_match_manager.handle_user_disconnected(uid, namespace_obj)
+            except Exception:
+                pass
         else:
             game_database.presence_manager.update_presence(
                 user_id=uid,
@@ -812,6 +817,51 @@ class SocialSessionManager:
                     room=f"user_{pid}",
                     namespace="/social",
                 )
+            return
+
+        # 10. Post-Match Rematch & Switch Game Together (2-player human matches only)
+        if cmd_id == commands.Rematch_Request:
+            if not self._check_rate(uid, "rematch", max_calls=12, window_sec=60.0):
+                await self._send_error(socket_id, "تعداد درخواست‌های بازی مجدد بیش از حد مجاز است.", namespace_obj)
+                return
+            from Controllers.SocialSession.post_match_manager import post_match_manager
+            gid = str(payload.get("game_id", "")).strip()
+            await post_match_manager.handle_rematch_request(uid, gid, namespace_obj)
+            return
+
+        if cmd_id == commands.Rematch_Respond:
+            if not self._check_rate(uid, "rematch_respond", max_calls=20, window_sec=60.0):
+                return
+            from Controllers.SocialSession.post_match_manager import post_match_manager
+            gid = str(payload.get("game_id", "")).strip()
+            action = str(payload.get("action", "decline")).strip()
+            await post_match_manager.handle_rematch_respond(uid, gid, action, namespace_obj)
+            return
+
+        if cmd_id == commands.Switch_Game_Request:
+            if not self._check_rate(uid, "switch_game", max_calls=12, window_sec=60.0):
+                await self._send_error(socket_id, "تعداد درخواست‌های تغییر بازی بیش از حد مجاز است.", namespace_obj)
+                return
+            from Controllers.SocialSession.post_match_manager import post_match_manager
+            gid = str(payload.get("game_id", "")).strip()
+            target_gt = str(payload.get("target_game_type", payload.get("game_type", ""))).strip()
+            open_lobby = bool(payload.get("open_lobby", False))
+            await post_match_manager.handle_switch_game_request(uid, gid, target_gt, open_lobby, namespace_obj)
+            return
+
+        if cmd_id == commands.Switch_Game_Respond:
+            if not self._check_rate(uid, "switch_game_respond", max_calls=20, window_sec=60.0):
+                return
+            from Controllers.SocialSession.post_match_manager import post_match_manager
+            gid = str(payload.get("game_id", "")).strip()
+            action = str(payload.get("action", "decline")).strip()
+            await post_match_manager.handle_switch_game_respond(uid, gid, action, namespace_obj)
+            return
+
+        if cmd_id == commands.PostMatch_Leave:
+            from Controllers.SocialSession.post_match_manager import post_match_manager
+            gid = str(payload.get("game_id", "")).strip()
+            await post_match_manager.handle_post_match_leave(uid, gid, namespace_obj)
             return
 
     async def _send_error(self, socket_id: str, message: str, namespace_obj) -> None:

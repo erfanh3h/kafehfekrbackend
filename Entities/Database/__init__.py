@@ -7,6 +7,7 @@ from Entities.Database.social import (
     InvitationsCollectionManager,
     ReportsCollectionManager,
     PresenceCollectionManager,
+    RivalsCollectionManager,
 )
 import os
 import pymongo
@@ -54,6 +55,7 @@ class DataBaseManager:
         self.invitations_manager = InvitationsCollectionManager(self.base_db["game_invitations"])
         self.reports_manager = ReportsCollectionManager(self.base_db["social_reports"])
         self.presence_manager = PresenceCollectionManager(self.base_db["user_presence"])
+        self.rivals_manager = RivalsCollectionManager(self.base_db["head_to_head_rivals"])
 
         self.questions_manager = QuestionsCollectionManager(self.base_db['questions'])
 

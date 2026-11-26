@@ -110,6 +110,71 @@ class BaseGamePlayClass:
                 return False
         return True
 
+    def _is_bot_match(self) -> bool:
+        try:
+            if getattr(self.game_score_type, "value", str(self.game_score_type or "")).lower() == "classicrank":
+                return True
+            from Entities.Database.social.rivals_collection import is_bot_user_id
+            for g in self.gamers:
+                if bool(getattr(g, "is_bot", False)) or is_bot_user_id(getattr(g, "user_id", "")):
+                    return True
+        except Exception:
+            pass
+        return False
+
+    def _build_post_match_payload_for_user(self, viewer_id) -> dict:
+        if self._is_bot_match():
+            return {"eligible": False, "is_bot_match": True}
+        if len(self.gamers) != 2:
+            return {"eligible": False, "is_bot_match": False}
+        vid = str(viewer_id or "").strip()
+        opp = None
+        for g in self.gamers:
+            if str(g.user_id) != vid:
+                opp = g
+                break
+        if opp is None:
+            return {"eligible": False, "is_bot_match": False}
+        oid = str(opp.user_id)
+        try:
+            from Entities.Database import game_database
+            from Entities.Database.social.rivals_collection import resolve_friend_status_from_db
+            h2h = game_database.rivals_manager.get_head_to_head(
+                vid,
+                oid,
+                history_col=game_database.game_play_history_manager.collection,
+            )
+            friend_status, incoming_req_id = resolve_friend_status_from_db(
+                getattr(game_database, "friends_manager", None),
+                vid,
+                oid,
+            )
+        except Exception as e:
+            print(f"[BaseGamePlayClass] Error building post-match payload: {e}")
+            h2h = {"my_wins": 0, "opp_wins": 0, "draws": 0, "total_matches": 0, "is_arch_rival": False, "last_game_type": ""}
+            friend_status, incoming_req_id = "none", ""
+
+        last_gt = str(self.game_types[-1]) if self.game_types else ""
+        return {
+            "eligible": friend_status != "blocked",
+            "is_bot_match": False,
+            "game_id": self.game_play_id,
+            "game_type": last_gt,
+            "game_score_type": getattr(self.game_score_type, "value", str(self.game_score_type or "")),
+            "opponent_user_id": oid,
+            "opponent_username": str(getattr(opp, "username", "حریف") or "حریف"),
+            "opponent_image": int(getattr(opp, "user_image", 0) or 0),
+            "opponent_profile_frame": int(getattr(opp, "profile_frame", 1) or 1),
+            "my_wins": int(h2h.get("my_wins", 0) or 0),
+            "opp_wins": int(h2h.get("opp_wins", 0) or 0),
+            "draws": int(h2h.get("draws", 0) or 0),
+            "total_matches": int(h2h.get("total_matches", 0) or 0),
+            "is_arch_rival": bool(h2h.get("is_arch_rival", False)),
+            "friend_status": friend_status,
+            "incoming_request_id": incoming_req_id,
+            "can_add_friend": friend_status in ("none", "incoming_pending"),
+        }
+
     def send_game_play_data(self, socket_id):
         is_between = (self.game_session is None or self.game_session.is_game_finished) and not self.is_game_finished
         spec_cnt = 0
@@ -132,12 +197,20 @@ class BaseGamePlayClass:
             for sg in getattr(self.game_session, 'gamers', []):
                 if getattr(sg, 'gamer_id', 0) > 0:
                     session_gamer_map[str(sg.user_id)] = sg.gamer_id
+        recipient_uid = ""
         for gamer in self.gamers:
+            if socket_id and gamer.socket_id == socket_id:
+                recipient_uid = str(gamer.user_id)
             g_json = gamer.to_json()
             if str(gamer.user_id) in session_gamer_map:
                 g_json['gamer_id'] = session_gamer_map[str(gamer.user_id)]
                 g_json['team_id'] = session_gamer_map[str(gamer.user_id)]
             game_data['gamers'].append(g_json)
+        if recipient_uid:
+            pm = self._build_post_match_payload_for_user(recipient_uid)
+            game_data['rivalry'] = pm
+            if self.is_game_finished:
+                game_data['post_match'] = pm
         from Entities.SocketIOManagerClass import send_private_command
         safe_run_async(
             send_private_command(command=make_command_json(id=commands.Game_Play_Data, data=game_data),
@@ -671,6 +744,30 @@ class BaseGamePlayClass:
                 print(f"[BaseGamePlayClass] Error updating game_play_history: {e}")
             self.game_winner_id = winner_id
 
+            # Record Head-to-Head Rival stats and register post-match Rematch/Switch session (strictly human 2P only!)
+            if not self._is_bot_match() and len(self.gamers) == 2:
+                try:
+                    last_gt = str(self.game_types[-1]) if self.game_types else ""
+                    game_database.rivals_manager.record_match_result(
+                        self.gamers[0].user_id,
+                        self.gamers[1].user_id,
+                        winner_id,
+                        game_type=last_gt,
+                        game_id=self.game_play_id,
+                    )
+                except Exception as e:
+                    print(f"[BaseGamePlayClass] Error recording head-to-head rivalry: {e}")
+                try:
+                    from Controllers.SocialSession.post_match_manager import post_match_manager
+                    post_match_manager.register_finished_match(
+                        self.game_play_id,
+                        self.gamers,
+                        self.game_types,
+                        self.game_score_type,
+                    )
+                except Exception as e:
+                    print(f"[BaseGamePlayClass] Error registering post-match session: {e}")
+
             from Entities.SocketIOManagerClass import send_private_command
             last_xp = getattr(self.score_manager, 'last_awarded_xp', {})
             last_score = getattr(self.score_manager, 'last_awarded_score', {})
@@ -704,6 +801,7 @@ class BaseGamePlayClass:
                         "xp_earned": earned,
                         "score_earned": s_earned,
                         "coin_earned": c_earned,
+                        "post_match": self._build_post_match_payload_for_user(gamer.user_id),
                     }
                     if rank1_val is not None:
                         finish_payload["rank1"] = rank1_val
